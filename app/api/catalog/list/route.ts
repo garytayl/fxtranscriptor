@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase not configured" },
+        { error: "Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY" },
         { status: 500 }
       );
     }
@@ -35,6 +35,18 @@ export async function GET(request: NextRequest) {
     const { data: sermons, error } = await query;
 
     if (error) {
+      console.error("Error fetching sermons:", error);
+      if (error.message.includes("relation") || error.message.includes("does not exist")) {
+        return NextResponse.json(
+          { 
+            error: "Database tables not found. Please run the schema.sql file in your Supabase SQL Editor first.",
+            details: error.message,
+            sermons: [],
+            count: 0
+          },
+          { status: 500 }
+        );
+      }
       throw error;
     }
 
@@ -47,6 +59,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
+        sermons: [],
+        count: 0
       },
       { status: 500 }
     );

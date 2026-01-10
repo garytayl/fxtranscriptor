@@ -33,11 +33,31 @@ export async function POST(request: NextRequest) {
       .from("sermons")
       .select("*")
       .eq("id", sermonId)
-      .single();
+      .maybeSingle();
 
-    if (fetchError || !sermon) {
+    if (fetchError) {
+      console.error("Error fetching sermon:", fetchError);
+      if (fetchError.message.includes("relation") || fetchError.message.includes("does not exist")) {
+        return NextResponse.json(
+          { 
+            error: "Database tables not found. Please run the schema.sql file in your Supabase SQL Editor first.",
+            details: fetchError.message
+          },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
-        { error: "Sermon not found" },
+        { 
+          error: "Failed to fetch sermon",
+          details: fetchError.message
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!sermon) {
+      return NextResponse.json(
+        { error: `Sermon with ID "${sermonId}" not found. Try syncing the catalog first.` },
         { status: 404 }
       );
     }

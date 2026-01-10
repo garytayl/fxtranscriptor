@@ -27,10 +27,32 @@ export default function Home() {
     try {
       setLoading(true);
       const response = await fetch("/api/catalog/list");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || `HTTP ${response.status}`;
+        
+        if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
+          console.error("Database setup required:", errorMsg);
+          // Don't show alert on every load, just log it
+        } else {
+          console.error("Error loading sermons:", errorMsg);
+        }
+        
+        setSermons([]);
+        return;
+      }
+      
       const data = await response.json();
       setSermons(data.sermons || []);
+      
+      // If we got an error in the response but 200 status
+      if (data.error && data.error.includes("tables not found")) {
+        console.error("Database setup required:", data.error);
+      }
     } catch (error) {
       console.error("Error loading sermons:", error);
+      setSermons([]);
     } finally {
       setLoading(false);
     }
@@ -40,18 +62,33 @@ export default function Home() {
     try {
       setSyncing(true);
       const response = await fetch("/api/catalog/sync");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
+        
+        if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
+          alert(`❌ Database Setup Required\n\n${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`);
+        } else {
+          alert(`Sync failed: ${errorMsg}${details}`);
+        }
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.success) {
         // Reload sermons after sync
         await loadSermons();
-        alert(`Catalog synced! Found ${data.summary.matchedSermons} sermons. Created: ${data.summary.created}, Updated: ${data.summary.updated}`);
+        alert(`✅ Catalog synced!\n\nFound ${data.summary.matchedSermons} sermons.\nCreated: ${data.summary.created}\nUpdated: ${data.summary.updated}${data.errors && data.errors.length > 0 ? `\n\nErrors: ${data.errors.length}` : ""}`);
       } else {
         alert("Sync failed: " + (data.error || "Unknown error"));
       }
     } catch (error) {
       console.error("Error syncing catalog:", error);
-      alert("Error syncing catalog. Please try again.");
+      const errorMsg = error instanceof Error ? error.message : "Network error";
+      alert(`Error syncing catalog: ${errorMsg}\n\nMake sure:\n1. Database tables exist (run schema.sql)\n2. Supabase credentials are configured\n3. You're connected to the internet`);
     } finally {
       setSyncing(false);
     }
@@ -69,6 +106,30 @@ export default function Home() {
         body: JSON.stringify({ sermonId: sermon.id }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
+        
+        if (errorMsg.includes("not found") && !errorMsg.includes("tables")) {
+          alert(`Sermon not found: ${errorMsg}\n\nTry syncing the catalog first.`);
+        } else if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
+          alert(`❌ Database Setup Required\n\n${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`);
+        } else {
+          alert(`Failed to generate transcript: ${errorMsg}${details}`);
+        }
+        
+        // Update sermon status to failed
+        setSermons((prev) =>
+          prev.map((s) =>
+            s.id === sermon.id
+              ? { ...s, status: "failed" as const, error_message: errorMsg }
+              : s
+          )
+        );
+        return;
+      }
+
       const data = await response.json();
 
       if (data.success && data.sermon) {
@@ -78,19 +139,31 @@ export default function Home() {
         );
         setSelectedSermon(data.sermon);
       } else {
-        alert("Failed to generate transcript: " + (data.error || "Unknown error"));
+        const errorMsg = data.error || "Unknown error";
+        alert(`Failed to generate transcript: ${errorMsg}\n\n${sermon.youtube_url ? "Tried YouTube first, then " : ""}${sermon.podbean_url ? "Podbean. " : ""}Transcript may not be available for this episode.`);
+        
         // Update sermon status to failed
         setSermons((prev) =>
           prev.map((s) =>
             s.id === sermon.id
-              ? { ...s, status: "failed" as const, error_message: data.error }
+              ? { ...s, status: "failed" as const, error_message: errorMsg }
               : s
           )
         );
       }
     } catch (error) {
       console.error("Error generating transcript:", error);
-      alert("Error generating transcript. Please try again.");
+      const errorMsg = error instanceof Error ? error.message : "Network error";
+      alert(`Error generating transcript: ${errorMsg}\n\nMake sure you're connected to the internet and the server is running.`);
+      
+      // Update sermon status to failed
+      setSermons((prev) =>
+        prev.map((s) =>
+          s.id === sermon.id
+            ? { ...s, status: "failed" as const, error_message: errorMsg }
+            : s
+        )
+      );
     } finally {
       setGenerating((prev) => {
         const next = new Set(prev);
