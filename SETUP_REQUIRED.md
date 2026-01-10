@@ -72,7 +72,7 @@ After setting up Supabase, add these to Vercel:
 
 Just provide:
 - ✅ Supabase URL and anon key
-- ✅ Confirm Podbean RSS URL (or provide different one)
-- ✅ Confirm YouTube channel handle (or provide different one)
+- ✅ ~~Podbean RSS URL~~ (CONFIRMED: https://feed.podbean.com/fxtalk/feed.xml)
+- ✅ ~~YouTube channel handle~~ (CONFIRMED: @fxchurch)
 
 Then I'll finish the UI and we're done! 🎉
