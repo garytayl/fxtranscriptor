@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { HeroSection } from "@/components/hero-section";
 import { SideNav } from "@/components/side-nav";
+import { SermonSeriesSection } from "@/components/sermon-series-section";
+import { SeriesDetailView } from "@/components/series-detail-view";
 import { Sermon } from "@/lib/supabase";
+import { groupSermonsBySeries, SermonSeries } from "@/lib/extractSeries";
 import { format } from "date-fns";
 
 export default function Home() {
@@ -17,8 +18,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [selectedSermon, setSelectedSermon] = useState<Sermon | null>(null);
+  const [selectedSeries, setSelectedSeries] = useState<SermonSeries | null>(null);
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+
+  // Group sermons by series
+  const { series: sermonSeries, ungrouped } = useMemo(() => {
+    return groupSermonsBySeries(sermons);
+  }, [sermons]);
 
   // Load sermons on mount
   useEffect(() => {
@@ -194,6 +201,20 @@ export default function Home() {
     } catch (err) {
       alert("Failed to copy to clipboard. Please select and copy manually.");
     }
+  };
+
+  const handleSeriesClick = (series: SermonSeries) => {
+    setSelectedSeries(series);
+    // Scroll to top of detail view
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCloseSeriesDetail = () => {
+    setSelectedSeries(null);
+  };
+
+  const handleViewTranscript = (sermon: Sermon) => {
+    setSelectedSermon(sermon);
   };
 
   const handleDownload = (sermon: Sermon) => {

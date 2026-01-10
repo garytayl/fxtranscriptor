@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { fetchTranscript } from "@/lib/fetchTranscript";
+import { transcribeWithWhisper } from "@/lib/transcribeWithWhisper";
 
 export const runtime = "nodejs";
 
@@ -149,6 +150,44 @@ export async function POST(request: NextRequest) {
           transcript: "",
           error: `Podbean extraction failed: ${podbeanError instanceof Error ? podbeanError.message : "Unknown error"}`,
         };
+      }
+    }
+
+    // Priority 3: Whisper AI fallback (if YouTube and Podbean both failed, and we have audio URL)
+    if (!transcriptResult?.success && sermon.audio_url) {
+      console.log(`[Generate] Attempting Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
+      attemptedUrls.push(`Whisper AI: ${sermon.audio_url.substring(0, 50)}...`);
+      
+      const huggingFaceKey = process.env.HUGGINGFACE_API_KEY;
+      if (!huggingFaceKey || huggingFaceKey.trim().length === 0) {
+        console.log(`[Generate] Whisper AI not configured (HUGGINGFACE_API_KEY missing), skipping...`);
+      } else {
+        try {
+          const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
+          if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
+            console.log(`[Generate] Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
+            transcriptResult = {
+              success: true,
+              transcript: whisperResult.transcript,
+              source: "generated" as const,
+            };
+            transcriptSource = "generated";
+          } else {
+            console.log(`[Generate] Whisper AI transcription failed: ${whisperResult.error || "No transcript"}`);
+            transcriptResult = {
+              success: false,
+              transcript: "",
+              error: whisperResult.error || "Whisper AI transcription failed",
+            };
+          }
+        } catch (whisperError) {
+          console.error(`[Generate] Whisper AI transcription error:`, whisperError);
+          transcriptResult = {
+            success: false,
+            transcript: "",
+            error: `Whisper AI transcription failed: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`,
+          };
+        }
       }
     }
 

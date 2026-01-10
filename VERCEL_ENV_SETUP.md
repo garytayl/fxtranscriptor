@@ -117,12 +117,27 @@ vercel --prod
 - 🔄 **After adding env vars, redeploy** your project for them to take effect
 - ✅ **The `NEXT_PUBLIC_` prefix** is required for client-side accessible variables in Next.js
 
+## Optional (For Better Transcript Extraction)
+
+5. **`YOUTUBE_API_KEY`** (optional, but recommended)
+   - Setup: See `YOUTUBE_API_SETUP.md`
+   - Value: Your YouTube Data API v3 key (starts with `AIzaSy...`)
+   - Note: This helps with caption detection, but download requires OAuth2 (limitation)
+
+6. **`HUGGINGFACE_API_KEY`** (optional, but recommended for fallback transcription)
+   - Setup: See `HUGGINGFACE_SETUP.md`
+   - Value: Your Hugging Face API token (starts with `hf_...`)
+   - Note: Enables Whisper AI transcription for videos without accessible captions
+   - Free tier: 30 hours/month transcription
+
 ## Quick Setup Checklist
 
 - [ ] Set `NEXT_PUBLIC_SUPABASE_URL` on Vercel
 - [ ] Set `NEXT_PUBLIC_SUPABASE_ANON_KEY` on Vercel
 - [ ] (Optional) Set `PODBEAN_RSS_URL` if different from default
 - [ ] (Optional) Set `YOUTUBE_CHANNEL_ID` if different from default
+- [ ] (Recommended) Set `YOUTUBE_API_KEY` for better caption detection
+- [ ] (Recommended) Set `HUGGINGFACE_API_KEY` for Whisper AI fallback transcription
 - [ ] Redeploy project
 - [ ] Test the site works correctly
 
