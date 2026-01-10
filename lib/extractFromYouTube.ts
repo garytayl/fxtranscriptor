@@ -50,13 +50,53 @@ export async function extractFromYouTube(
     console.log(`[YouTube] Fetching transcript for video ID: ${videoId}`);
     
     // Use the youtube-transcript library (free, reliable)
-    // It automatically handles:
-    // - Finding available caption tracks
-    // - Language selection (prefers English, falls back to others)
-    // - Parsing and formatting
-    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, {
-      lang: 'en', // Prefer English, but will fallback to available languages
-    });
+    // Try to get available languages first, then fetch transcript
+    let transcriptItems: any[] = [];
+    
+    try {
+      // Try English first (most common)
+      transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, {
+        lang: 'en',
+      });
+      console.log(`[YouTube] Successfully fetched English transcript (${transcriptItems.length} items)`);
+    } catch (enError) {
+      console.log(`[YouTube] English transcript not available, trying without language specification...`);
+      
+      try {
+        // Try without language specification (gets any available captions)
+        transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+        console.log(`[YouTube] Successfully fetched transcript in any language (${transcriptItems.length} items)`);
+      } catch (anyLangError) {
+        // If that fails, try to get list of available languages
+        console.log(`[YouTube] Attempting to list available languages...`);
+        try {
+          // @ts-ignore - listFormats is available but not in types
+          const formats = await YoutubeTranscript.listFormats?.(videoId).catch(() => null);
+          if (formats) {
+            console.log(`[YouTube] Available languages: ${formats.map((f: any) => f.languageCode).join(', ')}`);
+          }
+        } catch (listError) {
+          // Ignore list error
+        }
+        
+        // Check if error indicates no captions available
+        const errorMessage = (anyLangError instanceof Error ? anyLangError.message : String(anyLangError)).toLowerCase();
+        if (errorMessage.includes('could not retrieve') || 
+            errorMessage.includes('no transcript') ||
+            errorMessage.includes('not available') ||
+            errorMessage.includes('disabled')) {
+          console.log(`[YouTube] No captions available for video ${videoId}`);
+          return { 
+            success: false, 
+            transcript: "", 
+            videoId,
+          };
+        }
+        
+        // Re-throw if it's a different error
+        throw anyLangError;
+      }
+    }
 
     if (transcriptItems && transcriptItems.length > 0) {
       // Combine all transcript items into a single text
@@ -97,25 +137,35 @@ export async function extractFromYouTube(
           transcript,
           videoId,
         };
+      } else {
+        console.log(`[YouTube] Transcript too short (${transcript.length} chars), likely incomplete`);
       }
     }
 
-    console.log(`[YouTube] No transcript found for video ID: ${videoId}`);
+    console.log(`[YouTube] No transcript found for video ID: ${videoId} (no items returned)`);
     return { success: false, transcript: "", videoId };
   } catch (error) {
     console.error(`[YouTube] Error extracting transcript for ${videoId}:`, error);
     
     // Provide helpful error messages
-    if (error instanceof Error) {
-      if (error.message.includes('could not retrieve a transcript')) {
-        return { 
-          success: false, 
-          transcript: "", 
-          videoId,
-        };
-      }
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const lowerError = errorMessage.toLowerCase();
+    
+    if (lowerError.includes('could not retrieve') || 
+        lowerError.includes('no transcript') ||
+        lowerError.includes('not available') ||
+        lowerError.includes('disabled') ||
+        lowerError.includes('does not exist')) {
+      console.log(`[YouTube] Video ${videoId} has no captions available`);
+      return { 
+        success: false, 
+        transcript: "", 
+        videoId,
+      };
     }
     
+    // For other errors, log and return failure
+    console.error(`[YouTube] Unexpected error for ${videoId}:`, errorMessage);
     return { success: false, transcript: "", videoId };
   }
 }

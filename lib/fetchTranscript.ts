@@ -126,6 +126,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
         if (pageResult.success && pageResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(pageResult.transcript);
           if (cleaned.trim().length > 100) {
+            console.log("[fetchTranscript] Page-based YouTube extraction succeeded");
             return {
               success: true,
               title: pageResult.title || "YouTube Video",
@@ -135,6 +136,17 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
             };
           }
         }
+        
+        // If both methods failed, provide helpful error with direct link
+        console.log(`[fetchTranscript] Both YouTube extraction methods failed for video ${videoId}`);
+        const videoLink = `https://www.youtube.com/watch?v=${videoId}`;
+        return {
+          success: false,
+          transcript: "",
+          source: "youtube",
+          videoId: videoId || undefined,
+          error: `No captions available for this YouTube video.\n\nVideo ID: ${videoId}\nVideo Link: ${videoLink}\n\nThis video may not have captions enabled. To check:\n1. Visit the video: ${videoLink}\n2. Click the three dots (⋯) below the video\n3. Select "Show transcript"\n\nIf no transcript appears, captions are not available. You can enable auto-generated captions in YouTube Studio under Video Details > Subtitles.`,
+        };
       }
     }
 
