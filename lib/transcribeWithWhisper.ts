@@ -134,15 +134,32 @@ export async function transcribeWithWhisper(
           continue;
         }
         
-        // If 410 (Gone) - deprecated, but might still work, so try to use it anyway
-        // The deprecation warning says to use router, but router might not be ready yet
+        // If 410 (Gone) - deprecated endpoint, but might still return data
+        // Check if response body contains valid transcript data despite 410 status
         if (response.status === 410) {
+          console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410), checking if response contains data...`);
+          try {
+            const responseText = await response.text();
+            // Try to parse as JSON - if it contains transcript data, use it
+            try {
+              const jsonData = JSON.parse(responseText);
+              if (jsonData.text || (Array.isArray(jsonData) && jsonData.length > 0)) {
+                console.log(`[Whisper] Deprecated endpoint returned valid data, using it...`);
+                // Create a mock Response object with status 200 for downstream processing
+                response = new Response(responseText, { status: 200, headers: response.headers });
+                break;
+              }
+            } catch {
+              // Not JSON, ignore
+            }
+          } catch {
+            // Can't read response, continue to next endpoint
+          }
           const errorText = await response.text().catch(() => '');
           lastError = `${response.status} - ${errorText.substring(0, 100)}`;
-          console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410), but attempting to use it anyway...`);
-          // Don't continue - try to process the response even if deprecated
-          // The endpoint might still work despite the deprecation warning
-          break;
+          console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410) with no valid data, trying next...`);
+          response = null;
+          continue;
         }
         
         // For other status codes, break and handle error below
@@ -156,7 +173,28 @@ export async function transcribeWithWhisper(
     }
     
     if (!response) {
-      throw new Error(`All Hugging Face endpoints failed. Last error: ${lastError || 'Unknown error'}`);
+      const errorMsg = `Hugging Face Inference API endpoints are currently unavailable or migrated.
+
+Last error: ${lastError || 'Unknown error'}
+
+Possible causes:
+• Hugging Face is migrating from api-inference.huggingface.co to router.huggingface.co
+• The router endpoint format may have changed
+• The model may require license acceptance (visit https://huggingface.co/openai/whisper-large-v3)
+
+Solutions:
+1. Check Hugging Face status: https://status.huggingface.co
+2. Try again later (migration may be in progress)
+3. Use an alternative transcription service (OpenAI Whisper API, AssemblyAI)
+4. Accept model license on Hugging Face if required
+
+For updates, check: https://huggingface.co/docs/api-inference`;
+      
+      return {
+        success: false,
+        transcript: "",
+        error: errorMsg,
+      };
     }
 
     if (!response.ok) {
@@ -179,6 +217,22 @@ export async function transcribeWithWhisper(
           success: false,
           transcript: "",
           error: "Hugging Face rate limit exceeded. Free tier allows ~30 hours/month. Please try again later.",
+        };
+      }
+      
+      if (response.status === 404) {
+        return {
+          success: false,
+          transcript: "",
+          error: `Hugging Face endpoint not found (404). The API endpoint format may have changed. 
+
+Current endpoint: ${apiUrl}
+
+Please check Hugging Face documentation for the latest endpoint format:
+https://huggingface.co/docs/api-inference
+
+Or check if the model requires license acceptance:
+https://huggingface.co/openai/whisper-large-v3`,
         };
       }
       
