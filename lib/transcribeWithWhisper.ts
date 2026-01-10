@@ -90,12 +90,11 @@ export async function transcribeWithWhisper(
     const base64Audio = audioBuffer.toString('base64');
     
     // Use the new router endpoint (migrated from api-inference.huggingface.co)
-    // Format: https://router.huggingface.co/models/{model_id}
-    const apiUrl = 'https://router.huggingface.co/models/openai/whisper-large-v3';
-    
-    console.log(`[Whisper] Using Hugging Face Router API: ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
+    // The router endpoint format may differ - try both formats
+    // Format 1: https://router.huggingface.co/{model_id}
+    // Format 2: https://router.huggingface.co/models/{model_id}
+    let apiUrl = 'https://router.huggingface.co/openai/whisper-large-v3';
+    let response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -105,6 +104,24 @@ export async function transcribeWithWhisper(
         inputs: base64Audio,
       }),
     });
+    
+    // If format 1 fails with 404, try format 2
+    if (response.status === 404) {
+      console.log(`[Whisper] Router endpoint format 1 failed (404), trying format 2...`);
+      apiUrl = 'https://router.huggingface.co/models/openai/whisper-large-v3';
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: base64Audio,
+        }),
+      });
+    }
+    
+    console.log(`[Whisper] Using Hugging Face Router API: ${apiUrl} (status: ${response.status})`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
