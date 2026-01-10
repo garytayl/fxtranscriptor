@@ -21,16 +21,64 @@ export default function Home() {
   const [selectedSeries, setSelectedSeries] = useState<SermonSeries | null>(null);
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [playlistSeriesMap, setPlaylistSeriesMap] = useState<Map<string, string>>(new Map());
 
-  // Group sermons by series
+  // Group sermons by series (using playlist data if available)
   const { series: sermonSeries, ungrouped } = useMemo(() => {
-    return groupSermonsBySeries(sermons);
-  }, [sermons]);
+    return groupSermonsBySeries(sermons, playlistSeriesMap);
+  }, [sermons, playlistSeriesMap]);
 
-  // Load sermons on mount
+  // Load sermons and playlists on mount
   useEffect(() => {
     loadSermons();
+    loadPlaylistSeries();
   }, []);
+
+  const loadPlaylistSeries = async () => {
+    try {
+      // Default playlist from FX Church's latest sermon series
+      // Can be extended to fetch from API or environment variable
+      const defaultPlaylists = [
+        "https://youtube.com/playlist?list=PLQwpPWOYg4MOLr9lUNMBgjCCV0ifkKMDu", // Latest series from user
+        // Add more playlists here or fetch from an API endpoint
+      ];
+
+      if (defaultPlaylists.length === 0) return;
+
+      const response = await fetch("/api/playlists/fetch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ playlistUrls: defaultPlaylists }),
+      });
+
+      if (!response.ok) {
+        console.warn("Failed to fetch playlist series data:", response.status);
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.playlists) {
+        // Create a map of sermon IDs to series names from playlists
+        const seriesMap = new Map<string, string>();
+        
+        for (const playlist of data.playlists) {
+          for (const sermonId of playlist.sermonIds || []) {
+            // Use playlist title as series name (already cleaned by API)
+            seriesMap.set(sermonId, playlist.seriesName);
+          }
+        }
+        
+        setPlaylistSeriesMap(seriesMap);
+        console.log(`[Playlist Series] Loaded ${seriesMap.size} sermon-series mappings from ${data.playlists.length} playlists`);
+      }
+    } catch (error) {
+      console.warn("Error loading playlist series data (non-critical):", error);
+      // Don't block the app if playlist fetch fails - fallback to title extraction
+    }
+  };
 
   const loadSermons = async () => {
     try {

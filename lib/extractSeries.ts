@@ -93,8 +93,12 @@ function generateSeriesId(name: string): string {
 
 /**
  * Group sermons by series
+ * Optionally accepts playlist-based series mapping for better organization
  */
-export function groupSermonsBySeries(sermons: Sermon[]): {
+export function groupSermonsBySeries(
+  sermons: Sermon[],
+  playlistSeriesMap?: Map<string, string> // Map of sermon ID -> series name from playlists
+): {
   series: SermonSeries[];
   ungrouped: Sermon[];
 } {
@@ -102,7 +106,13 @@ export function groupSermonsBySeries(sermons: Sermon[]): {
   const ungrouped: Sermon[] = [];
 
   for (const sermon of sermons) {
-    const seriesName = extractSeriesName(sermon.title);
+    // Priority 1: Use playlist-based series name if available
+    let seriesName: string | null | undefined = playlistSeriesMap?.get(sermon.id);
+    
+    // Priority 2: Fallback to title extraction
+    if (!seriesName) {
+      seriesName = extractSeriesName(sermon.title);
+    }
 
     if (seriesName) {
       const seriesId = generateSeriesId(seriesName);
