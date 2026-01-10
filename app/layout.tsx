@@ -17,8 +17,8 @@ const ibmPlexMono = IBM_Plex_Mono({
 const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas" })
 
 export const metadata: Metadata = {
-  title: "FX Transcriptor — Sermon Catalog",
-  description: "Sermon transcript catalog and generator for fxchurch",
+  title: "FX Archive — Sermon Transcript Archive",
+  description: "Sermon transcript archive for FX Church (Foot of the Cross). Automatically syncs from Podbean and YouTube with one-click transcript generation.",
 }
 
 export default function RootLayout({

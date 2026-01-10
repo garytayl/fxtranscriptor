@@ -40,7 +40,7 @@ export function HeroSection() {
       {/* Left vertical label */}
       <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground -rotate-90 origin-left block whitespace-nowrap">
-          FX TRANSCRIPTOR
+          FX ARCHIVE
         </span>
       </div>
 
@@ -48,7 +48,7 @@ export function HeroSection() {
       <div ref={contentRef} className="flex-1 w-full">
         <SplitFlapAudioProvider>
           <div className="relative">
-            <SplitFlapText text="FX TRANSCRIPTOR" speed={80} />
+            <SplitFlapText text="FX ARCHIVE" speed={80} />
             <div className="mt-4">
               <SplitFlapMuteToggle />
             </div>
@@ -56,11 +56,11 @@ export function HeroSection() {
         </SplitFlapAudioProvider>
 
         <h2 className="font-[var(--font-bebas)] text-muted-foreground/60 text-[clamp(1rem,3vw,2rem)] mt-4 tracking-wide">
-          Studies in Sermon Transcription
+          Sermon Transcript Archive
         </h2>
 
         <p className="mt-12 max-w-md font-mono text-sm text-muted-foreground leading-relaxed">
-          Sermon transcript catalog and generator for fxchurch. Automatically syncs from Podbean and YouTube with one-click transcript generation.
+          Sermon transcript archive for FX Church (Foot of the Cross). Automatically syncs from Podbean and YouTube with one-click transcript generation.
         </p>
 
         <div className="mt-16 flex items-center gap-8">
