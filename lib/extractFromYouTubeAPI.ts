@@ -197,7 +197,7 @@ export async function extractFromYouTubeAPI(
             
             if (textParts && textParts.trim().length > 100) {
               captionContent = textParts;
-              console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (${captionContent.length} chars)`);
+              console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (${textParts.length} chars)`);
             }
           }
           
@@ -214,7 +214,7 @@ export async function extractFromYouTubeAPI(
               const vttContent = await vttResponse.text();
               if (vttContent && vttContent.trim().length > 100) {
                 captionContent = vttContent;
-                console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (VTT format, ${captionContent.length} chars)`);
+                console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (VTT format, ${vttContent.length} chars)`);
               }
             }
           }
@@ -230,18 +230,20 @@ export async function extractFromYouTubeAPI(
     }
 
     if (!captionContent || captionContent.trim().length < 100) {
-      console.log(`[YouTube API] Caption content too short (${captionContent.length} chars)`);
+      console.log(`[YouTube API] Caption content too short (${captionContent?.length || 0} chars)`);
       return { success: false, transcript: "", videoId };
     }
 
-    console.log(`[YouTube API] Downloaded caption content (${captionContent.length} chars)`);
+    // At this point, captionContent is guaranteed to be non-null
+    const finalCaptionContent = captionContent;
+    console.log(`[YouTube API] Downloaded caption content (${finalCaptionContent.length} chars)`);
 
     // Parse caption content based on format
     let textContent = '';
     
-    if (captionContent.includes('<tt:') || captionContent.includes('<tt xmlns')) {
+    if (finalCaptionContent.includes('<tt:') || finalCaptionContent.includes('<tt xmlns')) {
       // TTML format (XML)
-      textContent = captionContent
+      textContent = finalCaptionContent
         .replace(/<tt:[^>]*>([^<]*)<\/tt:[^>]*>/gi, '$1 ')
         .replace(/<[^>]*>/g, '')
         .replace(/&quot;/g, '"')
@@ -252,9 +254,9 @@ export async function extractFromYouTubeAPI(
         .replace(/&apos;/g, "'")
         .replace(/\s+/g, ' ')
         .trim();
-    } else if (captionContent.includes('WEBVTT') || captionContent.includes('-->')) {
+    } else if (finalCaptionContent.includes('WEBVTT') || finalCaptionContent.includes('-->')) {
       // VTT/SRT format
-      textContent = captionContent
+      textContent = finalCaptionContent
         .replace(/WEBVTT[\s\S]*?\n\n/, '') // Remove WEBVTT header
         .replace(/\d+\n/g, '') // Remove sequence numbers (SRT)
         .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\n/gi, '') // Remove timestamps
@@ -269,7 +271,7 @@ export async function extractFromYouTubeAPI(
         .trim();
     } else {
       // Plain text
-      textContent = captionContent.trim();
+      textContent = finalCaptionContent.trim();
     }
 
     if (textContent.length < 100) {

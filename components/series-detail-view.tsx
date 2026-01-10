@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, type ReactElement } from "react"
 import { SermonSeries } from "@/lib/extractSeries"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,8 +21,8 @@ interface SeriesDetailViewProps {
   onDownload: (sermon: SermonType) => void
   onCopyTranscript: (transcript: string) => Promise<void>
   generating: Set<string>
-  getStatusBadge: (sermon: SermonType) => JSX.Element
-  getSourceBadge: (source: string | null) => JSX.Element | null
+  getStatusBadge: (sermon: SermonType) => ReactElement
+  getSourceBadge: (source: string | null) => ReactElement | null
   copied: boolean
 }
 
