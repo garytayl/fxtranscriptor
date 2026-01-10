@@ -148,7 +148,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
           transcript: "",
           source: "youtube",
           videoId: videoId || undefined,
-          error: `No captions available for this YouTube video.\n\nVideo ID: ${videoId}\nVideo Link: ${videoLink}\n\nThis video may not have captions enabled. To check:\n1. Visit the video: ${videoLink}\n2. Click the three dots (⋯) below the video\n3. Select "Show transcript"\n\nIf no transcript appears, captions are not available. You can enable auto-generated captions in YouTube Studio under Video Details > Subtitles.`,
+          error: `Unable to extract captions from this YouTube video.\n\nVideo ID: ${videoId}\nVideo Link: ${videoLink}\n\nPossible reasons:\n• Captions are loaded via JavaScript (not accessible to serverless functions)\n• YouTube is blocking automated requests\n• Captions may require authentication\n\nSolutions:\n1. Use YouTube Data API v3 (requires free API key - see YOUTUBE_CAPTION_LIMITATION.md)\n2. Use Whisper AI transcription fallback (free via Hugging Face)\n3. Manually verify captions are enabled on YouTube\n\nNote: Even if you can see captions when visiting YouTube manually, they may not be accessible to automated tools.`,
         };
       }
     }

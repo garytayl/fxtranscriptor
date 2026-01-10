@@ -147,8 +147,8 @@ export default function Home() {
         
         if (!sermon.youtube_url && !sermon.podbean_url) {
           userMessage = "No YouTube or Podbean URL available for this sermon. Cannot generate transcript.";
-        } else if (errorMsg.includes("Unable to extract transcript")) {
-          userMessage = `No transcript found for this sermon.${attemptedUrls}\n\nPossible reasons:\n• Video has no captions enabled\n• Podbean episode has no transcript\n• Transcript is not publicly accessible\n\nYou may need to:\n• Enable captions on YouTube video\n• Add transcript to Podbean episode\n• Use Whisper AI transcription (coming soon)`;
+        } else if (errorMsg.includes("Unable to extract transcript") || errorMsg.includes("Unable to extract captions")) {
+          userMessage = `Unable to extract transcript from this sermon.${attemptedUrls}\n\nPossible reasons:\n• YouTube captions load via JavaScript (not accessible to automated tools)\n• Video captions require authentication\n• Podbean episode has no transcript\n\nSolutions:\n• YouTube Data API v3 can access these captions (requires free API key)\n• Whisper AI transcription can generate transcript from audio (free via Hugging Face)\n• See YOUTUBE_CAPTION_LIMITATION.md for details\n\nNote: Even if you can see captions on YouTube, they may not be accessible to automated extraction.`;
         }
         
         alert(userMessage);
