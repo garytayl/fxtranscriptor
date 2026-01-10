@@ -255,6 +255,10 @@ export async function extractFromYouTubePage(
         console.log(`[YouTube Page] Found ytInitialPlayerResponse, parsing...`);
         const playerResponse = JSON.parse(playerResponseMatch[1]);
         
+        // Debug: Check if captions object exists
+        console.log(`[YouTube Page] Player response has captions:`, !!playerResponse?.captions);
+        console.log(`[YouTube Page] Captions structure:`, playerResponse?.captions ? Object.keys(playerResponse.captions) : 'none');
+        
         // Find caption tracks in multiple possible locations
         captionTracks = 
           playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
@@ -262,7 +266,51 @@ export async function extractFromYouTubePage(
           playerResponse?.captionTracks ||
           [];
         
+        // Also check in different nested structures
+        if (captionTracks.length === 0) {
+          // Check if captions is an object with a different structure
+          if (playerResponse?.captions) {
+            const captionsObj = playerResponse.captions;
+            // Try to find captionTracks anywhere in the captions object
+            const searchForCaptionTracks = (obj: any, depth = 0): any[] => {
+              if (depth > 3) return []; // Limit recursion depth
+              if (Array.isArray(obj)) {
+                for (const item of obj) {
+                  if (item?.baseUrl && (item?.languageCode || item?.lang)) {
+                    return [item];
+                  }
+                  const found = searchForCaptionTracks(item, depth + 1);
+                  if (found.length > 0) return found;
+                }
+              } else if (obj && typeof obj === 'object') {
+                // Check if this object has baseUrl and looks like a caption track
+                if (obj.baseUrl && (obj.languageCode || obj.lang)) {
+                  return [obj];
+                }
+                // Recursively search all properties
+                for (const key in obj) {
+                  if (key === 'captionTracks' && Array.isArray(obj[key])) {
+                    return obj[key];
+                  }
+                  const found = searchForCaptionTracks(obj[key], depth + 1);
+                  if (found.length > 0) return found;
+                }
+              }
+              return [];
+            };
+            
+            const foundTracks = searchForCaptionTracks(captionsObj);
+            if (foundTracks.length > 0) {
+              captionTracks = foundTracks;
+              console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks via recursive search`);
+            }
+          }
+        }
+        
         console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks in ytInitialPlayerResponse`);
+        if (captionTracks.length > 0) {
+          console.log(`[YouTube Page] Caption track languages:`, captionTracks.map((t: any) => t.languageCode || t.lang || 'unknown').join(', '));
+        }
       } catch (e) {
         console.error(`[YouTube Page] Error parsing ytInitialPlayerResponse:`, e);
       }
