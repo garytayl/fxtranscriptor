@@ -142,16 +142,28 @@ export function SeriesDetailView({
               {getStatusBadge(sermon)}
               {sermon.transcript_source && getSourceBadge(sermon.transcript_source)}
               {sermon.podbean_url && (
-                <Badge variant="outline" className="gap-1 text-xs">
+                <a
+                  href={sermon.podbean_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs font-mono transition-colors hover:border-accent hover:text-accent"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <ExternalLink className="size-3" />
                   Podbean
-                </Badge>
+                </a>
               )}
               {sermon.youtube_url && (
-                <Badge variant="outline" className="gap-1 text-xs">
+                <a
+                  href={sermon.youtube_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs font-mono transition-colors hover:border-accent hover:text-accent"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <ExternalLink className="size-3" />
                   YouTube
-                </Badge>
+                </a>
               )}
             </div>
 

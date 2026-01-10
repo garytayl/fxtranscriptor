@@ -370,6 +370,28 @@ export default function Home() {
                   </span>
                 )}
                 {selectedSermon?.transcript_source && getSourceBadge(selectedSermon.transcript_source)}
+                {selectedSermon?.podbean_url && (
+                  <a
+                    href={selectedSermon.podbean_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <ExternalLink className="size-3" />
+                    Podbean
+                  </a>
+                )}
+                {selectedSermon?.youtube_url && (
+                  <a
+                    href={selectedSermon.youtube_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <ExternalLink className="size-3" />
+                    YouTube
+                  </a>
+                )}
               </DialogDescription>
             </DialogHeader>
 

@@ -80,9 +80,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Match sermons (deduplicate)
-    console.log("Matching sermons...");
+    console.log("[Sync] Matching sermons...");
     const matchedSermons = matchSermons(podbeanEpisodes, youtubeVideos);
-    console.log(`Matched ${matchedSermons.length} unique sermons`);
+    
+    // Calculate match statistics
+    const matchedCount = matchedSermons.filter(m => m.podbeanEpisode && m.youtubeVideo).length;
+    const podbeanOnlyCount = matchedSermons.filter(m => m.podbeanEpisode && !m.youtubeVideo).length;
+    const youtubeOnlyCount = matchedSermons.filter(m => m.youtubeVideo && !m.podbeanEpisode).length;
+    const withAudioUrlCount = matchedSermons.filter(m => m.podbeanEpisode?.audioUrl).length;
+    
+    console.log(`[Sync] Matching complete: ${matchedSermons.length} total sermons`);
+    console.log(`[Sync] Statistics: ${matchedCount} matched (both sources), ${podbeanOnlyCount} Podbean-only, ${youtubeOnlyCount} YouTube-only`);
+    console.log(`[Sync] Audio URLs available: ${withAudioUrlCount}/${matchedSermons.length} (${(withAudioUrlCount / matchedSermons.length * 100).toFixed(1)}%)`);
 
     if (matchedSermons.length === 0) {
       return NextResponse.json({
@@ -96,12 +105,93 @@ export async function GET(request: NextRequest) {
       }, { status: 404 });
     }
 
+    // Reverse lookup: Find existing YouTube-only sermons and try to match with Podbean episodes
+    console.log(`[Sync] Performing reverse lookup for existing YouTube-only sermons...`);
+    let reverseMatchedCount = 0;
+    try {
+      const { data: existingYouTubeOnlySermons, error: fetchError } = await supabase
+        .from("sermons")
+        .select("id, title, youtube_url, youtube_video_id, date")
+        .is("podbean_url", null)
+        .not("youtube_url", "is", null);
+      
+      if (!fetchError && existingYouTubeOnlySermons && existingYouTubeOnlySermons.length > 0) {
+        console.log(`[Sync] Found ${existingYouTubeOnlySermons.length} existing YouTube-only sermons, attempting to match...`);
+        
+        // Helper functions for reverse lookup (simplified versions)
+        const normalizeTitleForMatch = (title: string): string => {
+          return title.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        };
+        
+        const calculateSimpleTitleSimilarity = (title1: string, title2: string): number => {
+          const words1 = new Set(title1.split(' ').filter(w => w.length > 2));
+          const words2 = new Set(title2.split(' ').filter(w => w.length > 2));
+          const intersection = new Set([...words1].filter(x => words2.has(x)));
+          const union = new Set([...words1, ...words2]);
+          return union.size === 0 ? 0 : intersection.size / union.size;
+        };
+        
+        const calculateSimpleDateProximity = (date1: Date, date2: Date): number => {
+          const diffMs = Math.abs(date1.getTime() - date2.getTime());
+          const diffDays = diffMs / (1000 * 60 * 60 * 24);
+          if (diffDays <= 1) return 1.0;
+          if (diffDays <= 7) return 1.0 - (diffDays - 1) / 6;
+          return 0;
+        };
+        
+        for (const existingSermon of existingYouTubeOnlySermons) {
+          // Try to find matching Podbean episode by title/date
+          const bestMatch = podbeanEpisodes.find(pb => {
+            const normalizedExisting = normalizeTitleForMatch(existingSermon.title || '');
+            const normalizedPodbean = normalizeTitleForMatch(pb.title);
+            const titleSimilarity = calculateSimpleTitleSimilarity(normalizedExisting, normalizedPodbean);
+            
+            const titleMatch = titleSimilarity >= 0.6;
+            
+            const dateMatch = existingSermon.date && pb.date
+              ? calculateSimpleDateProximity(new Date(existingSermon.date), pb.date) > 0.5
+              : false;
+            
+            return titleMatch && dateMatch;
+          });
+          
+          if (bestMatch) {
+            // Update existing sermon with Podbean data
+            const { error: updateError } = await supabase
+              .from("sermons")
+              .update({
+                podbean_url: bestMatch.url,
+                audio_url: bestMatch.audioUrl || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existingSermon.id);
+            
+            if (!updateError) {
+              reverseMatchedCount++;
+              console.log(`[Sync] ✅ Reverse matched existing YouTube-only sermon: "${existingSermon.title?.substring(0, 50)}..." with Podbean episode`);
+            }
+          }
+        }
+        
+        if (reverseMatchedCount > 0) {
+          console.log(`[Sync] Reverse lookup: ${reverseMatchedCount} existing YouTube-only sermons matched with Podbean episodes`);
+        }
+      }
+    } catch (reverseLookupError) {
+      console.warn(`[Sync] Reverse lookup failed (non-critical):`, reverseLookupError);
+    }
+
     // Store in Supabase
-    console.log(`Storing ${matchedSermons.length} sermons in database...`);
+    console.log(`[Sync] Storing ${matchedSermons.length} sermons in database...`);
     
     const results = {
       created: 0,
       updated: 0,
+      matched: matchedCount,
+      podbeanOnly: podbeanOnlyCount,
+      youtubeOnly: youtubeOnlyCount,
+      withAudioUrl: withAudioUrlCount,
+      reverseMatched: reverseMatchedCount,
       errors: [] as string[],
     };
 
@@ -157,6 +247,39 @@ export async function GET(request: NextRequest) {
 
         if (existingSermonId) {
           // Update existing sermon
+          // Preserve audio_url if it already exists and new match doesn't have one
+          const { data: existingSermon, error: fetchExistingError } = await supabase
+            .from("sermons")
+            .select("audio_url, podbean_url, youtube_url")
+            .eq("id", existingSermonId)
+            .maybeSingle();
+          
+          if (fetchExistingError) {
+            throw new Error(`Failed to fetch existing sermon: ${fetchExistingError.message}`);
+          }
+          
+          // If existing sermon has audio_url but new match doesn't, preserve it
+          if (existingSermon?.audio_url && !sermonData.audio_url) {
+            sermonData.audio_url = existingSermon.audio_url;
+            console.log(`[Sync] Preserved existing audio_url for sermon: ${matched.title.substring(0, 50)}...`);
+          }
+          
+          // If existing sermon has YouTube URL but new match has Podbean, try to merge
+          if (existingSermon?.youtube_url && !sermonData.youtube_url && matched.youtubeVideo?.url) {
+            sermonData.youtube_url = existingSermon.youtube_url;
+            sermonData.youtube_video_id = existingSermon.youtube_url.match(/[?&]v=([^&]+)/)?.[1] || null;
+            console.log(`[Sync] Merging YouTube URL from existing sermon: ${matched.title.substring(0, 50)}...`);
+          }
+          
+          // If existing sermon has Podbean URL but new match has YouTube, try to merge
+          if (existingSermon?.podbean_url && !sermonData.podbean_url && matched.podbeanEpisode?.url) {
+            sermonData.podbean_url = existingSermon.podbean_url;
+            if (matched.podbeanEpisode?.audioUrl) {
+              sermonData.audio_url = matched.podbeanEpisode.audioUrl;
+            }
+            console.log(`[Sync] Merging Podbean URL from existing sermon: ${matched.title.substring(0, 50)}...`);
+          }
+          
           const { error: updateError } = await supabase
             .from("sermons")
             .update(sermonData)
@@ -166,6 +289,7 @@ export async function GET(request: NextRequest) {
             throw new Error(`Update failed: ${updateError.message}`);
           }
           results.updated++;
+          console.log(`[Sync] Updated existing sermon: ${matched.title.substring(0, 50)}...`);
         } else {
           // Create new sermon
           const { data: newSermon, error: insertError } = await supabase
@@ -177,6 +301,7 @@ export async function GET(request: NextRequest) {
           if (insertError) {
             throw new Error(`Insert failed: ${insertError.message}`);
           }
+          console.log(`[Sync] Created new sermon: ${matched.title.substring(0, 50)}... (has audio_url: ${!!sermonData.audio_url})`);
           
           if (!newSermon) {
             throw new Error("Insert succeeded but no data returned");
