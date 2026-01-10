@@ -1,133 +1,210 @@
 # FX Transcriptor
 
-A Next.js web app that extracts clean, copyable transcripts from multiple podcast and video sources using a **multi-source aggregation strategy**.
+A modern sermon transcript catalog system for fxchurch. Automatically syncs sermons from Podbean and YouTube, with one-click transcript generation that's shared across all users.
 
-## Features
+## ✨ Features
 
-- 🎬 **YouTube Support** - Auto-extracts captions from YouTube videos (most reliable)
-- 🎙️ **Podbean Support** - Extracts transcripts from Podbean episodes
-- 📝 **Clean Transcripts** - Automatically cleaned and formatted text
-- 📋 **Copy All** - One-click copy to clipboard
-- 💾 **Download** - Save transcripts as `.txt` files
-- 🔄 **Multi-Source Strategy** - Automatically selects best available transcript source
-- 🚀 **Vercel-Ready** - Optimized for serverless deployment
-- 📊 **Source Tracking** - Shows which source was used (YouTube/Podbean/Apple)
+- 📚 **Automatic Catalog** - Syncs all 818+ sermons from Podbean RSS and YouTube channel
+- 🔄 **Smart Deduplication** - Matches sermons across platforms (no duplicates)
+- 🎬 **Multi-Source** - Extracts transcripts from YouTube (auto-captions) or Podbean
+- 💾 **Persistent Storage** - Transcripts stored in Supabase (shared across all users)
+- ⚡ **Generate Once** - Click "Generate" once per sermon, all users see it
+- 🎨 **Beautiful UI** - Dark, monochrome design with orange accents (interface template)
+- 📋 **Copy & Download** - Easy transcript copying and .txt downloads
 
-## How It Works
+## 🚀 Quick Start
 
-The app uses a **priority-based multi-source strategy**:
+### 1. Supabase Setup (Already Done ✅)
 
-### 🥇 Priority 1: YouTube (Most Reliable)
-- Auto-generated captions available for most videos
-- Parses YouTube's caption tracks from video pages
-- Converts captions to clean paragraph text
+- Project URL: `https://mfzrunlgkpbtiwuzmivq.supabase.co`
+- Credentials are configured in code
 
-### 🥈 Priority 2: Podbean (Primary Podcast Host)
-- Extracts transcripts from Podbean episode pages
-- Falls back to RSS feed metadata if available
-- Captures audio URL for future Whisper fallback
+**Next Step**: Run the database schema:
+1. Go to: https://supabase.com/dashboard/project/mfzrunlgkpbtiwuzmivq/sql
+2. Click "New Query"
+3. Copy and paste the entire contents of `supabase/schema.sql`
+4. Click "Run" (Cmd/Ctrl + Enter)
 
-### 🥉 Priority 3: Apple Podcasts (Limited)
-- Metadata-only pages, usually no transcripts
-- Attempts VTT file detection and RSS feed parsing
-- Provides helpful error messages directing to better sources
+### 2. Environment Variables (Optional)
 
-### 🎯 Fallback: Generic HTML Extraction
-- Best-effort extraction from any HTML page
-- Useful for custom podcast hosts
-
-All extraction happens **server-side** to avoid CORS issues.
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-
-### Installation
+Create `.env.local` in the project root (optional - defaults are set):
 
 ```bash
-# Install dependencies
-npm install
+NEXT_PUBLIC_SUPABASE_URL=https://mfzrunlgkpbtiwuzmivq.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+PODBEAN_RSS_URL=https://feed.podbean.com/fxtalk/feed.xml
+YOUTUBE_CHANNEL_ID=@fxchurch
+```
 
-# Run development server
+**Note**: The app will work with hardcoded values, but using `.env.local` is recommended for production.
+
+### 3. Run the App
+
+```bash
+npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Visit http://localhost:3000
 
-### Build for Production
+### 4. Sync Your Catalog
 
-```bash
-npm run build
-npm start
-```
+1. Click **"Sync Catalog"** button in the UI
+2. The app will fetch all episodes from:
+   - Podbean RSS: https://feed.podbean.com/fxtalk/feed.xml (818 episodes)
+   - YouTube Channel: @fxchurch
+3. Sermons are matched and deduplicated automatically
 
-## Deployment to Vercel
+### 5. Generate Transcripts
 
-1. Push your code to GitHub
-2. Import the repository in Vercel
-3. Vercel will automatically detect Next.js and configure settings
-4. Deploy!
+1. Click **"Generate Transcript"** on any sermon card
+2. The app tries YouTube first (auto-captions), then Podbean
+3. Once generated, the transcript is stored permanently
+4. All users can view it immediately (no need to regenerate)
 
-The app is configured for Vercel's serverless functions with Node.js runtime.
+## 🎯 How It Works
 
-## Usage
+### Catalog Sync Flow
 
-### Best Results (Recommended)
-1. **YouTube Video URL** - Paste any YouTube video URL (auto-generated captions)
-2. **Podbean Episode URL** - Paste a Podbean episode page URL
-3. Click "Fetch Transcript"
-4. Copy or download the clean transcript
+1. **Fetch Sources**:
+   - Podbean RSS feed → Parse all episodes
+   - YouTube channel → Parse all videos
 
-### Supported URLs
-- YouTube: `https://youtube.com/watch?v=...` or `https://youtu.be/...`
-- Podbean: `https://fxtalk.podbean.com/...`
-- Apple Podcasts: `https://podcasts.apple.com/...` (limited success)
+2. **Match & Deduplicate**:
+   - Title-based matching algorithm
+   - Combines Podbean + YouTube into single sermon entries
+   - No duplicates in the catalog
 
-### Why YouTube Works Best
-YouTube auto-generates captions for most videos, making it the **most reliable source** for transcripts. Even if your podcast is primarily hosted on Podbean, if episodes are also posted to YouTube, use the YouTube URL for best results.
+3. **Store in Database**:
+   - Each sermon stored once with all source URLs
+   - Status tracked: `pending` → `generating` → `completed` / `failed`
 
-## Error Handling
+### Transcript Generation Flow
 
-If a transcript cannot be extracted, the app will display a clear error message with suggestions. Common scenarios:
+1. **User clicks "Generate"** on a sermon card
+2. **Priority extraction**:
+   - 🥇 YouTube URL (if available) → Auto-generated captions
+   - 🥈 Podbean URL (if YouTube fails) → Episode page extraction
+   - 🥉 Apple Podcasts (fallback) → Limited success
 
-- **Podbean**: Transcript may need to be manually generated on Podbean first
-- **Apple Podcasts**: Pages are metadata-only; try YouTube or Podbean URL instead
-- **YouTube**: Video may not have captions enabled (rare for public videos)
-- **Network errors**: Server timeout or unreachable host
+3. **Store & Share**:
+   - Transcript saved to Supabase
+   - Status updated to `completed`
+   - All users can immediately view/copy/download
 
-The app shows which source it attempted and provides helpful suggestions for alternatives.
+## 📊 Database Schema
 
-## Architecture
+- **`sermons`** - Main catalog table
+  - Stores sermon metadata, transcript, status
+  - Links to Podbean and YouTube URLs
+  
+- **`sermon_sources`** - Source tracking
+  - Tracks where each sermon came from
+  - Prevents duplicate entries across platforms
 
-```
-/app
-  /api/transcript/route.ts    # POST endpoint for transcript extraction
-  /page.tsx                   # Main UI component
-/lib
-  fetchTranscript.ts          # Orchestrator (tiered strategy)
-  extractFromVTT.ts          # WebVTT parser
-  extractFromHTML.ts         # HTML extraction fallback
-  extractFromRSS.ts          # RSS feed extraction
-  cleanTranscript.ts         # Text normalization
-```
+See `supabase/schema.sql` for full schema.
 
-## Technical Stack
+## 🎨 UI Features
+
+- **Grid Layout** - Responsive 3-column sermon cards
+- **Status Badges** - Visual status indicators (Pending/Generating/Completed/Failed)
+- **Source Badges** - Shows transcript source (YouTube/Podbean/Generated)
+- **Modal Transcript Viewer** - Large dialog for reading transcripts
+- **Copy & Download** - One-click actions for transcripts
+- **Loading States** - Skeleton loaders and spinner animations
+- **Error Handling** - Clear error messages with retry options
+
+## 🔧 Technical Stack
 
 - **Framework**: Next.js 16 (App Router)
-- **Runtime**: Node.js (for flexible server-side fetching)
-- **Styling**: Tailwind CSS
+- **Database**: Supabase (PostgreSQL)
+- **Styling**: Tailwind CSS v4 + Interface template (dark, monochrome)
 - **Icons**: Lucide React
-- **TypeScript**: Full type safety
+- **UI Components**: Custom shadcn/ui-based components
+- **Fonts**: IBM Plex Sans/Mono, Bebas Neue
 
-## Limitations
+## 📝 API Routes
 
-- Transcripts must be publicly accessible
-- Some podcasts may not have transcripts available
-- Large transcripts may take longer to process (15s timeout)
+- `GET /api/catalog/sync` - Fetch and sync sermons from sources
+- `GET /api/catalog/list` - Get all sermons from database
+- `POST /api/catalog/generate` - Generate transcript for a sermon
+- `POST /api/transcript` - Legacy URL-based transcript extraction
 
-## License
+## 🚢 Deployment
 
-MIT
+### Vercel (Recommended)
+
+1. Push code to GitHub
+2. Import project in Vercel
+3. Add environment variables (optional - defaults work)
+4. Deploy!
+
+The app is fully configured for Vercel serverless functions.
+
+### Environment Variables for Vercel
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://mfzrunlgkpbtiwuzmivq.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+PODBEAN_RSS_URL=https://feed.podbean.com/fxtalk/feed.xml
+YOUTUBE_CHANNEL_ID=@fxchurch
+```
+
+## 🎯 Usage
+
+### First Time Setup
+
+1. ✅ Run `supabase/schema.sql` in Supabase SQL Editor
+2. ✅ (Optional) Create `.env.local` with credentials
+3. ✅ Deploy to Vercel or run `npm run dev`
+4. ✅ Click "Sync Catalog" to load all sermons
+5. ✅ Click "Generate Transcript" on any sermon to create transcripts
+
+### Daily Use
+
+- **View Catalog**: All sermons listed automatically
+- **Generate**: Click "Generate" on any sermon (once per sermon)
+- **View Transcript**: Click "View Transcript" on completed sermons
+- **Sync**: Click "Sync Catalog" to fetch new episodes (run periodically)
+
+## 📋 Source Configuration
+
+- **Podbean**: https://feed.podbean.com/fxtalk/feed.xml (confirmed)
+- **YouTube**: @fxchurch (confirmed)
+
+These are hardcoded defaults but can be overridden with environment variables.
+
+## 🔒 Privacy & Security
+
+- All sermons are publicly readable (RLS allows SELECT for everyone)
+- Transcript generation requires no authentication
+- Supabase anon key is safe for client-side use (RLS enforced)
+
+## 🐛 Troubleshooting
+
+**"No sermons in catalog"**:
+- Run `supabase/schema.sql` first
+- Click "Sync Catalog" button
+- Check browser console for errors
+
+**"Transcript generation failed"**:
+- Check if sermon has YouTube URL (most reliable)
+- Check if sermon has Podbean URL (fallback)
+- Some episodes may not have transcripts available
+
+**"Sync failed"**:
+- Verify RSS feed URL is accessible
+- Check YouTube channel handle is correct
+- Check Supabase connection (credentials)
+
+## 📚 Next Steps
+
+- [ ] Run `supabase/schema.sql` in Supabase
+- [ ] Deploy to Vercel
+- [ ] Add environment variables (optional)
+- [ ] Sync catalog
+- [ ] Start generating transcripts!
+
+---
+
+Built with ❤️ for fxchurch
