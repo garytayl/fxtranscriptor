@@ -17,6 +17,7 @@ import {
   extractFromYouTubePage,
   extractYouTubeVideoId,
 } from "./extractFromYouTube";
+import { extractFromYouTubeAPI } from "./extractFromYouTubeAPI";
 import {
   extractFromPodbean,
   extractFromPodbeanRSS,
@@ -99,15 +100,41 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
 
   try {
     // 🥇 PRIORITY 1: YouTube (most reliable - auto-generated captions)
-    // Uses free 'youtube-transcript' npm package for reliable extraction
     if (sourceType === "youtube" || extractYouTubeVideoId(episodeUrl)) {
       const videoId = extractYouTubeVideoId(episodeUrl);
       if (videoId) {
         console.log(`[fetchTranscript] Attempting YouTube transcript extraction for video: ${videoId}`);
         
-        // Try page-based extraction FIRST (more reliable on Vercel/serverless)
-        // The youtube-transcript library may be blocked by YouTube from Vercel IPs
-        console.log(`[fetchTranscript] Trying page-based extraction first (most reliable on serverless)...`);
+        // Try YouTube Data API v3 FIRST if API key is available (most reliable, works for JS-loaded captions)
+        const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+        if (youtubeApiKey && youtubeApiKey.trim().length > 0) {
+          console.log(`[fetchTranscript] Trying YouTube Data API v3 (official API - most reliable)...`);
+          try {
+            const apiResult = await extractFromYouTubeAPI(videoId, youtubeApiKey);
+            if (apiResult.success && apiResult.transcript.trim().length > 100) {
+              const cleaned = cleanTranscript(apiResult.transcript);
+              if (cleaned.trim().length > 100) {
+                console.log(`[fetchTranscript] ✅ YouTube Data API v3 succeeded (${cleaned.length} chars)`);
+                return {
+                  success: true,
+                  title: apiResult.title || "YouTube Video",
+                  transcript: cleaned,
+                  source: "youtube",
+                  videoId: apiResult.videoId,
+                };
+              }
+            }
+          } catch (apiError) {
+            const apiErrorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+            console.error(`[fetchTranscript] YouTube Data API v3 failed: ${apiErrorMessage}`);
+            // Continue to fallback methods
+          }
+        } else {
+          console.log(`[fetchTranscript] YouTube Data API v3 not configured (YOUTUBE_API_KEY missing), using fallback methods...`);
+        }
+
+        // Fallback 1: Try page-based extraction (works for some videos)
+        console.log(`[fetchTranscript] Trying page-based extraction...`);
         const pageResult = await extractFromYouTubePage(episodeUrl);
         if (pageResult.success && pageResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(pageResult.transcript);
@@ -123,8 +150,8 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
           }
         }
 
-        // Fallback to youtube-transcript library if page-based fails
-        console.log(`[fetchTranscript] Page-based extraction failed, trying youtube-transcript library...`);
+        // Fallback 2: Try youtube-transcript library (may be blocked on Vercel)
+        console.log(`[fetchTranscript] Trying youtube-transcript library...`);
         const youtubeResult = await extractFromYouTube(episodeUrl);
         if (youtubeResult.success && youtubeResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(youtubeResult.transcript);
