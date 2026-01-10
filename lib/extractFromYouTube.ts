@@ -60,13 +60,17 @@ export async function extractFromYouTube(
       });
       console.log(`[YouTube] Successfully fetched English transcript (${transcriptItems.length} items)`);
     } catch (enError) {
-      console.log(`[YouTube] English transcript not available, trying without language specification...`);
+      const enErrorMessage = enError instanceof Error ? enError.message : String(enError);
+      console.log(`[YouTube] English transcript failed: ${enErrorMessage}`);
+      console.log(`[YouTube] Trying without language specification...`);
       
       try {
         // Try without language specification (gets any available captions)
         transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
         console.log(`[YouTube] Successfully fetched transcript in any language (${transcriptItems.length} items)`);
       } catch (anyLangError) {
+        const anyLangErrorMessage = anyLangError instanceof Error ? anyLangError.message : String(anyLangError);
+        console.error(`[YouTube] Any language transcript also failed: ${anyLangErrorMessage}`);
         // If that fails, try to get list of available languages
         console.log(`[YouTube] Attempting to list available languages...`);
         try {
@@ -206,95 +210,186 @@ export async function extractFromYouTubePage(
       ? titleMatch[1].replace(/\s*-\s*YouTube$/, "").trim()
       : undefined;
 
-    // Look for caption track URLs in the page JSON
-    // YouTube embeds data in ytInitialPlayerResponse
+    console.log(`[YouTube Page] Searching for caption tracks in page HTML (${html.length} chars)...`);
+
+    // Look for caption track URLs in multiple places (YouTube may embed data differently)
+    let captionTracks: any[] = [];
+    
+    // Method 1: Look in ytInitialPlayerResponse (most common)
     const playerResponseMatch = html.match(
       /var ytInitialPlayerResponse = ({.*?});/s
     );
 
     if (playerResponseMatch) {
       try {
+        console.log(`[YouTube Page] Found ytInitialPlayerResponse, parsing...`);
         const playerResponse = JSON.parse(playerResponseMatch[1]);
         
-        // Find caption tracks
-        const captionTracks =
-          playerResponse?.captions?.playerCaptionsTracklistRenderer
-            ?.captionTracks || [];
+        // Find caption tracks in multiple possible locations
+        captionTracks = 
+          playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
+          playerResponse?.captions?.playerCaptionsRenderer?.captionTracks ||
+          playerResponse?.captionTracks ||
+          [];
+        
+        console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks in ytInitialPlayerResponse`);
+      } catch (e) {
+        console.error(`[YouTube Page] Error parsing ytInitialPlayerResponse:`, e);
+      }
+    }
 
-        if (captionTracks.length > 0) {
-          // Prefer English, fallback to first available
-          let captionTrack = captionTracks.find(
-            (track: any) => track.languageCode === "en"
-          );
-          if (!captionTrack) {
-            captionTrack = captionTracks[0];
-          }
-
-          if (captionTrack?.baseUrl) {
-            // Fetch the transcript XML
-            const transcriptResponse = await fetch(captionTrack.baseUrl, {
-              headers: {
-                "User-Agent": "Mozilla/5.0 (compatible; TranscriptBot/1.0)",
-              },
-            });
-
-            if (transcriptResponse.ok) {
-              const xml = await transcriptResponse.text();
-
-              // Parse XML transcript
-              const textContent = xml
-                .replace(/<text[^>]*start="([^"]*)"[^>]*>([^<]*)<\/text>/gi, "$2 ")
-                .replace(/<[^>]*>/g, "")
-                .replace(/&quot;/g, '"')
-                .replace(/&amp;/g, "&")
-                .replace(/&lt;/g, "<")
-                .replace(/&gt;/g, ">")
-                .replace(/&#39;/g, "'")
-                .replace(/&apos;/g, "'")
-                .replace(/\s+/g, " ")
-                .trim();
-
-              if (textContent.length > 100) {
-                // Format into readable paragraphs
-                const sentences = textContent
-                  .replace(/\. +/g, ".\n")
-                  .split("\n")
-                  .map((s) => s.trim())
-                  .filter((s) => s.length > 0);
-
-                const paragraphs: string[] = [];
-                let currentParagraph = "";
-
-                for (const sentence of sentences) {
-                  if (currentParagraph.length + sentence.length > 500) {
-                    if (currentParagraph)
-                      paragraphs.push(currentParagraph.trim());
-                    currentParagraph = sentence;
-                  } else {
-                    currentParagraph +=
-                      (currentParagraph ? " " : "") + sentence;
-                  }
-                }
-
-                if (currentParagraph) {
-                  paragraphs.push(currentParagraph.trim());
-                }
-
-                const transcript = paragraphs.join("\n\n");
-
-                return {
-                  success: true,
-                  transcript,
-                  title,
-                  videoId,
-                };
-              }
+    // Method 2: Look in ytInitialData (fallback)
+    if (captionTracks.length === 0) {
+      const ytInitialDataMatch = html.match(
+        /var ytInitialData = ({.*?});/s
+      );
+      
+      if (ytInitialDataMatch) {
+        try {
+          console.log(`[YouTube Page] Trying ytInitialData...`);
+          const initialData = JSON.parse(ytInitialDataMatch[1]);
+          
+          // Navigate through YouTube's nested structure
+          const videoDetails = initialData?.contents?.twoColumnWatchNextResults?.results?.results?.contents || [];
+          for (const item of videoDetails) {
+            if (item?.videoSecondaryInfoRenderer?.metadataRowContainer?.metadataRowContainerRenderer?.rows) {
+              // Check metadata rows for captions
             }
           }
+          
+          // Try to find in player response within initial data
+          captionTracks = 
+            initialData?.playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
+            [];
+          
+          console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks in ytInitialData`);
+        } catch (e) {
+          console.error(`[YouTube Page] Error parsing ytInitialData:`, e);
         }
-      } catch (e) {
-        console.error("Error parsing YouTube player response:", e);
       }
+    }
+
+    // Method 3: Direct search for caption URLs in HTML
+    if (captionTracks.length === 0) {
+      console.log(`[YouTube Page] Searching for caption URLs directly in HTML...`);
+      const captionUrlPattern = /"captionTracks":\s*\[(.*?)\]/s;
+      const captionMatch = html.match(captionUrlPattern);
+      if (captionMatch) {
+        try {
+          const captionJson = JSON.parse(`[${captionMatch[1]}]`);
+          captionTracks = captionJson.filter((track: any) => track.baseUrl);
+          console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks via direct search`);
+        } catch (e) {
+          console.error(`[YouTube Page] Error parsing caption tracks from HTML:`, e);
+        }
+      }
+    }
+
+    if (captionTracks.length > 0) {
+      console.log(`[YouTube Page] Processing ${captionTracks.length} caption tracks...`);
+      
+      // Prefer English, fallback to first available
+      let captionTrack = captionTracks.find(
+        (track: any) => track.languageCode === "en" || track.languageCode === "en-US"
+      );
+      if (!captionTrack) {
+        captionTrack = captionTracks.find((track: any) => track.languageCode?.startsWith("en"));
+      }
+      if (!captionTrack) {
+        captionTrack = captionTracks[0];
+      }
+
+      if (captionTrack?.baseUrl) {
+        console.log(`[YouTube Page] Fetching transcript from: ${captionTrack.baseUrl.substring(0, 100)}...`);
+        
+        // Fetch the transcript XML
+        const transcriptResponse = await fetch(captionTrack.baseUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; TranscriptBot/1.0)",
+            "Accept": "text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,*/*;q=0.8",
+          },
+        });
+
+        if (transcriptResponse.ok) {
+          const xml = await transcriptResponse.text();
+          console.log(`[YouTube Page] Successfully fetched transcript XML (${xml.length} chars)`);
+
+          // Parse XML transcript - handle multiple formats
+          let textContent = xml
+            // Handle <text> tags with start time
+            .replace(/<text[^>]*start="[^"]*"[^>]*dur="[^"]*"[^>]*>([^<]*)<\/text>/gi, "$1 ")
+            // Handle <text> tags without attributes
+            .replace(/<text[^>]*>([^<]*)<\/text>/gi, "$1 ")
+            // Remove all remaining XML tags
+            .replace(/<[^>]*>/g, "")
+            // Decode HTML entities
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&#39;/g, "'")
+            .replace(/&apos;/g, "'")
+            .replace(/&#8217;/g, "'")
+            .replace(/&#8220;/g, '"')
+            .replace(/&#8221;/g, '"')
+            .replace(/&#8211;/g, "-")
+            .replace(/&#8212;/g, "--")
+            // Normalize whitespace
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (textContent.length > 100) {
+            console.log(`[YouTube Page] Successfully parsed transcript (${textContent.length} chars), formatting...`);
+            
+            // Format into readable paragraphs
+            const sentences = textContent
+              .replace(/\. +/g, ".\n")
+              .split("\n")
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
+
+            const paragraphs: string[] = [];
+            let currentParagraph = "";
+
+            for (const sentence of sentences) {
+              if (currentParagraph.length + sentence.length > 500) {
+                if (currentParagraph)
+                  paragraphs.push(currentParagraph.trim());
+                currentParagraph = sentence;
+              } else {
+                currentParagraph +=
+                  (currentParagraph ? " " : "") + sentence;
+              }
+            }
+
+            if (currentParagraph) {
+              paragraphs.push(currentParagraph.trim());
+            }
+
+            const transcript = paragraphs.join("\n\n");
+
+            if (transcript.trim().length > 100) {
+              console.log(`[YouTube Page] Successfully extracted transcript (${transcript.length} chars)`);
+              return {
+                success: true,
+                transcript,
+                title,
+                videoId,
+              };
+            } else {
+              console.log(`[YouTube Page] Transcript too short after formatting (${transcript.length} chars)`);
+            }
+          } else {
+            console.log(`[YouTube Page] Transcript text content too short (${textContent.length} chars)`);
+          }
+        } else {
+          console.error(`[YouTube Page] Failed to fetch transcript XML: ${transcriptResponse.status} ${transcriptResponse.statusText}`);
+        }
+      } else {
+        console.error(`[YouTube Page] Caption track has no baseUrl`);
+      }
+    } else {
+      console.log(`[YouTube Page] No caption tracks found in page HTML`);
     }
 
     return { success: false, transcript: "", title, videoId };
