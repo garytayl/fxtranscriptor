@@ -134,30 +134,44 @@ export async function transcribeWithWhisper(
           continue;
         }
         
-        // If 410 (Gone) - deprecated endpoint, but might still return data
-        // Check if response body contains valid transcript data despite 410 status
+        // If 410 (Gone) - deprecated endpoint, but might still work
+        // Sometimes deprecated endpoints still return data despite the status code
+        // Try to read the response body and check if it contains valid data
         if (response.status === 410) {
           console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410), checking if response contains data...`);
           try {
             const responseText = await response.text();
+            lastError = `${response.status} - ${responseText.substring(0, 200)}`;
+            
+            // Check if the response contains the deprecation message but also data
+            // Sometimes the 410 response includes the actual data along with a deprecation message
+            if (responseText.includes('"text"') || responseText.includes('router.huggingface.co')) {
+              // If it mentions router, the endpoint is truly gone - try next
+              console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410) with migration message, trying next...`);
+              response = null;
+              continue;
+            }
+            
             // Try to parse as JSON - if it contains transcript data, use it
             try {
               const jsonData = JSON.parse(responseText);
               if (jsonData.text || (Array.isArray(jsonData) && jsonData.length > 0)) {
-                console.log(`[Whisper] Deprecated endpoint returned valid data, using it...`);
-                // Create a mock Response object with status 200 for downstream processing
-                response = new Response(responseText, { status: 200, headers: response.headers });
+                console.log(`[Whisper] Deprecated endpoint returned valid data despite 410, using it...`);
+                // Create a new Response object with status 200 for downstream processing
+                response = new Response(responseText, { 
+                  status: 200, 
+                  headers: { 'Content-Type': 'application/json' }
+                });
                 break;
               }
             } catch {
-              // Not JSON, ignore
+              // Not valid JSON with transcript data, continue to next endpoint
+              console.log(`[Whisper] Endpoint ${apiUrl} returned 410 without valid transcript data, trying next...`);
             }
-          } catch {
+          } catch (readError) {
             // Can't read response, continue to next endpoint
+            console.log(`[Whisper] Error reading 410 response: ${readError}`);
           }
-          const errorText = await response.text().catch(() => '');
-          lastError = `${response.status} - ${errorText.substring(0, 100)}`;
-          console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410) with no valid data, trying next...`);
           response = null;
           continue;
         }
