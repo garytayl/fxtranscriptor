@@ -14,26 +14,33 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 0.8, // Reduced from 1.2 for snappier scrolling
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       orientation: "vertical",
       smoothWheel: true,
+      wheelMultiplier: 1, // Reduce scroll sensitivity for smoother feel
     })
 
     lenisRef.current = lenis
 
-    // Connect Lenis to GSAP ScrollTrigger
-    lenis.on("scroll", ScrollTrigger.update)
+    // Connect Lenis to GSAP ScrollTrigger with requestAnimationFrame
+    function raf(time: number) {
+      lenis.raf(time)
+      ScrollTrigger.update()
+      requestAnimationFrame(raf)
+    }
 
-    gsap.ticker.add((time) => {
-      lenis.raf(time * 1000)
-    })
+    requestAnimationFrame(raf)
 
-    gsap.ticker.lagSmoothing(0)
+    // Enable ScrollTrigger refresh on window resize
+    const handleResize = () => {
+      ScrollTrigger.refresh()
+    }
+    window.addEventListener("resize", handleResize)
 
     return () => {
       lenis.destroy()
-      gsap.ticker.remove(lenis.raf)
+      window.removeEventListener("resize", handleResize)
     }
   }, [])
 

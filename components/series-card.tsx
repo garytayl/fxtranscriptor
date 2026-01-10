@@ -29,6 +29,8 @@ export function SeriesCard({ series, index, onClick, persistHover = false }: Ser
         trigger: cardRef.current,
         start: "top 80%",
         onEnter: () => setIsScrollActive(true),
+        markers: false, // Disable debug markers
+        refreshPriority: -1, // Lower priority
       })
     }, cardRef)
 

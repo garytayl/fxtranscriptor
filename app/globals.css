@@ -83,6 +83,9 @@
     /* Apply scrollbar styles to html element */
     scrollbar-width: thin;
     scrollbar-color: hsl(0, 0%, 24%) hsl(0, 0%, 8%);
+    /* Improve scroll performance */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
   }
   body {
     @apply bg-background text-foreground;
@@ -90,6 +93,12 @@
     max-width: 100vw;
     scrollbar-width: thin;
     scrollbar-color: hsl(0, 0%, 24%) hsl(0, 0%, 8%);
+    /* Improve scroll performance */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+    /* GPU acceleration hints */
+    transform: translateZ(0);
+    will-change: scroll-position;
   }
   /* Webkit scrollbar styling for html and body */
   html::-webkit-scrollbar,

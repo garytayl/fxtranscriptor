@@ -31,12 +31,14 @@ export function SermonSeriesSection({ series, onSeriesClick }: SermonSeriesSecti
         {
           x: 0,
           opacity: 1,
-          duration: 1,
-          ease: "power3.out",
+          duration: 0.8, // Reduced from 1 for snappier animations
+          ease: "power2.out", // Changed from power3 for better performance
           scrollTrigger: {
             trigger: headerRef.current,
             start: "top 90%",
             toggleActions: "play none none reverse",
+            markers: false, // Disable debug markers
+            refreshPriority: -1, // Lower priority
           },
         },
       )
@@ -50,13 +52,15 @@ export function SermonSeriesSection({ series, onSeriesClick }: SermonSeriesSecti
           {
             x: 0,
             opacity: 1,
-            duration: 0.8,
-            stagger: 0.15,
-            ease: "power3.out",
+            duration: 0.6, // Reduced from 0.8 for snappier animations
+            stagger: 0.1, // Reduced stagger for faster appearance
+            ease: "power2.out", // Changed from power3 for better performance
             scrollTrigger: {
               trigger: cardsRef.current,
               start: "top 90%",
               toggleActions: "play none none reverse",
+              markers: false, // Disable debug markers
+              refreshPriority: -1, // Lower priority
             },
           },
         )
@@ -88,7 +92,12 @@ export function SermonSeriesSection({ series, onSeriesClick }: SermonSeriesSecti
           cardsRef.current = el
         }}
         className="flex gap-8 overflow-x-auto pb-8 pr-12 scrollbar-hide"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        style={{ 
+          scrollbarWidth: "none", 
+          msOverflowStyle: "none",
+          willChange: "scroll-position", // GPU acceleration hint
+          WebkitOverflowScrolling: "touch", // Smooth scrolling on iOS
+        }}
       >
         {series.map((s, index) => (
           <SeriesCard

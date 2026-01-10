@@ -42,8 +42,8 @@ export function AnimatedNoise({ opacity = 0.05, className }: AnimatedNoiseProps)
 
     const animate = () => {
       frame++
-      // Update noise every 2 frames for performance while still looking animated
-      if (frame % 2 === 0) {
+      // Update noise every 4 frames for better performance (reduced from every 2 frames)
+      if (frame % 4 === 0) {
         generateNoise()
       }
       animationId = requestAnimationFrame(animate)
@@ -71,6 +71,8 @@ export function AnimatedNoise({ opacity = 0.05, className }: AnimatedNoiseProps)
         pointerEvents: "none",
         opacity,
         mixBlendMode: "overlay",
+        willChange: "contents", // GPU acceleration hint
+        transform: "translateZ(0)", // Force GPU acceleration
       }}
     />
   )

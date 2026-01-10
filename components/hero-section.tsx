@@ -25,7 +25,8 @@ export function HeroSection() {
           trigger: sectionRef.current,
           start: "top top",
           end: "bottom top",
-          scrub: 1,
+          scrub: true, // Changed from 1 to true for smoother scrubbing
+          markers: false, // Disable debug markers
         },
       })
     }, sectionRef)
@@ -34,7 +35,12 @@ export function HeroSection() {
   }, [])
 
   return (
-    <section ref={sectionRef} id="hero" className="relative min-h-screen flex items-center pl-6 md:pl-28 pr-6 md:pr-12">
+    <section 
+      ref={sectionRef} 
+      id="hero" 
+      className="relative min-h-screen flex items-center pl-6 md:pl-28 pr-6 md:pr-12"
+      style={{ willChange: "transform" }} // GPU acceleration hint
+    >
       <AnimatedNoise opacity={0.03} />
 
       {/* Left vertical label */}

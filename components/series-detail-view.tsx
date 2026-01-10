@@ -62,13 +62,15 @@ export function SeriesDetailView({
         gsap.from(sermonCards, {
           opacity: 0,
           y: 30,
-          duration: 0.5,
-          stagger: 0.1,
+          duration: 0.4, // Reduced for snappier animations
+          stagger: 0.08, // Reduced stagger
           ease: "power2.out",
           scrollTrigger: {
             trigger: sermonsRef.current,
             start: "top 85%",
             toggleActions: "play none none reverse",
+            markers: false, // Disable debug markers
+            refreshPriority: -1, // Lower priority
           },
         })
       }
