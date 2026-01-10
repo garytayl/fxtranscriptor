@@ -2,37 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-black text-white;
-  }
-}
-
 :root {
   --background: 0 0% 0%;
   --foreground: 0 0% 100%;
 }
 
-body {
-  color: hsl(var(--foreground));
-  background: hsl(var(--background));
-  font-feature-settings: "rlig" 1, "calt" 1;
+@layer base {
+  body {
+    background-color: #000000;
+    color: #ffffff;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
-  }
-  
-  .glass {
-    @apply bg-black/50 backdrop-blur-sm border border-white/10;
-  }
-  
-  .outline-button {
-    @apply border-2 border-white bg-transparent text-white hover:bg-white hover:text-black transition-all duration-200;
-  }
-  
-  .outline-input {
-    @apply border-2 border-white/20 bg-black/50 text-white placeholder:text-white/40 focus:border-white focus:bg-black/80 transition-all duration-200;
   }
 }
