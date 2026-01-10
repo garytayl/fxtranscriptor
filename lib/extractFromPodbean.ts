@@ -161,13 +161,16 @@ export async function extractFromPodbean(
 /**
  * Attempts to extract transcript from Podbean RSS feed
  * Sometimes transcripts are stored in RSS metadata
+ * Note: Most Podbean episodes don't have transcripts in RSS, this is a best-effort fallback
  */
 export async function extractFromPodbeanRSS(
-  rssUrl: string
+  rssUrl: string,
+  episodeUrl?: string // Optional: episode URL to match against RSS items
 ): Promise<PodbeanExtractResult> {
   try {
+    console.log(`[Podbean RSS] Checking RSS feed: ${rssUrl}`);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     const response = await fetch(rssUrl, {
       signal: controller.signal,
@@ -179,58 +182,100 @@ export async function extractFromPodbeanRSS(
     clearTimeout(timeout);
 
     if (!response.ok) {
+      console.log(`[Podbean RSS] Failed to fetch RSS: ${response.status}`);
       return { success: false, transcript: "" };
     }
 
     const xml = await response.text();
 
-    // Look for transcript in RSS feed
-    // Podbean may include transcripts in custom tags or content:encoded
-    const transcriptPatterns = [
-      /<itunes:transcript[^>]*>([\s\S]*?)<\/itunes:transcript>/i,
-      /<transcript[^>]*>([\s\S]*?)<\/transcript>/i,
-      /<content:encoded[^>]*>([\s\S]*?)<\/content:encoded>/i,
-      /<description[^>]*>([\s\S]*?)<\/description>/i,
-    ];
+    // Extract all RSS items
+    const itemPattern = /<item[^>]*>([\s\S]*?)<\/item>/gi;
+    const items = Array.from(xml.matchAll(itemPattern));
 
-    for (const pattern of transcriptPatterns) {
-      const match = xml.match(pattern);
-      if (match && match[1]) {
-        const text = match[1]
-          .replace(/<[^>]*>/g, "")
-          .replace(/&nbsp;/g, " ")
-          .replace(/&amp;/g, "&")
-          .replace(/&lt;/g, "<")
-          .replace(/&gt;/g, ">")
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .trim();
-
-        if (text.length > 100) {
-          // Extract title from RSS
-          const titleMatch = xml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-          const title = titleMatch ? titleMatch[1].trim() : undefined;
-
-          // Extract audio URL
-          const enclosureMatch = xml.match(
-            /<enclosure[^>]*url="([^"]+\.mp3[^"]*)"[^>]*>/i
-          );
-          const audioUrl = enclosureMatch ? enclosureMatch[1] : undefined;
-
-          return {
-            success: true,
-            transcript: text,
-            title,
-            audioUrl,
-            rssUrl,
-          };
+    // If we have an episode URL, try to find matching item
+    let targetItem: string | null = null;
+    if (episodeUrl) {
+      for (const itemMatch of items) {
+        const itemContent = itemMatch[1];
+        const linkMatch = itemContent.match(/<link[^>]*>(.*?)<\/link>/i);
+        if (linkMatch && linkMatch[1].includes(new URL(episodeUrl).pathname)) {
+          targetItem = itemContent;
+          console.log(`[Podbean RSS] Found matching episode in RSS`);
+          break;
         }
       }
     }
 
+    // If no matching item found, use first item as fallback
+    if (!targetItem && items.length > 0) {
+      targetItem = items[0][1];
+    }
+
+    // Look for transcript in the item content
+    if (targetItem) {
+      const transcriptPatterns = [
+        /<itunes:transcript[^>]*>([\s\S]*?)<\/itunes:transcript>/i,
+        /<transcript[^>]*>([\s\S]*?)<\/transcript>/i,
+        /<podbean:transcript[^>]*>([\s\S]*?)<\/podbean:transcript>/i,
+        // Check description for long text (might be transcript)
+        /<description[^>]*><!\[CDATA\[([\s\S]{500,}?)\]\]><\/description>/i,
+        /<description[^>]*>([\s\S]{500,}?)<\/description>/i,
+        /<content:encoded[^>]*><!\[CDATA\[([\s\S]{500,}?)\]\]><\/content:encoded>/i,
+        /<content:encoded[^>]*>([\s\S]{500,}?)<\/content:encoded>/i,
+      ];
+
+      for (const pattern of transcriptPatterns) {
+        const match = targetItem.match(pattern);
+        if (match && match[1]) {
+          let text = match[1];
+
+          // Clean HTML tags and entities
+          text = text
+            .replace(/<[^>]*>/g, " ") // Remove HTML tags
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/&#8217;/g, "'")
+            .replace(/&#8220;/g, '"')
+            .replace(/&#8221;/g, '"')
+            .replace(/&#8211;/g, "-")
+            .replace(/&#8212;/g, "--")
+            .replace(/\s+/g, " ") // Normalize whitespace
+            .trim();
+
+          // Only accept if it looks like a transcript (long enough, not just metadata)
+          if (text.length > 500 && !text.match(/^(https?:\/\/|www\.|podbean\.com)/i)) {
+            // Extract title from RSS item
+            const titleMatch = targetItem.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>/i) ||
+                              targetItem.match(/<title[^>]*>(.*?)<\/title>/i);
+            const title = titleMatch ? titleMatch[1].trim() : undefined;
+
+            // Extract audio URL
+            const enclosureMatch = targetItem.match(
+              /<enclosure[^>]*url="([^"]+\.mp3[^"]*)"[^>]*>/i
+            );
+            const audioUrl = enclosureMatch ? enclosureMatch[1] : undefined;
+
+            console.log(`[Podbean RSS] Found transcript in RSS (${text.length} chars)`);
+            return {
+              success: true,
+              transcript: text,
+              title,
+              audioUrl,
+              rssUrl,
+            };
+          }
+        }
+      }
+    }
+
+    console.log(`[Podbean RSS] No transcript found in RSS feed`);
     return { success: false, transcript: "" };
   } catch (error) {
-    console.error("Error extracting from Podbean RSS:", error);
+    console.error("[Podbean RSS] Error extracting from RSS:", error);
     return { success: false, transcript: "" };
   }
 }

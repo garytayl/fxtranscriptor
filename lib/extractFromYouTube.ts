@@ -1,7 +1,11 @@
 /**
  * Extracts transcripts from YouTube videos
+ * Uses the free 'youtube-transcript' npm package for reliable extraction
  * YouTube auto-generates captions for most videos, making this a reliable source
  */
+
+// @ts-ignore - youtube-transcript doesn't have TypeScript types
+import { YoutubeTranscript } from 'youtube-transcript';
 
 export interface YouTubeExtractResult {
   success: boolean;
@@ -30,8 +34,8 @@ export function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
- * Fetches YouTube transcript using the YouTube Transcript API
- * This uses a public endpoint that doesn't require API keys
+ * Fetches YouTube transcript using the free 'youtube-transcript' package
+ * This is the most reliable method and works well on Vercel/serverless
  */
 export async function extractFromYouTube(
   videoUrl: string
@@ -43,65 +47,51 @@ export async function extractFromYouTube(
   }
 
   try {
-    // Use a server-side compatible method to fetch YouTube transcripts
-    // We'll use a public API that scrapes YouTube's caption endpoints
-    const transcriptUrl = `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}`;
+    console.log(`[YouTube] Fetching transcript for video ID: ${videoId}`);
     
-    // Try fetching English captions first
-    const response = await fetch(transcriptUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; TranscriptBot/1.0)",
-      },
+    // Use the youtube-transcript library (free, reliable)
+    // It automatically handles:
+    // - Finding available caption tracks
+    // - Language selection (prefers English, falls back to others)
+    // - Parsing and formatting
+    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, {
+      lang: 'en', // Prefer English, but will fallback to available languages
     });
 
-    if (response.ok) {
-      const xml = await response.text();
-      
-      // Parse YouTube XML transcript format
-      const textContent = xml
-        .replace(/<text[^>]*>([^<]*)<\/text>/gi, (match, text) => {
-          // Decode HTML entities
-          return (
-            text
-              .replace(/&quot;/g, '"')
-              .replace(/&amp;/g, "&")
-              .replace(/&lt;/g, "<")
-              .replace(/&gt;/g, ">")
-              .replace(/&#39;/g, "'")
-              .replace(/&apos;/g, "'")
-              .trim() + " "
-          );
-        })
-        .replace(/<[^>]*>/g, "") // Remove remaining XML tags
-        .replace(/\s+/g, " ") // Normalize whitespace
-        .trim();
+    if (transcriptItems && transcriptItems.length > 0) {
+      // Combine all transcript items into a single text
+      // Type: transcriptItems is an array of { text: string, offset: number, duration: number }
+      let fullTranscript = transcriptItems
+        .map((item: any) => item.text)
+        .join(' ');
 
-      if (textContent.length > 100) {
-        // Format into paragraphs (group sentences)
-        const sentences = textContent
-          .replace(/\. /g, ".\n")
-          .split("\n")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
+      // Format into readable paragraphs (group sentences)
+      const sentences = fullTranscript
+        .replace(/\. +/g, ".\n")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 
-        const paragraphs: string[] = [];
-        let currentParagraph = "";
+      const paragraphs: string[] = [];
+      let currentParagraph = "";
 
-        for (const sentence of sentences) {
-          if (currentParagraph.length + sentence.length > 500) {
-            if (currentParagraph) paragraphs.push(currentParagraph.trim());
-            currentParagraph = sentence;
-          } else {
-            currentParagraph += (currentParagraph ? " " : "") + sentence;
-          }
+      for (const sentence of sentences) {
+        if (currentParagraph.length + sentence.length > 500) {
+          if (currentParagraph) paragraphs.push(currentParagraph.trim());
+          currentParagraph = sentence;
+        } else {
+          currentParagraph += (currentParagraph ? " " : "") + sentence;
         }
+      }
 
-        if (currentParagraph) {
-          paragraphs.push(currentParagraph.trim());
-        }
+      if (currentParagraph) {
+        paragraphs.push(currentParagraph.trim());
+      }
 
-        const transcript = paragraphs.join("\n\n");
+      const transcript = paragraphs.join("\n\n");
 
+      if (transcript.trim().length > 100) {
+        console.log(`[YouTube] Successfully extracted transcript (${transcript.length} chars)`);
         return {
           success: true,
           transcript,
@@ -110,11 +100,22 @@ export async function extractFromYouTube(
       }
     }
 
-    // If direct API doesn't work, try alternative method using YouTube's caption list
-    // This requires parsing the video page for caption track URLs
+    console.log(`[YouTube] No transcript found for video ID: ${videoId}`);
     return { success: false, transcript: "", videoId };
   } catch (error) {
-    console.error("Error extracting YouTube transcript:", error);
+    console.error(`[YouTube] Error extracting transcript for ${videoId}:`, error);
+    
+    // Provide helpful error messages
+    if (error instanceof Error) {
+      if (error.message.includes('could not retrieve a transcript')) {
+        return { 
+          success: false, 
+          transcript: "", 
+          videoId,
+        };
+      }
+    }
+    
     return { success: false, transcript: "", videoId };
   }
 }

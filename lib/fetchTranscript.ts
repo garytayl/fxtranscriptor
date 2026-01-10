@@ -99,13 +99,14 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
 
   try {
     // 🥇 PRIORITY 1: YouTube (most reliable - auto-generated captions)
+    // Uses free 'youtube-transcript' npm package for reliable extraction
     if (sourceType === "youtube" || extractYouTubeVideoId(episodeUrl)) {
       const videoId = extractYouTubeVideoId(episodeUrl);
       if (videoId) {
-        console.log("Attempting YouTube transcript extraction...");
+        console.log("[fetchTranscript] Attempting YouTube transcript extraction...");
         
-        // Try page-based extraction first (more reliable)
-        const youtubeResult = await extractFromYouTubePage(episodeUrl);
+        // Use the youtube-transcript library (primary method - most reliable)
+        const youtubeResult = await extractFromYouTube(episodeUrl);
         if (youtubeResult.success && youtubeResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(youtubeResult.transcript);
           if (cleaned.trim().length > 100) {
@@ -119,17 +120,18 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
           }
         }
 
-        // Fallback to API method
-        const apiResult = await extractFromYouTube(episodeUrl);
-        if (apiResult.success && apiResult.transcript.trim().length > 100) {
-          const cleaned = cleanTranscript(apiResult.transcript);
+        // Fallback to page-based extraction if library method fails
+        console.log("[fetchTranscript] youtube-transcript library failed, trying page-based extraction...");
+        const pageResult = await extractFromYouTubePage(episodeUrl);
+        if (pageResult.success && pageResult.transcript.trim().length > 100) {
+          const cleaned = cleanTranscript(pageResult.transcript);
           if (cleaned.trim().length > 100) {
             return {
               success: true,
-              title: apiResult.title || "YouTube Video",
+              title: pageResult.title || "YouTube Video",
               transcript: cleaned,
               source: "youtube",
-              videoId: apiResult.videoId,
+              videoId: pageResult.videoId,
             };
           }
         }
@@ -155,12 +157,14 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
         }
       }
 
-      // Try RSS feed if available
+      // Try RSS feed if available (pass episodeUrl for better matching)
       if (podbeanResult.rssUrl) {
-        const rssResult = await extractFromPodbeanRSS(podbeanResult.rssUrl);
+        console.log("[fetchTranscript] Trying Podbean RSS feed extraction...");
+        const rssResult = await extractFromPodbeanRSS(podbeanResult.rssUrl, episodeUrl);
         if (rssResult.success && rssResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(rssResult.transcript);
           if (cleaned.trim().length > 100) {
+            console.log("[fetchTranscript] Podbean RSS transcript extracted successfully");
             return {
               success: true,
               title: rssResult.title || podbeanResult.title || "Podbean Episode",
