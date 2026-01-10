@@ -74,29 +74,81 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
     const html = await response.text();
     const htmlResult = extractFromHTML(html);
 
-    // Step 2: Look for transcript file references in the HTML
-    const transcriptLinkPatterns = [
-      /href=["']([^"']*\.vtt[^"']*)["']/gi,
-      /src=["']([^"']*\.vtt[^"']*)["']/gi,
-      /url["']?\s*:\s*["']([^"']*\.vtt[^"']*)["']/gi,
-      /transcript["']?\s*:\s*["']([^"']*)["']/gi,
-    ];
-
+    // Step 2: Look for JSON-LD structured data that might contain transcript links
+    const jsonLdPattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis;
+    const jsonLdMatches = Array.from(html.matchAll(jsonLdPattern));
+    
     let transcriptUrl: string | null = null;
 
-    for (const pattern of transcriptLinkPatterns) {
-      const matches = Array.from(html.matchAll(pattern));
-      for (const match of matches) {
-        if (match[1]) {
-          const url = new URL(match[1], episodeUrl).href;
-          // Verify it's likely a transcript URL
-          if (url.includes(".vtt") || url.includes("transcript")) {
-            transcriptUrl = url;
-            break;
+    // Parse JSON-LD for transcript links
+    for (const match of jsonLdMatches) {
+      try {
+        const jsonData = JSON.parse(match[1]);
+        const searchInObject = (obj: any): string | null => {
+          if (!obj || typeof obj !== "object") return null;
+          
+          // Check for transcript URLs in various formats
+          if (obj.transcript && typeof obj.transcript === "string") {
+            return obj.transcript;
+          }
+          if (obj["@type"] === "PodcastEpisode" && obj.transcript) {
+            return typeof obj.transcript === "string" ? obj.transcript : obj.transcript.url;
+          }
+          
+          // Recursively search nested objects
+          for (const key in obj) {
+            if (key.toLowerCase().includes("transcript")) {
+              const value = obj[key];
+              if (typeof value === "string" && (value.includes(".vtt") || value.includes("transcript"))) {
+                return value;
+              }
+              if (typeof value === "object" && value.url) {
+                return value.url;
+              }
+            }
+            if (typeof obj[key] === "object") {
+              const found = searchInObject(obj[key]);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        
+        const foundUrl = searchInObject(jsonData);
+        if (foundUrl) {
+          transcriptUrl = new URL(foundUrl, episodeUrl).href;
+          break;
+        }
+      } catch (e) {
+        // Invalid JSON, skip
+        continue;
+      }
+    }
+
+    // Step 2b: Look for transcript file references in the HTML (fallback)
+    if (!transcriptUrl) {
+      const transcriptLinkPatterns = [
+        /href=["']([^"']*\.vtt[^"']*)["']/gi,
+        /src=["']([^"']*\.vtt[^"']*)["']/gi,
+        /url["']?\s*:\s*["']([^"']*\.vtt[^"']*)["']/gi,
+        /transcript["']?\s*:\s*["']([^"']*)["']/gi,
+        /data-transcript-url=["']([^"']*)["']/gi,
+      ];
+
+      for (const pattern of transcriptLinkPatterns) {
+        const matches = Array.from(html.matchAll(pattern));
+        for (const match of matches) {
+          if (match[1]) {
+            const url = new URL(match[1], episodeUrl).href;
+            // Verify it's likely a transcript URL
+            if (url.includes(".vtt") || url.includes("transcript") || url.includes("subtitle")) {
+              transcriptUrl = url;
+              break;
+            }
           }
         }
+        if (transcriptUrl) break;
       }
-      if (transcriptUrl) break;
     }
 
     // Step 3: If found, try to fetch VTT file
@@ -112,13 +164,16 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
           const vttContent = await vttResponse.text();
           const vttResult = extractFromVTT(vttContent);
 
-          if (vttResult.success && vttResult.transcript.length > 50) {
+          if (vttResult.success && vttResult.transcript.length > 100) {
             const cleaned = cleanTranscript(vttResult.transcript);
-            return {
-              success: true,
-              title: htmlResult.title,
-              transcript: cleaned,
-            };
+            // Validate cleaned transcript has meaningful content
+            if (cleaned.trim().length > 100) {
+              return {
+                success: true,
+                title: htmlResult.title,
+                transcript: cleaned,
+              };
+            }
           }
         }
       } catch (error) {
@@ -135,13 +190,16 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
       const rssResult = await extractFromRSS(rssUrl);
 
       if (rssResult.success) {
-        if (rssResult.transcript) {
+        if (rssResult.transcript && rssResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(rssResult.transcript);
-          return {
-            success: true,
-            title: htmlResult.title,
-            transcript: cleaned,
-          };
+          // Validate cleaned transcript has meaningful content
+          if (cleaned.trim().length > 100) {
+            return {
+              success: true,
+              title: htmlResult.title,
+              transcript: cleaned,
+            };
+          }
         }
 
         // If RSS returned a transcript URL, fetch it
@@ -151,13 +209,16 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
             if (transcriptResponse.ok) {
               const transcriptContent = await transcriptResponse.text();
               const vttResult = extractFromVTT(transcriptContent);
-              if (vttResult.success) {
+              if (vttResult.success && vttResult.transcript.length > 100) {
                 const cleaned = cleanTranscript(vttResult.transcript);
-                return {
-                  success: true,
-                  title: htmlResult.title,
-                  transcript: cleaned,
-                };
+                // Validate cleaned transcript
+                if (cleaned.trim().length > 100) {
+                  return {
+                    success: true,
+                    title: htmlResult.title,
+                    transcript: cleaned,
+                  };
+                }
               }
             }
           } catch (error) {
@@ -168,13 +229,16 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
     }
 
     // Step 5: Fallback to HTML extraction
-    if (htmlResult.success && htmlResult.transcript.length > 50) {
+    if (htmlResult.success && htmlResult.transcript.length > 100) {
       const cleaned = cleanTranscript(htmlResult.transcript);
-      return {
-        success: true,
-        title: htmlResult.title,
-        transcript: cleaned,
-      };
+      // Validate cleaned transcript has meaningful content
+      if (cleaned.trim().length > 100) {
+        return {
+          success: true,
+          title: htmlResult.title,
+          transcript: cleaned,
+        };
+      }
     }
 
     // Step 6: If nothing worked, return helpful error
@@ -183,7 +247,11 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
       transcript: "",
       title: htmlResult.title,
       error:
-        "Transcript not publicly accessible from this URL. The episode may not have a transcript available, or it may be behind authentication. Try pasting the podcast RSS feed or hosting provider link instead.",
+        "Unable to find a transcript for this episode. Apple Podcasts pages typically don't include transcripts—they only show metadata. To get transcripts, you'll need to:\n\n" +
+        "1. Find the podcast's RSS feed URL\n" +
+        "2. Check if transcripts are available in the RSS feed metadata\n" +
+        "3. Or contact the podcast host directly\n\n" +
+        "If this podcast episode should have a transcript, try pasting the podcast RSS feed URL or the hosting provider's episode page URL instead.",
     };
   } catch (error) {
     console.error("Error fetching transcript:", error);

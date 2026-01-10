@@ -41,9 +41,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Final validation: ensure transcript has meaningful content
+    const cleanedTranscript = result.transcript.trim();
+    if (cleanedTranscript.length < 100) {
+      return NextResponse.json(
+        {
+          error: "Transcript found but content is too short or empty. The episode may not have a full transcript available.",
+          title: result.title,
+        },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       title: result.title || "Untitled Episode",
-      transcript: result.transcript,
+      transcript: cleanedTranscript,
     });
   } catch (error) {
     console.error("API error:", error);

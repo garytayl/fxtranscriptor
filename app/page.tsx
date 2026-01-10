@@ -44,7 +44,19 @@ export default function Home() {
         return;
       }
 
-      setTranscript(data.transcript);
+      // Validate transcript has content
+      const transcriptText = data.transcript?.trim() || "";
+      if (!transcriptText || transcriptText.length < 50) {
+        setError(
+          data.error || "Transcript was returned but appears to be empty or invalid. The episode may not have a transcript available."
+        );
+        if (data.title) {
+          setTitle(data.title);
+        }
+        return;
+      }
+
+      setTranscript(transcriptText);
       setTitle(data.title || "Untitled Episode");
       setError("");
     } catch (err) {
@@ -193,14 +205,23 @@ export default function Home() {
 
         {/* Footer/Info */}
         {!transcript && !loading && !error && (
-          <div className="mt-12 text-center text-slate-500 dark:text-slate-400 text-sm">
-            <p>
-              Paste an Apple Podcasts episode URL above to extract its transcript.
+          <div className="mt-12 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-center">
+            <p className="text-slate-700 dark:text-slate-300 font-medium mb-2">
+              How to use FX Transcriptor
             </p>
-            <p className="mt-2">
-              The transcript will be cleaned and formatted for easy copying and
-              download.
-            </p>
+            <div className="text-slate-600 dark:text-slate-400 text-sm space-y-1">
+              <p>
+                <strong>Important:</strong> Apple Podcasts pages are metadata-only and typically don't contain transcripts.
+              </p>
+              <p className="mt-2">
+                For best results, try using:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 text-left max-w-md mx-auto">
+                <li>The podcast's RSS feed URL</li>
+                <li>The hosting provider's episode page (Libsyn, Anchor, etc.)</li>
+                <li>Direct links to transcript files (.vtt, .srt)</li>
+              </ul>
+            </div>
           </div>
         )}
       </div>
