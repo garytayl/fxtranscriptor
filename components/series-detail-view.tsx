@@ -141,25 +141,37 @@ export function SeriesDetailView({
             <div className="flex flex-wrap gap-2 mb-4">
               {getStatusBadge(sermon)}
               {sermon.transcript_source && getSourceBadge(sermon.transcript_source)}
-              {sermon.podbean_url && (
+              {sermon.podbean_url && sermon.podbean_url.trim() && (
                 <a
                   href={sermon.podbean_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs font-mono transition-colors hover:border-accent hover:text-accent"
-                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-xs font-mono transition-all hover:border-accent hover:text-accent hover:bg-accent/5 cursor-pointer z-10 relative"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (sermon.podbean_url) {
+                      window.open(sermon.podbean_url, '_blank', 'noopener,noreferrer')
+                    }
+                  }}
                 >
                   <ExternalLink className="size-3" />
                   Podbean
                 </a>
               )}
-              {sermon.youtube_url && (
+              {sermon.youtube_url && sermon.youtube_url.trim() && (
                 <a
                   href={sermon.youtube_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-2 py-1 text-xs font-mono transition-colors hover:border-accent hover:text-accent"
-                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-transparent px-2.5 py-1.5 text-xs font-mono transition-all hover:border-accent hover:text-accent hover:bg-accent/5 cursor-pointer z-10 relative"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (sermon.youtube_url) {
+                      window.open(sermon.youtube_url, '_blank', 'noopener,noreferrer')
+                    }
+                  }}
                 >
                   <ExternalLink className="size-3" />
                   YouTube
