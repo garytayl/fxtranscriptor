@@ -89,39 +89,75 @@ export async function transcribeWithWhisper(
     // Note: This works for Node.js serverless environments
     const base64Audio = audioBuffer.toString('base64');
     
-    // Use the new router endpoint (migrated from api-inference.huggingface.co)
-    // The router endpoint format may differ - try both formats
-    // Format 1: https://router.huggingface.co/{model_id}
-    // Format 2: https://router.huggingface.co/models/{model_id}
-    let apiUrl = 'https://router.huggingface.co/openai/whisper-large-v3';
-    let response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: base64Audio,
-      }),
-    });
+    // Try multiple endpoint formats - Hugging Face has been migrating endpoints
+    // Try the old endpoint first (may still work despite deprecation warning)
+    // Then try router endpoints with different formats
+    const endpoints = [
+      'https://api-inference.huggingface.co/models/openai/whisper-large-v3', // Original (try first - may still work)
+      'https://router.huggingface.co/models/openai/whisper-large-v3', // Router format 1
+      'https://router.huggingface.co/openai/whisper-large-v3', // Router format 2
+      'https://api-inference.huggingface.co/models/whisper-large-v3', // Alternative model path
+    ];
     
-    // If format 1 fails with 404, try format 2
-    if (response.status === 404) {
-      console.log(`[Whisper] Router endpoint format 1 failed (404), trying format 2...`);
-      apiUrl = 'https://router.huggingface.co/models/openai/whisper-large-v3';
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: base64Audio,
-        }),
-      });
+    let response: Response | null = null;
+    let apiUrl = '';
+    let lastError: string | null = null;
+    
+    for (const endpoint of endpoints) {
+      apiUrl = endpoint;
+      console.log(`[Whisper] Trying Hugging Face endpoint: ${apiUrl}`);
+      
+      try {
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: base64Audio,
+          }),
+        });
+        
+        // If we get a valid response (200) or a model-loading response (503), use this endpoint
+        if (response.status === 200 || response.status === 503) {
+          console.log(`[Whisper] Using Hugging Face endpoint: ${apiUrl} (status: ${response.status})`);
+          break;
+        }
+        
+        // If 404 or other error, try next endpoint
+        if (response.status === 404) {
+          const errorText = await response.text().catch(() => '');
+          lastError = `${response.status} - ${errorText.substring(0, 100)}`;
+          console.log(`[Whisper] Endpoint ${apiUrl} returned 404, trying next...`);
+          response = null;
+          continue;
+        }
+        
+        // If 410 (Gone) - deprecated, but might still work, so try to use it anyway
+        // The deprecation warning says to use router, but router might not be ready yet
+        if (response.status === 410) {
+          const errorText = await response.text().catch(() => '');
+          lastError = `${response.status} - ${errorText.substring(0, 100)}`;
+          console.log(`[Whisper] Endpoint ${apiUrl} is deprecated (410), but attempting to use it anyway...`);
+          // Don't continue - try to process the response even if deprecated
+          // The endpoint might still work despite the deprecation warning
+          break;
+        }
+        
+        // For other status codes, break and handle error below
+        break;
+      } catch (fetchError) {
+        console.log(`[Whisper] Error trying endpoint ${apiUrl}:`, fetchError);
+        lastError = fetchError instanceof Error ? fetchError.message : String(fetchError);
+        response = null;
+        continue;
+      }
     }
     
-    console.log(`[Whisper] Using Hugging Face Router API: ${apiUrl} (status: ${response.status})`);
+    if (!response) {
+      throw new Error(`All Hugging Face endpoints failed. Last error: ${lastError || 'Unknown error'}`);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
