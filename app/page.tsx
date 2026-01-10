@@ -269,165 +269,93 @@ export default function Home() {
       <div className="relative z-10">
         <HeroSection />
         
-        {/* Sermons Section */}
-        <section id="sermons" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
-          <div className="mb-16">
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Catalog</span>
-            <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERMONS</h2>
-            <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
-              {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} in catalog • Sync from Podbean and YouTube
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="mb-12 flex flex-col sm:flex-row gap-4 items-center">
-            <Button
-              onClick={syncCatalog}
-              disabled={syncing}
-              variant="outline"
-              className="gap-2 border-foreground/20 font-mono text-xs uppercase tracking-widest hover:border-accent hover:text-accent"
-            >
-              <RefreshCw className={syncing ? "animate-spin size-4" : "size-4"} />
-              {syncing ? "Syncing..." : "Sync Catalog"}
-            </Button>
-            <Button
-              onClick={loadSermons}
-              disabled={loading}
-              variant="ghost"
-              size="sm"
-              className="font-mono text-xs uppercase tracking-widest"
-            >
-              Refresh
-            </Button>
-          </div>
-
-        {/* Sermon List */}
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-20 w-full" />
-                </CardContent>
-                <CardFooter>
-                  <Skeleton className="h-9 w-24" />
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        ) : sermons.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <p className="text-muted-foreground mb-4">No sermons in catalog yet.</p>
-              <Button onClick={syncCatalog} disabled={syncing} variant="outline">
-                <RefreshCw className={syncing ? "animate-spin mr-2" : "mr-2"} />
-                Sync Catalog to Load Sermons
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Series Detail View or Series List */}
+        {selectedSeries ? (
+          <SeriesDetailView
+            series={selectedSeries}
+            onClose={handleCloseSeriesDetail}
+            onGenerateTranscript={generateTranscript}
+            onViewTranscript={handleViewTranscript}
+            onDownload={handleDownload}
+            onCopyTranscript={handleCopyAll}
+            generating={generating}
+            getStatusBadge={getStatusBadge}
+            getSourceBadge={getSourceBadge}
+            copied={copied}
+          />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {sermons.map((sermon) => (
-              <Card key={sermon.id} className="hover:border-accent transition-colors">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base font-semibold mb-2 line-clamp-2">
-                        {sermon.title}
-                      </CardTitle>
-                      {sermon.date && (
-                        <CardDescription className="flex items-center gap-1.5 text-xs font-mono">
-                          <Calendar className="size-3" />
-                          {format(new Date(sermon.date), "MMM d, yyyy")}
-                        </CardDescription>
-                      )}
-                    </div>
-                    <CardAction>
-                      {getStatusBadge(sermon)}
-                    </CardAction>
+          <>
+            {/* Actions */}
+            <div className="relative py-12 pl-6 md:pl-28 pr-6 md:pr-12 border-b border-border/30">
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <Button
+                  onClick={syncCatalog}
+                  disabled={syncing}
+                  variant="outline"
+                  className="gap-2 border-foreground/20 font-mono text-xs uppercase tracking-widest hover:border-accent hover:text-accent"
+                >
+                  <RefreshCw className={syncing ? "animate-spin size-4" : "size-4"} />
+                  {syncing ? "Syncing..." : "Sync Catalog"}
+                </Button>
+                <Button
+                  onClick={loadSermons}
+                  disabled={loading}
+                  variant="ghost"
+                  size="sm"
+                  className="font-mono text-xs uppercase tracking-widest"
+                >
+                  Refresh
+                </Button>
+                {sermons.length > 0 && (
+                  <div className="text-sm text-muted-foreground font-mono">
+                    {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} • {sermonSeries.length} {sermonSeries.length === 1 ? "series" : "series"}
                   </div>
-                </CardHeader>
+                )}
+              </div>
+            </div>
 
-                <CardContent className="space-y-3">
-                  {sermon.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {sermon.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {sermon.transcript_source && getSourceBadge(sermon.transcript_source)}
-                    {sermon.podbean_url && (
-                      <Badge variant="outline" className="gap-1">
-                        <ExternalLink className="size-3" />
-                        Podbean
-                      </Badge>
-                    )}
-                    {sermon.youtube_url && (
-                      <Badge variant="outline" className="gap-1">
-                        <ExternalLink className="size-3" />
-                        YouTube
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-
-                <CardFooter className="flex flex-col sm:flex-row gap-2">
-                  {sermon.transcript ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 gap-2"
-                        onClick={() => setSelectedSermon(sermon)}
-                      >
-                        <Play className="size-4" />
-                        View Transcript
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownload(sermon)}
-                      >
-                        <Download className="size-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant={sermon.status === "generating" ? "secondary" : "default"}
-                      size="sm"
-                      className="w-full gap-2"
-                      disabled={generating.has(sermon.id) || sermon.status === "generating"}
-                      onClick={() => generateTranscript(sermon)}
-                    >
-                      {generating.has(sermon.id) || sermon.status === "generating" ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : sermon.status === "failed" ? (
-                        <>
-                          <AlertCircle className="size-4" />
-                          Retry Generate
-                        </>
-                      ) : (
-                        <>
-                          <Play className="size-4" />
-                          Generate Transcript
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+            {/* Loading State */}
+            {loading ? (
+              <div className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+                <div className="mb-16">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Loading</span>
+                  <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERIES</h2>
+                </div>
+                <div className="text-center text-muted-foreground font-mono text-sm">
+                  Loading sermon catalog...
+                </div>
+              </div>
+            ) : sermons.length === 0 ? (
+              <div className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+                <div className="mb-16">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Empty</span>
+                  <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">NO SERIES</h2>
+                </div>
+                <div className="text-center text-muted-foreground font-mono text-sm mb-8">
+                  No sermons in catalog yet.
+                </div>
+                <div className="text-center">
+                  <Button onClick={syncCatalog} disabled={syncing} variant="outline" className="font-mono text-xs uppercase tracking-widest">
+                    <RefreshCw className={syncing ? "animate-spin mr-2 size-4" : "mr-2 size-4"} />
+                    Sync Catalog to Load Sermons
+                  </Button>
+                </div>
+              </div>
+            ) : sermonSeries.length > 0 ? (
+              <SermonSeriesSection series={sermonSeries} onSeriesClick={handleSeriesClick} />
+            ) : (
+              <div className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+                <div className="mb-16">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">No Series</span>
+                  <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">NO SERIES FOUND</h2>
+                </div>
+                <div className="text-center text-muted-foreground font-mono text-sm">
+                  Sermons found but unable to organize into series. Sermons may need title formatting.
+                </div>
+              </div>
+            )}
+          </>
         )}
-        </section>
 
         {/* Transcript Dialog */}
         <Dialog open={!!selectedSermon} onOpenChange={(open) => !open && setSelectedSermon(null)}>
