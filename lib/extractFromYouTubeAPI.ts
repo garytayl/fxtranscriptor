@@ -175,52 +175,74 @@ export async function extractFromYouTubeAPI(
       // Method 2: Try YouTube's public timedtext API (no OAuth required!)
       // This is a workaround that uses the video ID and language code we already have
       try {
-        console.log(`[YouTube API] Trying public timedtext API as fallback...`);
-        const timedtextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${languageCode}&fmt=json3`;
+        console.log(`[YouTube API] Trying public timedtext API as fallback (videoId: ${videoId}, lang: ${languageCode})...`);
         
-        const timedtextResponse = await fetch(timedtextUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; TranscriptBot/1.0)',
-          },
-        });
+        // Try multiple timedtext API formats and languages
+        const timedtextFormats = [
+          { fmt: 'json3', lang: languageCode },
+          { fmt: 'vtt', lang: languageCode },
+          { fmt: 'srv3', lang: languageCode }, // Alternative JSON format
+          { fmt: 'json3', lang: 'en' }, // Fallback to English if language doesn't work
+          { fmt: 'vtt', lang: 'en' },
+        ];
         
-        if (timedtextResponse.ok) {
-          const timedtextData = await timedtextResponse.json();
-          
-          // Parse JSON3 format (YouTube's timedtext API returns structured JSON)
-          if (timedtextData.events && Array.isArray(timedtextData.events)) {
-            const textParts = timedtextData.events
-              .filter((event: any) => event.segs && Array.isArray(event.segs))
-              .flatMap((event: any) => event.segs.map((seg: any) => seg.utf8 || ''))
-              .filter((text: string) => text && text.trim().length > 0)
-              .join(' ');
+        for (const format of timedtextFormats) {
+          try {
+            const timedtextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${format.lang}&fmt=${format.fmt}`;
+            console.log(`[YouTube API] Trying timedtext API: ${timedtextUrl}`);
             
-            if (textParts && textParts.trim().length > 100) {
-              captionContent = textParts;
-              console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (${textParts.length} chars)`);
-            }
-          }
-          
-          // If JSON3 doesn't work, try VTT format
-          if (!captionContent || captionContent.trim().length < 100) {
-            const timedtextVttUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${languageCode}&fmt=vtt`;
-            const vttResponse = await fetch(timedtextVttUrl, {
+            const timedtextResponse = await fetch(timedtextUrl, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; TranscriptBot/1.0)',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept-Language': `${format.lang},en;q=0.9`,
               },
             });
             
-            if (vttResponse.ok) {
-              const vttContent = await vttResponse.text();
-              if (vttContent && vttContent.trim().length > 100) {
-                captionContent = vttContent;
-                console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (VTT format, ${vttContent.length} chars)`);
+            if (timedtextResponse.ok) {
+              const responseText = await timedtextResponse.text();
+              
+              if (responseText && responseText.trim().length > 100) {
+                // Parse based on format
+                if (format.fmt === 'json3' || format.fmt === 'srv3') {
+                  try {
+                    const timedtextData = JSON.parse(responseText);
+                    
+                    // Parse JSON3 format (YouTube's timedtext API returns structured JSON)
+                    if (timedtextData.events && Array.isArray(timedtextData.events)) {
+                      const textParts = timedtextData.events
+                        .filter((event: any) => event.segs && Array.isArray(event.segs))
+                        .flatMap((event: any) => event.segs.map((seg: any) => seg.utf8 || ''))
+                        .filter((text: string) => text && text.trim().length > 0)
+                        .join(' ');
+                      
+                      if (textParts && textParts.trim().length > 100) {
+                        captionContent = textParts;
+                        console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (JSON3, ${textParts.length} chars)`);
+                        break; // Success, stop trying other formats
+                      }
+                    }
+                  } catch (parseError) {
+                    console.log(`[YouTube API] Failed to parse JSON3 format: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+                  }
+                } else if (format.fmt === 'vtt') {
+                  // VTT format - we'll parse it later in the main parsing section
+                  captionContent = responseText;
+                  console.log(`[YouTube API] ✅ Successfully downloaded via timedtext API (VTT format, ${responseText.length} chars)`);
+                  break; // Success, stop trying other formats
+                }
+              } else {
+                console.log(`[YouTube API] Timedtext API returned empty or too short content (${responseText?.length || 0} chars)`);
               }
+            } else {
+              console.log(`[YouTube API] Timedtext API ${format.fmt}/${format.lang} failed: ${timedtextResponse.status} ${timedtextResponse.statusText}`);
             }
+          } catch (formatError) {
+            console.log(`[YouTube API] Error trying timedtext ${format.fmt}/${format.lang}: ${formatError instanceof Error ? formatError.message : String(formatError)}`);
+            // Try next format
           }
         }
       } catch (timedtextError) {
-        console.log(`[YouTube API] Timedtext API fallback also failed: ${timedtextError instanceof Error ? timedtextError.message : String(timedtextError)}`);
+        console.log(`[YouTube API] Timedtext API fallback failed: ${timedtextError instanceof Error ? timedtextError.message : String(timedtextError)}`);
       }
       
       // If both methods failed, throw the original error
