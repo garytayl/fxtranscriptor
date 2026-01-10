@@ -389,18 +389,80 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-            ) : sermonSeries.length > 0 ? (
-              <SermonSeriesSection series={sermonSeries} onSeriesClick={handleSeriesClick} />
             ) : (
-              <div className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
-                <div className="mb-16">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">No Series</span>
-                  <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">NO SERIES FOUND</h2>
-                </div>
-                <div className="text-center text-muted-foreground font-mono text-sm">
-                  Sermons found but unable to organize into series. Sermons may need title formatting.
-                </div>
-              </div>
+              <>
+                {/* Show John series if it exists */}
+                {sermonSeries.length > 0 && (
+                  <SermonSeriesSection series={sermonSeries} onSeriesClick={handleSeriesClick} />
+                )}
+                
+                {/* Show ungrouped sermons after series */}
+                {ungrouped.length > 0 && (
+                  <section id="unsorted" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+                    <div className="mb-16 pr-6 md:pr-12">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">02 / Unsorted</span>
+                      <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">UNSORTED SERMONS</h2>
+                      <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
+                        {ungrouped.length} {ungrouped.length === 1 ? "sermon" : "sermons"} • Not in any series
+                      </p>
+                    </div>
+                    
+                    {/* Ungrouped sermons grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pr-6 md:pr-12">
+                      {ungrouped.map((sermon) => (
+                        <article
+                          key={sermon.id}
+                          className="group border border-border/30 p-6 hover:border-accent/50 transition-all duration-200 cursor-pointer"
+                          onClick={() => handleViewTranscript(sermon)}
+                        >
+                          <div className="flex items-start justify-between gap-4 mb-4">
+                            <h3 className="font-[var(--font-bebas)] text-xl tracking-tight line-clamp-2 flex-1 group-hover:text-accent transition-colors">
+                              {sermon.title}
+                            </h3>
+                            {getStatusBadge(sermon)}
+                          </div>
+                          
+                          {sermon.date && (
+                            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground mb-4">
+                              <Calendar className="size-3" />
+                              {format(new Date(sermon.date), "MMMM d, yyyy")}
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-3 mt-4">
+                            {sermon.transcript ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="font-mono text-xs uppercase tracking-widest"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewTranscript(sermon);
+                                }}
+                              >
+                                View Transcript
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="font-mono text-xs uppercase tracking-widest"
+                                disabled={generating.has(sermon.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  generateTranscript(sermon);
+                                }}
+                              >
+                                {generating.has(sermon.id) ? "Generating..." : "Generate"}
+                              </Button>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
             )}
           </>
         )}

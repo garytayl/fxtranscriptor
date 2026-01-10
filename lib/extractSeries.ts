@@ -93,7 +93,8 @@ function generateSeriesId(name: string): string {
 
 /**
  * Group sermons by series
- * Optionally accepts playlist-based series mapping for better organization
+ * Only uses playlist-based series mapping - no title extraction
+ * John series is always first, all others are ungrouped
  */
 export function groupSermonsBySeries(
   sermons: Sermon[],
@@ -105,14 +106,17 @@ export function groupSermonsBySeries(
   const seriesMap = new Map<string, SermonSeries>();
   const ungrouped: Sermon[] = [];
 
+  // John series name (for priority sorting)
+  const JOHN_SERIES_NAMES = [
+    "john: πιστεύω - fall 2025",
+    "john: pisteuo - fall 2025",
+    "john: πιστεύω",
+    "john: pisteuo",
+  ];
+
   for (const sermon of sermons) {
-    // Priority 1: Use playlist-based series name if available
-    let seriesName: string | null | undefined = playlistSeriesMap?.get(sermon.id);
-    
-    // Priority 2: Fallback to title extraction
-    if (!seriesName) {
-      seriesName = extractSeriesName(sermon.title);
-    }
+    // ONLY use playlist-based series name - no title extraction
+    const seriesName = playlistSeriesMap?.get(sermon.id);
 
     if (seriesName) {
       const seriesId = generateSeriesId(seriesName);
@@ -146,6 +150,7 @@ export function groupSermonsBySeries(
         }
       }
     } else {
+      // All non-playlist sermons go to ungrouped
       ungrouped.push(sermon);
     }
   }
@@ -159,8 +164,20 @@ export function groupSermonsBySeries(
     });
   }
 
-  // Convert map to array and sort by latest date (newest first)
+  // Convert map to array and sort so John series is always first
   const seriesArray = Array.from(seriesMap.values()).sort((a, b) => {
+    const aNameLower = a.name.toLowerCase();
+    const bNameLower = b.name.toLowerCase();
+    
+    // Check if either is the John series
+    const aIsJohn = JOHN_SERIES_NAMES.some(name => aNameLower.includes(name));
+    const bIsJohn = JOHN_SERIES_NAMES.some(name => bNameLower.includes(name));
+    
+    // John series always comes first
+    if (aIsJohn && !bIsJohn) return -1;
+    if (!aIsJohn && bIsJohn) return 1;
+    
+    // If both are John or both are not, sort by latest date (newest first)
     const dateA = a.latestDate ? new Date(a.latestDate).getTime() : 0;
     const dateB = b.latestDate ? new Date(b.latestDate).getTime() : 0;
     return dateB - dateA;
