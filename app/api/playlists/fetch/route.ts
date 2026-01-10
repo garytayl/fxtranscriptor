@@ -114,9 +114,12 @@ export async function POST(request: NextRequest) {
 }
 
 function cleanPlaylistTitle(title: string): string {
+  // Clean playlist title to use as series name
+  // Removes YouTube-specific suffixes but preserves the actual series name
   return title
-    .replace(/\s*-\s*YouTube$/, '')
-    .replace(/\s*\([^)]*\)$/, '')
-    .replace(/\s*\[[^\]]*\]$/, '')
+    .replace(/\s*-\s*YouTube$/, '') // Remove "- YouTube" suffix
+    .replace(/\s*\([^)]*\)$/, '') // Remove parenthetical notes at end
+    .replace(/\s*\[[^\]]*\]$/, '') // Remove bracket notes at end
+    .replace(/\s*by\s+[^-]+$/, '') // Remove "by Channel Name" suffix
     .trim();
 }

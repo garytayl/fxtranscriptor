@@ -15,7 +15,10 @@ FX Archive automatically organizes sermons into series based on YouTube playlist
 ### Default Playlist
 
 The app automatically uses this default playlist:
-- **Latest Series**: `https://youtube.com/playlist?list=PLQwpPWOYg4MOLr9lUNMBgjCCV0ifkKMDu`
+- **John: πιστεύω - Fall 2025**: `https://youtube.com/playlist?list=PLQwpPWOYg4MOLr9lUNMBgjCCV0ifkKMDu`
+  - 21 videos in the series
+  - Series name: "John: πιστεύω - Fall 2025" (preserves Greek characters)
+  - Automatically categorizes all matching sermons
 
 This is hardcoded in `app/page.tsx` in the `loadPlaylistSeries` function.
 

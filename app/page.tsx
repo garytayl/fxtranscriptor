@@ -36,10 +36,10 @@ export default function Home() {
 
   const loadPlaylistSeries = async () => {
     try {
-      // Default playlist from FX Church's latest sermon series
-      // Can be extended to fetch from API or environment variable
+      // Playlists from FX Church's sermon series
+      // These playlists organize sermons into series automatically
       const defaultPlaylists = [
-        "https://youtube.com/playlist?list=PLQwpPWOYg4MOLr9lUNMBgjCCV0ifkKMDu", // Latest series from user
+        "https://youtube.com/playlist?list=PLQwpPWOYg4MOLr9lUNMBgjCCV0ifkKMDu", // John: πιστεύω - Fall 2025 (21 videos)
         // Add more playlists here or fetch from an API endpoint
       ];
 
