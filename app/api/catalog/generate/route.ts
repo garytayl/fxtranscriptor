@@ -154,39 +154,44 @@ export async function POST(request: NextRequest) {
     }
 
     // Priority 3: Whisper AI fallback (if YouTube and Podbean both failed, and we have audio URL)
-    if (!transcriptResult?.success && sermon.audio_url) {
-      console.log(`[Generate] Attempting Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
-      attemptedUrls.push(`Whisper AI: ${sermon.audio_url.substring(0, 50)}...`);
-      
-      const huggingFaceKey = process.env.HUGGINGFACE_API_KEY;
-      if (!huggingFaceKey || huggingFaceKey.trim().length === 0) {
-        console.log(`[Generate] Whisper AI not configured (HUGGINGFACE_API_KEY missing), skipping...`);
+    if (!transcriptResult?.success) {
+      if (!sermon.audio_url) {
+        console.log(`[Generate] Whisper AI fallback skipped: No audio_url available. Sermon has YouTube URL but no Podbean audio URL.`);
+        console.log(`[Generate] Sermon URLs - YouTube: ${sermon.youtube_url || 'none'}, Podbean: ${sermon.podbean_url || 'none'}, Audio: ${sermon.audio_url || 'none'}`);
       } else {
-        try {
-          const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
-          if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
-            console.log(`[Generate] Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
-            transcriptResult = {
-              success: true,
-              transcript: whisperResult.transcript,
-              source: "generated" as const,
-            };
-            transcriptSource = "generated";
-          } else {
-            console.log(`[Generate] Whisper AI transcription failed: ${whisperResult.error || "No transcript"}`);
+        console.log(`[Generate] Attempting Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
+        attemptedUrls.push(`Whisper AI: ${sermon.audio_url.substring(0, 50)}...`);
+        
+        const huggingFaceKey = process.env.HUGGINGFACE_API_KEY;
+        if (!huggingFaceKey || huggingFaceKey.trim().length === 0) {
+          console.log(`[Generate] Whisper AI not configured (HUGGINGFACE_API_KEY missing). See HUGGINGFACE_SETUP.md for setup instructions.`);
+        } else {
+          try {
+            const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
+            if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
+              console.log(`[Generate] Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
+              transcriptResult = {
+                success: true,
+                transcript: whisperResult.transcript,
+                source: "generated" as const,
+              };
+              transcriptSource = "generated";
+            } else {
+              console.log(`[Generate] Whisper AI transcription failed: ${whisperResult.error || "No transcript"}`);
+              transcriptResult = {
+                success: false,
+                transcript: "",
+                error: whisperResult.error || "Whisper AI transcription failed",
+              };
+            }
+          } catch (whisperError) {
+            console.error(`[Generate] Whisper AI transcription error:`, whisperError);
             transcriptResult = {
               success: false,
               transcript: "",
-              error: whisperResult.error || "Whisper AI transcription failed",
+              error: `Whisper AI transcription failed: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`,
             };
           }
-        } catch (whisperError) {
-          console.error(`[Generate] Whisper AI transcription error:`, whisperError);
-          transcriptResult = {
-            success: false,
-            transcript: "",
-            error: `Whisper AI transcription failed: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`,
-          };
         }
       }
     }

@@ -201,6 +201,15 @@ export async function extractFromYouTubeAPI(
             if (timedtextResponse.ok) {
               const responseText = await timedtextResponse.text();
               
+              // Log response status and size for debugging
+              console.log(`[YouTube API] Timedtext API ${format.fmt}/${format.lang} returned: ${responseText?.length || 0} chars, status: ${timedtextResponse.status}`);
+              
+              // Check if response is actually empty or just small
+              if (responseText && responseText.trim().length > 0) {
+                // Log first 200 chars to see what we're getting
+                console.log(`[YouTube API] Timedtext response preview: ${responseText.substring(0, 200)}...`);
+              }
+              
               if (responseText && responseText.trim().length > 100) {
                 // Parse based on format
                 if (format.fmt === 'json3' || format.fmt === 'srv3') {
