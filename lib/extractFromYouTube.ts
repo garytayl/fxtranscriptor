@@ -216,9 +216,39 @@ export async function extractFromYouTubePage(
     let captionTracks: any[] = [];
     
     // Method 1: Look in ytInitialPlayerResponse (most common)
-    const playerResponseMatch = html.match(
+    // YouTube might embed this in a script tag or inline
+    let playerResponseMatch = html.match(
       /var ytInitialPlayerResponse = ({.*?});/s
     );
+    
+    // Also try with more flexible matching (YouTube sometimes uses single quotes, etc.)
+    if (!playerResponseMatch) {
+      playerResponseMatch = html.match(
+        /ytInitialPlayerResponse\s*=\s*({.*?});/s
+      );
+    }
+    
+    // Also check for window["ytInitialPlayerResponse"]
+    if (!playerResponseMatch) {
+      playerResponseMatch = html.match(
+        /window\["ytInitialPlayerResponse"\]\s*=\s*({.*?});/s
+      );
+    }
+    
+    // Also check for embedded in JSON-LD or script tag
+    if (!playerResponseMatch) {
+      const scriptTags = html.matchAll(/<script[^>]*>(.*?)<\/script>/gs);
+      for (const match of scriptTags) {
+        const scriptContent = match[1];
+        if (scriptContent.includes('ytInitialPlayerResponse')) {
+          const innerMatch = scriptContent.match(/ytInitialPlayerResponse\s*[=:]\s*({.*?});/s);
+          if (innerMatch) {
+            playerResponseMatch = innerMatch;
+            break;
+          }
+        }
+      }
+    }
 
     if (playerResponseMatch) {
       try {

@@ -103,36 +103,39 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
     if (sourceType === "youtube" || extractYouTubeVideoId(episodeUrl)) {
       const videoId = extractYouTubeVideoId(episodeUrl);
       if (videoId) {
-        console.log("[fetchTranscript] Attempting YouTube transcript extraction...");
+        console.log(`[fetchTranscript] Attempting YouTube transcript extraction for video: ${videoId}`);
         
-        // Use the youtube-transcript library (primary method - most reliable)
-        const youtubeResult = await extractFromYouTube(episodeUrl);
-        if (youtubeResult.success && youtubeResult.transcript.trim().length > 100) {
-          const cleaned = cleanTranscript(youtubeResult.transcript);
-          if (cleaned.trim().length > 100) {
-            return {
-              success: true,
-              title: youtubeResult.title || "YouTube Video",
-              transcript: cleaned,
-              source: "youtube",
-              videoId: youtubeResult.videoId,
-            };
-          }
-        }
-
-        // Fallback to page-based extraction if library method fails
-        console.log("[fetchTranscript] youtube-transcript library failed, trying page-based extraction...");
+        // Try page-based extraction FIRST (more reliable on Vercel/serverless)
+        // The youtube-transcript library may be blocked by YouTube from Vercel IPs
+        console.log(`[fetchTranscript] Trying page-based extraction first (most reliable on serverless)...`);
         const pageResult = await extractFromYouTubePage(episodeUrl);
         if (pageResult.success && pageResult.transcript.trim().length > 100) {
           const cleaned = cleanTranscript(pageResult.transcript);
           if (cleaned.trim().length > 100) {
-            console.log("[fetchTranscript] Page-based YouTube extraction succeeded");
+            console.log(`[fetchTranscript] ✅ Page-based YouTube extraction succeeded (${cleaned.length} chars)`);
             return {
               success: true,
               title: pageResult.title || "YouTube Video",
               transcript: cleaned,
               source: "youtube",
               videoId: pageResult.videoId,
+            };
+          }
+        }
+
+        // Fallback to youtube-transcript library if page-based fails
+        console.log(`[fetchTranscript] Page-based extraction failed, trying youtube-transcript library...`);
+        const youtubeResult = await extractFromYouTube(episodeUrl);
+        if (youtubeResult.success && youtubeResult.transcript.trim().length > 100) {
+          const cleaned = cleanTranscript(youtubeResult.transcript);
+          if (cleaned.trim().length > 100) {
+            console.log(`[fetchTranscript] ✅ youtube-transcript library succeeded (${cleaned.length} chars)`);
+            return {
+              success: true,
+              title: youtubeResult.title || "YouTube Video",
+              transcript: cleaned,
+              source: "youtube",
+              videoId: youtubeResult.videoId,
             };
           }
         }
