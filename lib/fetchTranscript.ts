@@ -28,7 +28,7 @@ export interface TranscriptResult {
   title?: string;
   transcript: string;
   error?: string;
-  source?: "youtube" | "podbean" | "apple" | "generated";
+  source?: "youtube" | "podbean" | "apple" | "generated" | "unknown";
   videoId?: string;
   audioUrl?: string;
 }
