@@ -1,25 +1,40 @@
 # FX Transcriptor
 
-A Next.js web app that extracts clean, copyable transcripts from Apple Podcasts episodes and other podcast sources.
+A Next.js web app that extracts clean, copyable transcripts from multiple podcast and video sources using a **multi-source aggregation strategy**.
 
 ## Features
 
-- 🎙️ **Simple URL Input** - Just paste an Apple Podcasts episode URL
+- 🎬 **YouTube Support** - Auto-extracts captions from YouTube videos (most reliable)
+- 🎙️ **Podbean Support** - Extracts transcripts from Podbean episodes
 - 📝 **Clean Transcripts** - Automatically cleaned and formatted text
 - 📋 **Copy All** - One-click copy to clipboard
 - 💾 **Download** - Save transcripts as `.txt` files
-- 🔄 **Tiered Extraction** - Multiple fallback strategies for maximum compatibility
+- 🔄 **Multi-Source Strategy** - Automatically selects best available transcript source
 - 🚀 **Vercel-Ready** - Optimized for serverless deployment
+- 📊 **Source Tracking** - Shows which source was used (YouTube/Podbean/Apple)
 
 ## How It Works
 
-The app uses a **tiered extraction strategy**:
+The app uses a **priority-based multi-source strategy**:
 
-1. **Primary**: Attempts to locate and fetch transcript files (VTT, JSON, text)
-2. **Secondary**: Parses WebVTT format if found
-3. **Tertiary**: Extracts from RSS feed metadata
-4. **Fallback**: Best-effort HTML extraction
-5. **Cleanup**: Removes timestamps, normalizes formatting
+### 🥇 Priority 1: YouTube (Most Reliable)
+- Auto-generated captions available for most videos
+- Parses YouTube's caption tracks from video pages
+- Converts captions to clean paragraph text
+
+### 🥈 Priority 2: Podbean (Primary Podcast Host)
+- Extracts transcripts from Podbean episode pages
+- Falls back to RSS feed metadata if available
+- Captures audio URL for future Whisper fallback
+
+### 🥉 Priority 3: Apple Podcasts (Limited)
+- Metadata-only pages, usually no transcripts
+- Attempts VTT file detection and RSS feed parsing
+- Provides helpful error messages directing to better sources
+
+### 🎯 Fallback: Generic HTML Extraction
+- Best-effort extraction from any HTML page
+- Useful for custom podcast hosts
 
 All extraction happens **server-side** to avoid CORS issues.
 
@@ -60,19 +75,30 @@ The app is configured for Vercel's serverless functions with Node.js runtime.
 
 ## Usage
 
-1. Navigate to an Apple Podcasts episode page
-2. Copy the URL from your browser
-3. Paste it into the FX Transcriptor input field
-4. Click "Fetch Transcript"
-5. Copy or download the clean transcript
+### Best Results (Recommended)
+1. **YouTube Video URL** - Paste any YouTube video URL (auto-generated captions)
+2. **Podbean Episode URL** - Paste a Podbean episode page URL
+3. Click "Fetch Transcript"
+4. Copy or download the clean transcript
+
+### Supported URLs
+- YouTube: `https://youtube.com/watch?v=...` or `https://youtu.be/...`
+- Podbean: `https://fxtalk.podbean.com/...`
+- Apple Podcasts: `https://podcasts.apple.com/...` (limited success)
+
+### Why YouTube Works Best
+YouTube auto-generates captions for most videos, making it the **most reliable source** for transcripts. Even if your podcast is primarily hosted on Podbean, if episodes are also posted to YouTube, use the YouTube URL for best results.
 
 ## Error Handling
 
-If a transcript cannot be extracted, the app will display a clear error message. Common reasons:
+If a transcript cannot be extracted, the app will display a clear error message with suggestions. Common scenarios:
 
-- Episode doesn't have a publicly accessible transcript
-- Transcript is behind authentication
-- Network timeout or server error
+- **Podbean**: Transcript may need to be manually generated on Podbean first
+- **Apple Podcasts**: Pages are metadata-only; try YouTube or Podbean URL instead
+- **YouTube**: Video may not have captions enabled (rare for public videos)
+- **Network errors**: Server timeout or unreachable host
+
+The app shows which source it attempted and provides helpful suggestions for alternatives.
 
 ## Architecture
 

@@ -10,6 +10,7 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [source, setSource] = useState<"youtube" | "podbean" | "apple" | "generated" | "unknown" | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ export default function Home() {
     setError("");
     setTranscript("");
     setTitle("");
+    setSource(null);
     setCopied(false);
 
     try {
@@ -58,6 +60,7 @@ export default function Home() {
 
       setTranscript(transcriptText);
       setTitle(data.title || "Untitled Episode");
+      setSource(data.source || null);
       setError("");
     } catch (err) {
       setError(
@@ -152,11 +155,25 @@ export default function Home() {
 
         {/* Title Display */}
         {title && !error && (
-          <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-            <h2 className="text-lg font-semibold text-green-800 dark:text-green-200">
-              {title}
-            </h2>
+          <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <h2 className="text-lg font-semibold text-green-800 dark:text-green-200">
+                {title}
+              </h2>
+            </div>
+            {source && (
+              <div className="text-sm text-green-700 dark:text-green-300 ml-8">
+                Source:{" "}
+                <span className="font-medium capitalize">
+                  {source === "youtube" && "📺 YouTube (Auto-generated captions)"}
+                  {source === "podbean" && "🎙️ Podbean"}
+                  {source === "apple" && "🍎 Apple Podcasts"}
+                  {source === "generated" && "🤖 Auto-generated (Whisper)"}
+                  {source === "unknown" && "❓ Unknown"}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

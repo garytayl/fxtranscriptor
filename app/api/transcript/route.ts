@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
         {
           error: result.error || "Failed to extract transcript",
           title: result.title,
+          source: result.source,
+          audioUrl: result.audioUrl, // For future Whisper fallback
         },
         { status: 404 }
       );
@@ -48,6 +50,7 @@ export async function POST(request: NextRequest) {
         {
           error: "Transcript found but content is too short or empty. The episode may not have a full transcript available.",
           title: result.title,
+          source: result.source,
         },
         { status: 404 }
       );
@@ -56,6 +59,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       title: result.title || "Untitled Episode",
       transcript: cleanedTranscript,
+      source: result.source || "unknown",
+      videoId: result.videoId,
+      audioUrl: result.audioUrl, // For future Whisper fallback
     });
   } catch (error) {
     console.error("API error:", error);

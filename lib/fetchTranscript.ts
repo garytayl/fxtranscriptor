@@ -1,18 +1,36 @@
 /**
  * Orchestrator for tiered transcript extraction
- * Implements the strategy: VTT/JSON → RSS → HTML → fallback
+ * Implements the strategy: YouTube → Podbean → Apple Podcasts → fallback
+ * 
+ * Priority order:
+ * 1. YouTube (auto-generated captions - most reliable)
+ * 2. Podbean (episode page or RSS feed)
+ * 3. Apple Podcasts (metadata only, usually no transcript)
  */
 
 import { extractFromVTT } from "./extractFromVTT";
 import { extractFromHTML } from "./extractFromHTML";
 import { extractFromRSS } from "./extractFromRSS";
 import { cleanTranscript } from "./cleanTranscript";
+import {
+  extractFromYouTube,
+  extractFromYouTubePage,
+  extractYouTubeVideoId,
+} from "./extractFromYouTube";
+import {
+  extractFromPodbean,
+  extractFromPodbeanRSS,
+  isPodbeanUrl,
+} from "./extractFromPodbean";
 
 export interface TranscriptResult {
   success: boolean;
   title?: string;
   transcript: string;
   error?: string;
+  source?: "youtube" | "podbean" | "apple" | "generated";
+  videoId?: string;
+  audioUrl?: string;
 }
 
 const FETCH_TIMEOUT = 15000; // 15 seconds
@@ -48,7 +66,24 @@ async function fetchWithTimeout(
 }
 
 /**
+ * Detects the source type from URL
+ */
+function detectSourceType(url: string): "youtube" | "podbean" | "apple" | "unknown" {
+  if (url.includes("youtube.com") || url.includes("youtu.be")) {
+    return "youtube";
+  }
+  if (isPodbeanUrl(url)) {
+    return "podbean";
+  }
+  if (url.includes("podcasts.apple.com")) {
+    return "apple";
+  }
+  return "unknown";
+}
+
+/**
  * Attempts to find and fetch transcript from various sources
+ * Priority: YouTube → Podbean → Apple Podcasts → HTML fallback
  */
 export async function fetchTranscript(episodeUrl: string): Promise<TranscriptResult> {
   if (!episodeUrl || typeof episodeUrl !== "string") {
@@ -56,23 +91,120 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
       success: false,
       transcript: "",
       error: "Invalid URL provided",
+      source: "unknown",
     };
   }
 
-  try {
-    // Step 1: Fetch the episode page
-    const response = await fetchWithTimeout(episodeUrl);
+  const sourceType = detectSourceType(episodeUrl);
 
-    if (!response.ok) {
-      return {
-        success: false,
-        transcript: "",
-        error: `Failed to fetch episode page: ${response.status} ${response.statusText}`,
-      };
+  try {
+    // 🥇 PRIORITY 1: YouTube (most reliable - auto-generated captions)
+    if (sourceType === "youtube" || extractYouTubeVideoId(episodeUrl)) {
+      const videoId = extractYouTubeVideoId(episodeUrl);
+      if (videoId) {
+        console.log("Attempting YouTube transcript extraction...");
+        
+        // Try page-based extraction first (more reliable)
+        const youtubeResult = await extractFromYouTubePage(episodeUrl);
+        if (youtubeResult.success && youtubeResult.transcript.trim().length > 100) {
+          const cleaned = cleanTranscript(youtubeResult.transcript);
+          if (cleaned.trim().length > 100) {
+            return {
+              success: true,
+              title: youtubeResult.title || "YouTube Video",
+              transcript: cleaned,
+              source: "youtube",
+              videoId: youtubeResult.videoId,
+            };
+          }
+        }
+
+        // Fallback to API method
+        const apiResult = await extractFromYouTube(episodeUrl);
+        if (apiResult.success && apiResult.transcript.trim().length > 100) {
+          const cleaned = cleanTranscript(apiResult.transcript);
+          if (cleaned.trim().length > 100) {
+            return {
+              success: true,
+              title: apiResult.title || "YouTube Video",
+              transcript: cleaned,
+              source: "youtube",
+              videoId: apiResult.videoId,
+            };
+          }
+        }
+      }
     }
 
-    const html = await response.text();
-    const htmlResult = extractFromHTML(html);
+    // 🥈 PRIORITY 2: Podbean (primary podcast host)
+    if (sourceType === "podbean" || isPodbeanUrl(episodeUrl)) {
+      console.log("Attempting Podbean transcript extraction...");
+      
+      // Try episode page first
+      const podbeanResult = await extractFromPodbean(episodeUrl);
+      if (podbeanResult.success && podbeanResult.transcript.trim().length > 100) {
+        const cleaned = cleanTranscript(podbeanResult.transcript);
+        if (cleaned.trim().length > 100) {
+          return {
+            success: true,
+            title: podbeanResult.title || "Podbean Episode",
+            transcript: cleaned,
+            source: "podbean",
+            audioUrl: podbeanResult.audioUrl,
+          };
+        }
+      }
+
+      // Try RSS feed if available
+      if (podbeanResult.rssUrl) {
+        const rssResult = await extractFromPodbeanRSS(podbeanResult.rssUrl);
+        if (rssResult.success && rssResult.transcript.trim().length > 100) {
+          const cleaned = cleanTranscript(rssResult.transcript);
+          if (cleaned.trim().length > 100) {
+            return {
+              success: true,
+              title: rssResult.title || podbeanResult.title || "Podbean Episode",
+              transcript: cleaned,
+              source: "podbean",
+              audioUrl: rssResult.audioUrl || podbeanResult.audioUrl,
+            };
+          }
+        }
+      }
+
+      // Podbean transcript not found, but we have audio URL for future Whisper fallback
+      if (podbeanResult.audioUrl) {
+        return {
+          success: false,
+          transcript: "",
+          title: podbeanResult.title,
+          audioUrl: podbeanResult.audioUrl,
+          source: "podbean",
+          error:
+            "Transcript not found on Podbean page. The transcript may need to be manually generated on Podbean, or you can try the YouTube version of this episode if available.",
+        };
+      }
+    }
+
+    // 🥉 PRIORITY 3: Apple Podcasts (metadata only, usually no transcript)
+    // But we'll try anyway for completeness
+    if (sourceType === "apple") {
+      console.log("Attempting Apple Podcasts extraction (limited success expected)...");
+      
+      // Fetch the episode page
+      const response = await fetchWithTimeout(episodeUrl);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          transcript: "",
+          error: `Failed to fetch episode page: ${response.status} ${response.statusText}`,
+          source: "apple",
+        };
+      }
+
+      const html = await response.text();
+      const htmlResult = extractFromHTML(html);
 
     // Step 2: Look for JSON-LD structured data that might contain transcript links
     const jsonLdPattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis;
@@ -172,6 +304,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
                 success: true,
                 title: htmlResult.title,
                 transcript: cleaned,
+                source: "apple",
               };
             }
           }
@@ -198,6 +331,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
               success: true,
               title: htmlResult.title,
               transcript: cleaned,
+              source: "apple",
             };
           }
         }
@@ -217,6 +351,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
                     success: true,
                     title: htmlResult.title,
                     transcript: cleaned,
+                    source: "apple",
                   };
                 }
               }
@@ -237,21 +372,60 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
           success: true,
           title: htmlResult.title,
           transcript: cleaned,
+          source: "apple",
         };
       }
     }
 
     // Step 6: If nothing worked, return helpful error
+      return {
+        success: false,
+        transcript: "",
+        title: htmlResult.title,
+        source: "apple",
+        error:
+          "Unable to find a transcript for this Apple Podcasts episode. Apple Podcasts pages are metadata-only and typically don't contain transcripts.\n\n" +
+          "💡 Try these instead:\n" +
+          "• The Podbean episode URL (if available)\n" +
+          "• The YouTube video URL (if the episode is on YouTube)\n" +
+          "• The podcast's RSS feed URL",
+      };
+    }
+
+    // If we reach here, source type was unknown or generic URL
+    // Try generic HTML extraction as last resort
+    try {
+      const response = await fetchWithTimeout(episodeUrl);
+      if (response.ok) {
+        const html = await response.text();
+        const htmlResult = extractFromHTML(html);
+
+        if (htmlResult.success && htmlResult.transcript.length > 100) {
+          const cleaned = cleanTranscript(htmlResult.transcript);
+          if (cleaned.trim().length > 100) {
+            return {
+              success: true,
+              title: htmlResult.title,
+              transcript: cleaned,
+              source: "unknown",
+            };
+          }
+        }
+      }
+    } catch (fallbackError) {
+      console.warn("Generic HTML extraction failed:", fallbackError);
+    }
+
+    // Final fallback: return helpful error
     return {
       success: false,
       transcript: "",
-      title: htmlResult.title,
+      source: sourceType,
       error:
-        "Unable to find a transcript for this episode. Apple Podcasts pages typically don't include transcripts—they only show metadata. To get transcripts, you'll need to:\n\n" +
-        "1. Find the podcast's RSS feed URL\n" +
-        "2. Check if transcripts are available in the RSS feed metadata\n" +
-        "3. Or contact the podcast host directly\n\n" +
-        "If this podcast episode should have a transcript, try pasting the podcast RSS feed URL or the hosting provider's episode page URL instead.",
+        "Unable to extract transcript from this URL. Please try:\n\n" +
+        "• YouTube video URL (most reliable - auto-generated captions)\n" +
+        "• Podbean episode URL\n" +
+        "• Direct transcript file link (.vtt, .srt)",
     };
   } catch (error) {
     console.error("Error fetching transcript:", error);
@@ -261,6 +435,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
         return {
           success: false,
           transcript: "",
+          source: sourceType,
           error: "Request timed out. The server may be slow or unreachable.",
         };
       }
@@ -269,6 +444,7 @@ export async function fetchTranscript(episodeUrl: string): Promise<TranscriptRes
     return {
       success: false,
       transcript: "",
+      source: sourceType,
       error: `Failed to fetch transcript: ${error instanceof Error ? error.message : "Unknown error"}`,
     };
   }
