@@ -347,16 +347,66 @@ export async function extractFromYouTubePage(
       }
     }
 
-    // Method 3: Direct search for caption URLs in HTML
+    // Method 3: Direct search for caption URLs in HTML using multiple patterns
     if (captionTracks.length === 0) {
       console.log(`[YouTube Page] Searching for caption URLs directly in HTML...`);
-      const captionUrlPattern = /"captionTracks":\s*\[(.*?)\]/s;
-      const captionMatch = html.match(captionUrlPattern);
-      if (captionMatch) {
+      
+      // Pattern 1: Standard captionTracks array
+      let captionMatch = html.match(/"captionTracks"\s*:\s*\[(.*?)\]/s);
+      if (!captionMatch) {
+        // Pattern 2: Single quotes
+        captionMatch = html.match(/'captionTracks'\s*:\s*\[(.*?)\]/s);
+      }
+      if (!captionMatch) {
+        // Pattern 3: Look for baseUrl directly (caption track URLs contain 'timedtext')
+        const timedtextMatches = html.matchAll(/"(https:\/\/[^"]*timedtext[^"]*)"/g);
+        const urls = Array.from(timedtextMatches).map(m => m[1]);
+        if (urls.length > 0) {
+          console.log(`[YouTube Page] Found ${urls.length} timedtext URLs in HTML`);
+          // Create caption track objects from URLs
+          captionTracks = urls.slice(0, 5).map((url: string) => ({
+            baseUrl: url,
+            languageCode: 'en', // Default, might not be accurate
+          }));
+          console.log(`[YouTube Page] Created ${captionTracks.length} caption tracks from timedtext URLs`);
+        }
+      }
+      
+      if (captionMatch && captionTracks.length === 0) {
         try {
-          const captionJson = JSON.parse(`[${captionMatch[1]}]`);
-          captionTracks = captionJson.filter((track: any) => track.baseUrl);
-          console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks via direct search`);
+          // Try to extract and parse the array
+          const arrayContent = captionMatch[1];
+          // Find complete objects within the array
+          const objects = [];
+          let depth = 0;
+          let currentObj = '';
+          for (let i = 0; i < arrayContent.length; i++) {
+            const char = arrayContent[i];
+            if (char === '{') {
+              if (depth === 0) currentObj = '';
+              depth++;
+              currentObj += char;
+            } else if (char === '}') {
+              currentObj += char;
+              depth--;
+              if (depth === 0 && currentObj) {
+                try {
+                  const obj = JSON.parse(currentObj);
+                  if (obj.baseUrl) objects.push(obj);
+                } catch (e) {
+                  // Skip invalid JSON objects
+                }
+                currentObj = '';
+              }
+            } else if (depth > 0) {
+              currentObj += char;
+            }
+          }
+          
+          if (objects.length > 0) {
+            captionTracks = objects;
+            console.log(`[YouTube Page] Found ${captionTracks.length} caption tracks via HTML parsing`);
+          }
         } catch (e) {
           console.error(`[YouTube Page] Error parsing caption tracks from HTML:`, e);
         }
