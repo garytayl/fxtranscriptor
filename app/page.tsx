@@ -106,10 +106,11 @@ export default function Home() {
         body: JSON.stringify({ sermonId: sermon.id }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-        const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
+      const data = await response.json().catch(() => ({ error: "Failed to parse response" }));
+
+      if (!response.ok && response.status !== 200) {
+        const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
+        const details = data.details ? `\n\nDetails: ${data.details}` : "";
         
         if (errorMsg.includes("not found") && !errorMsg.includes("tables")) {
           alert(`Sermon not found: ${errorMsg}\n\nTry syncing the catalog first.`);
@@ -130,8 +131,6 @@ export default function Home() {
         return;
       }
 
-      const data = await response.json();
-
       if (data.success && data.sermon) {
         // Update sermon in local state
         setSermons((prev) =>
@@ -139,8 +138,20 @@ export default function Home() {
         );
         setSelectedSermon(data.sermon);
       } else {
+        // Handle case where transcript generation failed (status 200, but success: false)
         const errorMsg = data.error || "Unknown error";
-        alert(`Failed to generate transcript: ${errorMsg}\n\n${sermon.youtube_url ? "Tried YouTube first, then " : ""}${sermon.podbean_url ? "Podbean. " : ""}Transcript may not be available for this episode.`);
+        const attemptedUrls = data.attemptedUrls ? `\n\n${data.attemptedUrls.map((u: string) => `• ${u}`).join('\n')}` : '';
+        
+        // More helpful error message
+        let userMessage = `Failed to generate transcript: ${errorMsg}${attemptedUrls}`;
+        
+        if (!sermon.youtube_url && !sermon.podbean_url) {
+          userMessage = "No YouTube or Podbean URL available for this sermon. Cannot generate transcript.";
+        } else if (errorMsg.includes("Unable to extract transcript")) {
+          userMessage = `No transcript found for this sermon.${attemptedUrls}\n\nPossible reasons:\n• Video has no captions enabled\n• Podbean episode has no transcript\n• Transcript is not publicly accessible\n\nYou may need to:\n• Enable captions on YouTube video\n• Add transcript to Podbean episode\n• Use Whisper AI transcription (coming soon)`;
+        }
+        
+        alert(userMessage);
         
         // Update sermon status to failed
         setSermons((prev) =>

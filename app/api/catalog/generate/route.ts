@@ -77,23 +77,78 @@ export async function POST(request: NextRequest) {
       .update({ status: "generating" })
       .eq("id", sermonId);
 
+    // Check if sermon has any URLs to extract from
+    if (!sermon.youtube_url && !sermon.podbean_url) {
+      const errorMessage = "No YouTube or Podbean URL available for this sermon. Cannot generate transcript.";
+      
+      await supabase
+        .from("sermons")
+        .update({
+          status: "failed",
+          error_message: errorMessage,
+        })
+        .eq("id", sermonId);
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: errorMessage,
+          sermon: {
+            ...sermon,
+            status: "failed",
+            error_message: errorMessage,
+          },
+        },
+        { status: 200 } // 200 because request was successful, just no transcript available
+      );
+    }
+
     // Try to fetch transcript from available sources (YouTube preferred, then Podbean)
     let transcriptResult = null;
     let transcriptSource: string | null = null;
+    const attemptedUrls: string[] = [];
 
     // Priority 1: Try YouTube
     if (sermon.youtube_url) {
-      transcriptResult = await fetchTranscript(sermon.youtube_url);
-      if (transcriptResult.success && transcriptResult.transcript.trim().length > 100) {
-        transcriptSource = transcriptResult.source || "youtube";
+      console.log(`[Generate] Attempting YouTube transcript for: ${sermon.youtube_url}`);
+      attemptedUrls.push(`YouTube: ${sermon.youtube_url}`);
+      try {
+        transcriptResult = await fetchTranscript(sermon.youtube_url);
+        if (transcriptResult.success && transcriptResult.transcript.trim().length > 100) {
+          transcriptSource = transcriptResult.source || "youtube";
+          console.log(`[Generate] YouTube transcript extracted successfully (${transcriptResult.transcript.length} chars)`);
+        } else {
+          console.log(`[Generate] YouTube extraction failed: ${transcriptResult.error || "No transcript found"}`);
+        }
+      } catch (youtubeError) {
+        console.error(`[Generate] YouTube extraction error:`, youtubeError);
+        transcriptResult = {
+          success: false,
+          transcript: "",
+          error: `YouTube extraction failed: ${youtubeError instanceof Error ? youtubeError.message : "Unknown error"}`,
+        };
       }
     }
 
     // Priority 2: Try Podbean if YouTube failed
     if (!transcriptResult?.success && sermon.podbean_url) {
-      transcriptResult = await fetchTranscript(sermon.podbean_url);
-      if (transcriptResult.success && transcriptResult.transcript.trim().length > 100) {
-        transcriptSource = transcriptResult.source || "podbean";
+      console.log(`[Generate] Attempting Podbean transcript for: ${sermon.podbean_url}`);
+      attemptedUrls.push(`Podbean: ${sermon.podbean_url}`);
+      try {
+        transcriptResult = await fetchTranscript(sermon.podbean_url);
+        if (transcriptResult.success && transcriptResult.transcript.trim().length > 100) {
+          transcriptSource = transcriptResult.source || "podbean";
+          console.log(`[Generate] Podbean transcript extracted successfully (${transcriptResult.transcript.length} chars)`);
+        } else {
+          console.log(`[Generate] Podbean extraction failed: ${transcriptResult.error || "No transcript found"}`);
+        }
+      } catch (podbeanError) {
+        console.error(`[Generate] Podbean extraction error:`, podbeanError);
+        transcriptResult = {
+          success: false,
+          transcript: "",
+          error: `Podbean extraction failed: ${podbeanError instanceof Error ? podbeanError.message : "Unknown error"}`,
+        };
       }
     }
 
@@ -120,7 +175,10 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Update with error status
-      const errorMessage = transcriptResult?.error || "Failed to extract transcript from available sources";
+      const attemptedSources = attemptedUrls.length > 0 ? `\n\nAttempted sources:\n${attemptedUrls.map(u => `• ${u}`).join('\n')}` : '';
+      const errorMessage = transcriptResult?.error || `Failed to extract transcript from available sources.${attemptedSources}`;
+      
+      console.log(`[Generate] Transcript generation failed for sermon "${sermon.title}": ${errorMessage}`);
       
       await supabase
         .from("sermons")
@@ -139,8 +197,9 @@ export async function POST(request: NextRequest) {
             status: "failed",
             error_message: errorMessage,
           },
+          attemptedUrls,
         },
-        { status: 404 }
+        { status: 200 } // Changed from 404 to 200 - this is a valid response, just no transcript found
       );
     }
   } catch (error) {

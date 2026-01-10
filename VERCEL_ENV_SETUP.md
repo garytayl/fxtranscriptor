@@ -24,9 +24,54 @@ These have defaults already set, but you can override them if needed:
    - Default: `@fxchurch`
    - Only set if your YouTube channel is different
 
+## Your Local Environment File
+
+Your `.env.local` file is already set up at:
+```
+/Users/garytaylor/Documents/fxtranscriptor/.env.local
+```
+
+It contains:
+- ✅ `NEXT_PUBLIC_SUPABASE_URL`
+- ✅ `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- ✅ `PODBEAN_RSS_URL`
+- ✅ `YOUTUBE_CHANNEL_ID`
+
 ## How to Set on Vercel
 
-### Method 1: Via Vercel Dashboard (Recommended)
+### Method 1: Via Vercel CLI (Fastest - Recommended if you have CLI installed)
+
+```bash
+# Install Vercel CLI if not installed
+npm i -g vercel
+
+# Login to Vercel
+vercel login
+
+# Link your project (if not already linked)
+vercel link
+
+# Pull env vars from your .env.local (syncs to Vercel)
+# This will prompt you to add each variable
+vercel env add NEXT_PUBLIC_SUPABASE_URL production preview development
+# Paste: https://mfzrunlgkpbtiwuzmivq.supabase.co
+
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production preview development
+# Paste: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1menJ1bmxna3BidGl3dXptaXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNzExOTcsImV4cCI6MjA4MzY0NzE5N30.0t5wve3InEVRGev5i_FwTohcxvZ_rmo4QwWTULv5RSc
+
+vercel env add PODBEAN_RSS_URL production preview development
+# Paste: https://fxtalk.podbean.com/feed.xml
+
+vercel env add YOUTUBE_CHANNEL_ID production preview development
+# Paste: @fxchurch
+
+# Redeploy with new env vars
+vercel --prod
+```
+
+**OR** you can manually copy the values from your `.env.local` file.
+
+### Method 2: Via Vercel Dashboard (Manual - Easiest)
 
 1. Go to your project on Vercel: https://vercel.com/dashboard
 2. Click on your **FX Transcriptor** project
