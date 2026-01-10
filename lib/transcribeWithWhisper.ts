@@ -82,25 +82,29 @@ export async function transcribeWithWhisper(
     
     console.log(`[Whisper] Sending audio to Hugging Face Whisper API...`);
     
-    // Use Hugging Face Inference API - free tier, no credit card required
+    // Use Hugging Face Router API - free tier, no credit card required
     // Model: openai/whisper-large-v3 (most accurate)
+    // Updated to use router.huggingface.co (api-inference.huggingface.co is deprecated as of 2024)
     // Hugging Face accepts audio as base64-encoded string in JSON format
     // Note: This works for Node.js serverless environments
     const base64Audio = audioBuffer.toString('base64');
     
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/openai/whisper-large-v3',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: base64Audio,
-        }),
-      }
-    );
+    // Use the new router endpoint (migrated from api-inference.huggingface.co)
+    // Format: https://router.huggingface.co/models/{model_id}
+    const apiUrl = 'https://router.huggingface.co/models/openai/whisper-large-v3';
+    
+    console.log(`[Whisper] Using Hugging Face Router API: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: base64Audio,
+      }),
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
