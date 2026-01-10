@@ -7,6 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { HeroSection } from "@/components/hero-section";
+import { SideNav } from "@/components/side-nav";
 import { Sermon } from "@/lib/supabase";
 import { format } from "date-fns";
 
@@ -240,29 +242,31 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen">
+      <SideNav />
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
       
-      <div className="relative z-10 container mx-auto px-4 md:px-8 py-12 md:py-16">
-        {/* Header */}
-        <div className="mb-12 text-center">
-          <h1 className="text-5xl md:text-7xl font-black mb-4 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-            FX Transcriptor
-          </h1>
-          <p className="text-muted-foreground text-lg font-light">
-            Sermon Transcript Catalog • 818 Episodes Available
-          </p>
-        </div>
+      <div className="relative z-10">
+        <HeroSection />
+        
+        {/* Sermons Section */}
+        <section id="sermons" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+          <div className="mb-16">
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Catalog</span>
+            <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERMONS</h2>
+            <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
+              {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} in catalog • Sync from Podbean and YouTube
+            </p>
+          </div>
 
-        {/* Actions */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-4 justify-between items-center">
-          <div className="flex gap-2 items-center">
+          {/* Actions */}
+          <div className="mb-12 flex flex-col sm:flex-row gap-4 items-center">
             <Button
               onClick={syncCatalog}
               disabled={syncing}
               variant="outline"
-              className="gap-2"
+              className="gap-2 border-foreground/20 font-mono text-xs uppercase tracking-widest hover:border-accent hover:text-accent"
             >
-              <RefreshCw className={syncing ? "animate-spin" : ""} />
+              <RefreshCw className={syncing ? "animate-spin size-4" : "size-4"} />
               {syncing ? "Syncing..." : "Sync Catalog"}
             </Button>
             <Button
@@ -270,14 +274,11 @@ export default function Home() {
               disabled={loading}
               variant="ghost"
               size="sm"
+              className="font-mono text-xs uppercase tracking-widest"
             >
               Refresh
             </Button>
           </div>
-          <div className="text-sm text-muted-foreground font-mono">
-            {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} in catalog
-          </div>
-        </div>
 
         {/* Sermon List */}
         {loading ? (
@@ -405,6 +406,7 @@ export default function Home() {
             ))}
           </div>
         )}
+        </section>
 
         {/* Transcript Dialog */}
         <Dialog open={!!selectedSermon} onOpenChange={(open) => !open && setSelectedSermon(null)}>
