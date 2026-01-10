@@ -36,7 +36,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 # Podcast Configuration (optional - defaults are set)
-PODBEAN_RSS_URL=https://fxtalk.podbean.com/feed/
+PODBEAN_RSS_URL=https://feed.podbean.com/fxtalk/feed.xml
 YOUTUBE_CHANNEL_ID=@fxchurch
 ```
 
