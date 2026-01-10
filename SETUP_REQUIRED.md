@@ -33,12 +33,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 If your RSS feed or YouTube channel are different from defaults, provide:
 
-- **Podbean RSS URL**: Currently defaults to `https://fxtalk.podbean.com/feed/`
-  - ✅ If this is correct, no action needed
-  - ❌ If different, add to `.env.local`:
-    ```bash
-    PODBEAN_RSS_URL=https://your-actual-feed-url.com/feed/
-    ```
+- **Podbean RSS URL**: ✅ Set to `https://feed.podbean.com/fxtalk/feed.xml` (confirmed)
+  - No action needed - this is the correct feed URL
 
 - **YouTube Channel**: Currently defaults to `@fxchurch`
   - ✅ If this is correct, no action needed

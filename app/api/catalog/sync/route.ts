@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get RSS URL and YouTube channel from env or use defaults
-    const podbeanRssUrl = process.env.PODBEAN_RSS_URL || "https://fxtalk.podbean.com/feed/";
+    const podbeanRssUrl = process.env.PODBEAN_RSS_URL || "https://feed.podbean.com/fxtalk/feed.xml";
     const youtubeChannel = process.env.YOUTUBE_CHANNEL_ID || "@fxchurch";
 
     // Fetch catalogs

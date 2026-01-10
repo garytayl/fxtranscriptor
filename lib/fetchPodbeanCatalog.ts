@@ -12,7 +12,7 @@ export interface PodbeanEpisode {
 }
 
 export async function fetchPodbeanCatalog(
-  rssUrl: string = 'https://fxtalk.podbean.com/feed/'
+  rssUrl: string = 'https://feed.podbean.com/fxtalk/feed.xml'
 ): Promise<PodbeanEpisode[]> {
   try {
     const controller = new AbortController();
