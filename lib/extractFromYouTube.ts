@@ -516,8 +516,94 @@ export async function extractFromYouTubePage(
       } else {
         console.error(`[YouTube Page] Caption track has no baseUrl`);
       }
-    } else {
-      console.log(`[YouTube Page] No caption tracks found in page HTML`);
+    }
+    
+    // Method 4: Try direct YouTube timedtext API as last resort
+    // Even if we can't find the URL in HTML, we can try common API patterns
+    if (captionTracks.length === 0) {
+      console.log(`[YouTube Page] No caption tracks found in HTML, trying direct API endpoints...`);
+      
+      // YouTube's timedtext API pattern (might work even if not in HTML)
+      const timedtextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3`;
+      try {
+        const directResponse = await fetch(timedtextUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; TranscriptBot/1.0)",
+            "Accept": "text/xml,application/xml,*/*",
+          },
+        });
+        
+        if (directResponse.ok) {
+          const xml = await directResponse.text();
+          console.log(`[YouTube Page] Direct timedtext API returned ${xml.length} chars`);
+          
+          if (xml.includes('<text') || xml.includes('WEBVTT')) {
+            // We got valid caption XML
+            let textContent = xml
+              .replace(/<text[^>]*start="[^"]*"[^>]*dur="[^"]*"[^>]*>([^<]*)<\/text>/gi, "$1 ")
+              .replace(/<text[^>]*>([^<]*)<\/text>/gi, "$1 ")
+              .replace(/<[^>]*>/g, "")
+              .replace(/&quot;/g, '"')
+              .replace(/&amp;/g, "&")
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">")
+              .replace(/&#39;/g, "'")
+              .replace(/&apos;/g, "'")
+              .replace(/&#8217;/g, "'")
+              .replace(/&#8220;/g, '"')
+              .replace(/&#8221;/g, '"')
+              .replace(/\s+/g, " ")
+              .trim();
+            
+            if (textContent.length > 100) {
+              console.log(`[YouTube Page] Successfully extracted from direct API (${textContent.length} chars)`);
+              
+              // Format into paragraphs
+              const sentences = textContent
+                .replace(/\. +/g, ".\n")
+                .split("\n")
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0);
+              
+              const paragraphs: string[] = [];
+              let currentParagraph = "";
+              
+              for (const sentence of sentences) {
+                if (currentParagraph.length + sentence.length > 500) {
+                  if (currentParagraph) paragraphs.push(currentParagraph.trim());
+                  currentParagraph = sentence;
+                } else {
+                  currentParagraph += (currentParagraph ? " " : "") + sentence;
+                }
+              }
+              
+              if (currentParagraph) {
+                paragraphs.push(currentParagraph.trim());
+              }
+              
+              const transcript = paragraphs.join("\n\n");
+              
+              if (transcript.trim().length > 100) {
+                console.log(`[YouTube Page] ✅ Direct API extraction succeeded (${transcript.length} chars)`);
+                return {
+                  success: true,
+                  transcript,
+                  title,
+                  videoId,
+                };
+              }
+            }
+          }
+        } else {
+          console.log(`[YouTube Page] Direct timedtext API returned ${directResponse.status}`);
+        }
+      } catch (apiError) {
+        console.error(`[YouTube Page] Direct API fetch failed:`, apiError);
+      }
+    }
+    
+    if (captionTracks.length === 0) {
+      console.log(`[YouTube Page] No caption tracks found after all search methods`);
     }
 
     return { success: false, transcript: "", title, videoId };
