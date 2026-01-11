@@ -21,8 +21,10 @@ export async function GET(
       );
     }
 
-    // Handle both Promise and direct params (Next.js 14 vs 15 compatibility)
-    const resolvedParams = params instanceof Promise ? await params : params;
+    // Handle both Promise and direct params (Next.js 14 vs 15+ compatibility)
+    const resolvedParams = 'then' in params && typeof (params as any).then === 'function' 
+      ? await (params as Promise<{ id: string }>)
+      : params as { id: string };
     const { id } = resolvedParams;
 
     if (!id || typeof id !== "string") {
