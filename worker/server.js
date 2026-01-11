@@ -73,18 +73,18 @@ function chunkAudio(inputFile, outputDir, chunkDuration = 600) {
     
     const outputPattern = path.join(outputDir, 'chunk_%03d.mp3');
     let chunkFiles = [];
-    let currentChunkIndex = 0;
 
     ffmpeg(inputFile)
       .audioCodec('libmp3lame')
       .audioBitrate(64)
       .audioFrequency(16000)
       .audioChannels(1)
-      .format('segment')
-      .segmentTime(chunkDuration)
       .outputOptions([
-        '-reset_timestamps', '1',
+        '-f', 'segment',
+        '-segment_time', chunkDuration.toString(),
         '-segment_format', 'mp3',
+        '-reset_timestamps', '1',
+        '-c', 'copy', // Try copy first for speed
       ])
       .output(outputPattern)
       .on('start', (commandLine) => {
