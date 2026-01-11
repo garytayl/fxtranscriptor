@@ -39,14 +39,16 @@ async function transcribeAudio(audioUrl, retries = 3) {
     contentType = 'audio/wav';
   }
 
-  // Try providers in order
-  const providers = ['hf-inference', 'fal-ai'];
+  // Try endpoints in order (direct inference API, then router with different providers)
+  const endpoints = [
+    'https://api-inference.huggingface.co/models/openai/whisper-large-v3',
+    'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+  ];
   
-  for (const provider of providers) {
+  for (const endpoint of endpoints) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const endpoint = `https://router.huggingface.co/${provider}/models/openai/whisper-large-v3`;
-        console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${provider}...`);
+        console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${endpoint}...`);
 
         const formData = new FormData();
         formData.append('inputs', audioBuffer, {
@@ -62,19 +64,29 @@ async function transcribeAudio(audioUrl, retries = 3) {
           timeout: 600000, // 10 minutes
         });
 
+        // Handle different response formats
+        let transcript = null;
         if (response.data && response.data.text) {
-          const transcript = response.data.text.trim();
+          transcript = response.data.text.trim();
+        } else if (typeof response.data === 'string') {
+          transcript = response.data.trim();
+        } else if (response.data && Array.isArray(response.data) && response.data[0] && response.data[0].text) {
+          transcript = response.data[0].text.trim();
+        }
+
+        if (transcript && transcript.length > 0) {
           console.log(`[Transcribe] ✅ Successfully transcribed (${transcript.length} chars)`);
           return transcript;
         } else {
           throw new Error('Invalid response format from Hugging Face');
         }
       } catch (error) {
-        const isLastAttempt = attempt === retries && provider === providers[providers.length - 1];
+        const isLastAttempt = attempt === retries && endpoint === endpoints[endpoints.length - 1];
         if (isLastAttempt) {
           throw error;
         }
-        console.log(`[Transcribe] Attempt ${attempt} failed: ${error.message}`);
+        const statusCode = error.response?.status || 'unknown';
+        console.log(`[Transcribe] Attempt ${attempt} failed: ${error.message} (status: ${statusCode})`);
         await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
       }
     }
