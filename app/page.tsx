@@ -804,6 +804,19 @@ export default function Home() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Audio URL Dialog - Simple modal for setting audio URL */}
+        <AudioUrlDialog
+          sermon={audioUrlDialogSermon}
+          open={audioUrlDialogOpen}
+          onOpenChange={(open) => {
+            setAudioUrlDialogOpen(open);
+            if (!open) {
+              setAudioUrlDialogSermon(null);
+            }
+          }}
+          onSave={updateAudioUrl}
+        />
       </div>
     </main>
   );
