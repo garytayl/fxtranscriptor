@@ -208,6 +208,15 @@ export async function transcribeWithWhisper(
           break;
         }
         
+        // If 502/503, server error or timeout - try next endpoint/format
+        if (response.status === 502 || response.status === 504) {
+          lastError = `${response.status} - ${responseText.substring(0, 200)}`;
+          console.log(`[Whisper] Endpoint ${apiUrl} returned ${response.status} (server error/timeout)`);
+          console.log(`[Whisper] This may be due to large file size. Trying next endpoint/format...`);
+          response = null;
+          continue; // Try next endpoint/format
+        }
+        
         // If 401/403, token permission issue - check if it's missing Inference Providers permission
         if (response.status === 401 || response.status === 403) {
           lastError = `${response.status} - ${responseText.substring(0, 200)}`;
