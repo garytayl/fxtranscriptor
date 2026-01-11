@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink } from "lucide-react";
+import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { HeroSection } from "@/components/hero-section";
 import { SideNav } from "@/components/side-nav";
@@ -22,6 +23,9 @@ export default function Home() {
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [playlistSeriesMap, setPlaylistSeriesMap] = useState<Map<string, string>>(new Map());
+  const [showAudioOverride, setShowAudioOverride] = useState(false);
+  const [audioOverrideUrl, setAudioOverrideUrl] = useState("");
+  const [updatingAudio, setUpdatingAudio] = useState(false);
 
   // Group sermons by series (using playlist data if available)
   const { series: sermonSeries, ungrouped } = useMemo(() => {
@@ -561,27 +565,157 @@ export default function Home() {
                 </DialogFooter>
               </>
             ) : (
-              <div className="py-12 text-center text-muted-foreground">
-                <p>No transcript available for this sermon.</p>
-                {selectedSermon && (
-                  <Button
-                    className="mt-4"
-                    onClick={() => selectedSermon && generateTranscript(selectedSermon)}
-                    disabled={generating.has(selectedSermon.id)}
-                  >
-                    {generating.has(selectedSermon.id) ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin mr-2" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="size-4 mr-2" />
-                        Generate Transcript
-                      </>
+              <div className="flex flex-col gap-6">
+                {/* Audio URL Override Section */}
+                {(!selectedSermon?.audio_url || selectedSermon.status === "failed") && (
+                  <div className="border rounded-lg p-4 bg-card">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-semibold font-mono uppercase tracking-widest mb-1">
+                          {selectedSermon?.audio_url ? "Update Audio URL" : "Manual Audio URL Override"}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedSermon?.audio_url 
+                            ? "Update the audio URL if the current one is incorrect."
+                            : "Paste a Podbean episode URL or direct MP3/M4A URL to enable transcript generation."}
+                        </p>
+                      </div>
+                      {!showAudioOverride && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="font-mono text-xs uppercase tracking-widest"
+                          onClick={() => {
+                            setShowAudioOverride(true);
+                            setAudioOverrideUrl(selectedSermon?.audio_url || "");
+                          }}
+                        >
+                          <Link2 className="size-3 mr-2" />
+                          {selectedSermon?.audio_url ? "Update" : "Set Audio URL"}
+                        </Button>
+                      )}
+                    </div>
+
+                    {showAudioOverride && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-1.5 block">
+                            Audio URL or Podbean Episode URL
+                          </label>
+                          <Input
+                            type="url"
+                            placeholder="https://... (MP3/M4A URL or Podbean episode URL)"
+                            value={audioOverrideUrl}
+                            onChange={(e) => setAudioOverrideUrl(e.target.value)}
+                            className="font-mono text-xs"
+                            disabled={updatingAudio}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1.5">
+                            Paste either: (1) Direct MP3/M4A URL, or (2) Podbean episode URL (we'll extract the audio URL)
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="font-mono text-xs uppercase tracking-widest"
+                            onClick={() => {
+                              if (!audioOverrideUrl.trim()) {
+                                alert("Please enter an audio URL or Podbean episode URL");
+                                return;
+                              }
+                              
+                              // Check if it's a Podbean URL or direct audio URL
+                              const isPodbeanUrl = audioOverrideUrl.includes("podbean.com");
+                              const isDirectAudio = /\.(mp3|m4a|wav|ogg)(\?|$)/i.test(audioOverrideUrl);
+                              
+                              if (!isPodbeanUrl && !isDirectAudio) {
+                                if (!confirm("This doesn't look like a Podbean URL or direct audio URL. Continue anyway?")) {
+                                  return;
+                                }
+                              }
+                              
+                              updateAudioUrl(
+                                selectedSermon!,
+                                isDirectAudio ? audioOverrideUrl : "",
+                                isPodbeanUrl ? audioOverrideUrl : undefined
+                              );
+                            }}
+                            disabled={updatingAudio || !audioOverrideUrl.trim()}
+                          >
+                            {updatingAudio ? (
+                              <>
+                                <Loader2 className="size-3 mr-2 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="size-3 mr-2" />
+                                Save Audio URL
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="font-mono text-xs uppercase tracking-widest"
+                            onClick={() => {
+                              setShowAudioOverride(false);
+                              setAudioOverrideUrl("");
+                            }}
+                            disabled={updatingAudio}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
                     )}
-                  </Button>
+                    
+                    {selectedSermon?.audio_url && !showAudioOverride && (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <p className="text-xs text-muted-foreground font-mono">
+                          Current: <span className="text-foreground/70 break-all">{selectedSermon.audio_url.substring(0, 80)}{selectedSermon.audio_url.length > 80 ? '...' : ''}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
+
+                {/* Generate Transcript Button */}
+                <div className="text-center">
+                  {selectedSermon?.status === "failed" && selectedSermon?.error_message && (
+                    <div className="mb-4 p-3 border border-destructive/50 rounded-lg bg-destructive/5">
+                      <p className="text-sm text-destructive font-mono whitespace-pre-wrap text-left">
+                        {selectedSermon.error_message}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {selectedSermon && (
+                    <Button
+                      className="font-mono text-xs uppercase tracking-widest"
+                      onClick={() => selectedSermon && generateTranscript(selectedSermon)}
+                      disabled={generating.has(selectedSermon.id) || !selectedSermon.audio_url}
+                      variant={!selectedSermon.audio_url ? "outline" : "default"}
+                    >
+                      {generating.has(selectedSermon.id) ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin mr-2" />
+                          Generating...
+                        </>
+                      ) : !selectedSermon.audio_url ? (
+                        <>
+                          <AlertCircle className="size-4 mr-2" />
+                          No Audio URL - Set Above First
+                        </>
+                      ) : (
+                        <>
+                          <Play className="size-4 mr-2" />
+                          Generate Transcript
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </DialogContent>
