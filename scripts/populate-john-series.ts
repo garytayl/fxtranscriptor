@@ -141,7 +141,7 @@ async function main() {
     // Get existing sermons with these video IDs
     const { data: existingSermons, error: sermonsError } = await supabase
       .from("sermons")
-      .select("id, youtube_video_id, title")
+      .select("id, youtube_video_id, title, audio_url, podbean_url")
       .in("youtube_video_id", playlist.videoIds);
 
     if (sermonsError) {
