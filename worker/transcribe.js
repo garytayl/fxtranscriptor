@@ -52,16 +52,17 @@ async function transcribeAudio(audioUrl, retries = 3) {
         console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${endpointConfig.url} (provider: ${endpointConfig.provider})...`);
 
         // Send raw audio bytes (not FormData) - matches Vercel implementation
-        // Convert Buffer to Uint8Array to ensure axios sends it as raw bytes
-        const audioBytes = new Uint8Array(audioBuffer);
-        const response = await axios.post(endpointConfig.url, audioBytes, {
+        // Pass Buffer directly - axios accepts Buffer and will send it as raw bytes
+        // when Content-Type is set to audio/* (not application/json)
+        const response = await axios.post(endpointConfig.url, audioBuffer, {
           headers: {
             'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
             'Content-Type': contentType,
           },
           timeout: 600000, // 10 minutes
-          // Ensure axios doesn't convert to FormData
-          transformRequest: [(data) => data],
+          // Don't let axios auto-detect and convert to JSON or FormData
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
         });
 
         // Handle different response formats
