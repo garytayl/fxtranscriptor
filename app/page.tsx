@@ -37,9 +37,10 @@ export default function Home() {
     return groupSermonsBySeries(sermons, playlistSeriesMap);
   }, [sermons, playlistSeriesMap]);
 
-  // Load sermons and playlists on mount
+  // Load sermons on mount (which will also reload playlist series)
   useEffect(() => {
     loadSermons();
+    // Also load playlist series initially in case sermons are already loaded
     loadPlaylistSeries();
   }, []);
 
@@ -122,6 +123,7 @@ export default function Home() {
         const seriesMap = new Map<string, string>();
         
         for (const playlist of data.playlists) {
+          console.log(`[Playlist Series] Playlist "${playlist.seriesName}": ${playlist.matchedSermonCount} matched sermons out of ${playlist.videoCount} videos`);
           for (const sermonId of playlist.sermonIds || []) {
             // Use playlist title as series name (already cleaned by API)
             seriesMap.set(sermonId, playlist.seriesName);
@@ -130,6 +132,7 @@ export default function Home() {
         
         setPlaylistSeriesMap(seriesMap);
         console.log(`[Playlist Series] Loaded ${seriesMap.size} sermon-series mappings from ${data.playlists.length} playlists`);
+        console.log(`[Playlist Series] Sermon IDs in map:`, Array.from(seriesMap.keys()).slice(0, 5), seriesMap.size > 5 ? `... and ${seriesMap.size - 5} more` : '');
       }
     } catch (error) {
       console.warn("Error loading playlist series data (non-critical):", error);
@@ -159,6 +162,10 @@ export default function Home() {
       
       const data = await response.json();
       setSermons(data.sermons || []);
+      
+      // Reload playlist series after sermons load to ensure proper matching
+      // This ensures the series map is created with the latest sermon data
+      await loadPlaylistSeries();
       
       // If we got an error in the response but 200 status
       if (data.error && data.error.includes("tables not found")) {
