@@ -97,23 +97,30 @@ export async function transcribeWithWhisper(
     const audioBase64 = audioBuffer.toString('base64');
     
     // Try endpoints in order: hf-inference (primary), fal-ai (fallback)
-    const endpoints = [
+    // Note: Base64 fallback disabled for large files (>10MB) - adds 33% overhead, makes 502s worse
+    const endpoints: Array<{ url: string; provider: string; useRawBytes: boolean }> = [
       {
         url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
         provider: 'hf-inference',
         useRawBytes: true, // Try raw bytes first (simpler, faster)
       },
-      {
+    ];
+    
+    // Only add base64 fallback for small files (base64 adds 33% overhead, counterproductive for large files)
+    if (sizeMB <= NO_BASE64_FALLBACK_MB) {
+      endpoints.push({
         url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
         provider: 'hf-inference',
-        useRawBytes: false, // Fallback to JSON if raw bytes fail
-      },
-      {
-        url: 'https://router.huggingface.co/fal-ai/models/openai/whisper-large-v3',
-        provider: 'fal-ai',
-        useRawBytes: true, // Try fal-ai provider as fallback
-      },
-    ];
+        useRawBytes: false, // Fallback to JSON only for small files
+      });
+    }
+    
+    // Add fal-ai provider fallback (always try, regardless of size)
+    endpoints.push({
+      url: 'https://router.huggingface.co/fal-ai/models/openai/whisper-large-v3',
+      provider: 'fal-ai',
+      useRawBytes: true, // Try fal-ai provider as fallback
+    });
     
     let response: Response | null = null;
     let apiUrl = '';
@@ -255,11 +262,15 @@ Possible causes:
 • Server timeout or overload
 • Provider gateway choked on payload size
 
-Solutions:
-1. Compress audio: Convert to MP3 16kHz mono 64kbps (reduces file size dramatically)
-2. Chunk audio: Split into ~10 minute segments and transcribe separately
+Recommended solution:
+1. **Chunk audio**: Split into ~10 minute segments using preprocessing worker (Railway/Render/Fly)
+   - Worker downloads audio, splits with ffmpeg, uploads chunks to storage
+   - Vercel orchestrates chunk transcription and merges results
+   - See AUDIO_PREPROCESSING.md for implementation details
+   
+Alternative solutions:
+2. Compress audio: Convert to MP3 16kHz mono 64kbps (reduces file size dramatically)
 3. Use paid transcription service: OpenAI Whisper API, AssemblyAI, or Deepgram (handles large files better)
-4. Add preprocessing worker: Use Railway/Render/Fly with ffmpeg for compression/chunking
 
 For API documentation: https://huggingface.co/docs/inference-providers/en/tasks/automatic-speech-recognition`;
       } else {
