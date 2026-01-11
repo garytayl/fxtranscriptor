@@ -88,6 +88,52 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Check if Railway worker is configured - if so, delegate to it
+    const workerUrl = process.env.AUDIO_WORKER_URL;
+    if (workerUrl && sermon.audio_url) {
+      console.log(`[Generate] Delegating transcription to Railway worker for sermon ${sermonId}`);
+      
+      // Update status to "generating"
+      await supabase
+        .from("sermons")
+        .update({ status: "generating", progress_json: { step: "queued", message: "Queued for transcription..." } })
+        .eq("id", sermonId);
+
+      // Trigger worker asynchronously (don't wait for response)
+      fetch(`${workerUrl}/transcribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sermonId: sermonId,
+          audioUrl: sermon.audio_url,
+        }),
+      }).catch(error => {
+        console.error(`[Generate] Error triggering worker:`, error);
+        // Update status to failed if worker trigger fails
+        supabase
+          .from("sermons")
+          .update({ 
+            status: "failed",
+            error_message: `Failed to trigger worker: ${error.message}`,
+            progress_json: null,
+          })
+          .eq("id", sermonId);
+      });
+
+      // Return immediately - worker will update database
+      return NextResponse.json({
+        success: true,
+        message: "Transcription queued. Check back in a few minutes.",
+        sermon: {
+          ...sermon,
+          status: "generating",
+        },
+      });
+    }
+
+    // Fallback: Use Vercel transcription (for small files or if worker not configured)
+    console.log(`[Generate] Using Vercel transcription (worker not configured or no audio_url)`);
+    
     // Update status to "generating"
     await supabase
       .from("sermons")

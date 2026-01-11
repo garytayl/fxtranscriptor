@@ -281,6 +281,160 @@ app.post('/chunk', async (req, res) => {
 });
 
 /**
+ * POST /transcribe
+ * 
+ * Full transcription pipeline:
+ * 1. Download audio (or use provided chunks)
+ * 2. Chunk if needed (>20MB)
+ * 3. Transcribe each chunk
+ * 4. Concatenate transcripts
+ * 5. Update Supabase database
+ */
+const { transcribeAudio } = require('./transcribe');
+
+app.post('/transcribe', async (req, res) => {
+  try {
+    const { sermonId, audioUrl } = req.body;
+
+    if (!sermonId || !audioUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing sermonId or audioUrl',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    console.log(`[Worker] Transcription request for sermon ${sermonId}`);
+
+    // Update status to generating
+    await supabase
+      .from('sermons')
+      .update({ 
+        status: 'generating',
+        progress_json: { step: 'downloading', message: 'Downloading audio...' }
+      })
+      .eq('id', sermonId);
+
+    // Check file size
+    let fileSizeMB = 0;
+    try {
+      const headResponse = await axios.head(audioUrl, { timeout: 10000 });
+      const contentLength = headResponse.headers['content-length'];
+      if (contentLength) {
+        fileSizeMB = parseInt(contentLength) / 1024 / 1024;
+        console.log(`[Worker] Audio file size: ${fileSizeMB.toFixed(2)} MB`);
+      }
+    } catch (error) {
+      console.log(`[Worker] Could not determine file size, proceeding...`);
+    }
+
+    let transcript = '';
+
+    // If file is large, chunk it first
+    if (fileSizeMB > 20) {
+      console.log(`[Worker] File is large (${fileSizeMB.toFixed(2)} MB), chunking first...`);
+      
+      await supabase
+        .from('sermons')
+        .update({ 
+          progress_json: { step: 'chunking', message: 'Chunking audio file...' }
+        })
+        .eq('id', sermonId);
+
+      // Chunk the audio
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'transcribe-'));
+      const inputFile = await downloadAudio(audioUrl, tempDir);
+      const chunkFiles = await chunkAudio(inputFile, tempDir, 600);
+      
+      // Upload chunks
+      const chunks = [];
+      for (const chunkFile of chunkFiles) {
+        const chunkUrl = await uploadChunk(chunkFile.file, chunkFile.index);
+        chunks.push(chunkUrl);
+      }
+
+      console.log(`[Worker] ✅ Chunked into ${chunks.length} chunks, starting transcription...`);
+
+      // Transcribe each chunk
+      const transcripts = [];
+      for (let i = 0; i < chunks.length; i++) {
+        await supabase
+          .from('sermons')
+          .update({ 
+            progress_json: { 
+              step: 'transcribing',
+              current: i + 1,
+              total: chunks.length,
+              message: `Transcribing chunk ${i + 1}/${chunks.length}...`
+            }
+          })
+          .eq('id', sermonId);
+
+        console.log(`[Worker] Transcribing chunk ${i + 1}/${chunks.length}...`);
+        const chunkTranscript = await transcribeAudio(chunks[i]);
+        transcripts.push(chunkTranscript);
+      }
+
+      transcript = transcripts.join('\n\n');
+    } else {
+      // Small file, transcribe directly
+      await supabase
+        .from('sermons')
+        .update({ 
+          progress_json: { step: 'transcribing', message: 'Transcribing audio...' }
+        })
+        .eq('id', sermonId);
+
+      transcript = await transcribeAudio(audioUrl);
+    }
+
+    // Update database with transcript
+    await supabase
+      .from('sermons')
+      .update({
+        transcript: transcript,
+        status: 'completed',
+        progress_json: null,
+      })
+      .eq('id', sermonId);
+
+    console.log(`[Worker] ✅ Transcription complete for sermon ${sermonId} (${transcript.length} chars)`);
+
+    res.json({
+      success: true,
+      transcript: transcript,
+      sermonId: sermonId,
+    });
+
+  } catch (error) {
+    console.error('[Worker] Transcription error:', error);
+    
+    // Update database with error
+    if (supabase && req.body.sermonId) {
+      await supabase
+        .from('sermons')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+          progress_json: null,
+        })
+        .eq('id', req.body.sermonId);
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Unknown error',
+    });
+  }
+});
+
+/**
  * Health check endpoint
  */
 app.get('/health', (req, res) => {
