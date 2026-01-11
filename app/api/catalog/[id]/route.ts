@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     if (!supabase) {
@@ -21,7 +21,9 @@ export async function GET(
       );
     }
 
-    const { id } = await params;
+    // Handle both Promise and direct params (Next.js 14 vs 15 compatibility)
+    const resolvedParams = params instanceof Promise ? await params : params;
+    const { id } = resolvedParams;
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
