@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { fetchTranscript } from "@/lib/fetchTranscript";
 import { transcribeWithWhisper } from "@/lib/transcribeWithWhisper";
 
 export const runtime = "nodejs";
