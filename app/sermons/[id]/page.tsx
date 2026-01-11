@@ -272,8 +272,20 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       <main className="relative min-h-screen">
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
         <div className="relative z-10 py-32 pl-6 md:pl-28 pr-6 md:pr-12">
-          <div className="text-center text-muted-foreground font-mono text-sm">
-            Loading sermon...
+          <div className="text-center">
+            <Loader2 className="size-8 animate-spin text-accent mx-auto mb-4" />
+            <div className="text-muted-foreground font-mono text-sm mb-4">
+              Loading sermon...
+            </div>
+            <Button 
+              onClick={() => router.push("/")} 
+              variant="outline" 
+              size="sm"
+              className="font-mono text-xs uppercase tracking-widest"
+            >
+              <ArrowLeft className="size-4 mr-2" />
+              Back to Catalog
+            </Button>
           </div>
         </div>
       </main>
