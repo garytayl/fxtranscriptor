@@ -10,6 +10,7 @@ import { HeroSection } from "@/components/hero-section";
 import { SideNav } from "@/components/side-nav";
 import { SermonSeriesSection } from "@/components/sermon-series-section";
 import { SeriesDetailView } from "@/components/series-detail-view";
+import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { Sermon } from "@/lib/supabase";
 import { groupSermonsBySeries, SermonSeries } from "@/lib/extractSeries";
 import { format } from "date-fns";
@@ -26,6 +27,8 @@ export default function Home() {
   const [showAudioOverride, setShowAudioOverride] = useState(false);
   const [audioOverrideUrl, setAudioOverrideUrl] = useState("");
   const [updatingAudio, setUpdatingAudio] = useState(false);
+  const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
+  const [audioUrlDialogSermon, setAudioUrlDialogSermon] = useState<Sermon | null>(null);
 
   // Group sermons by series (using playlist data if available)
   const { series: sermonSeries, ungrouped } = useMemo(() => {
@@ -271,6 +274,11 @@ export default function Home() {
     setAudioOverrideUrl("");
   };
 
+  const handleSetAudioUrl = (sermon: Sermon) => {
+    setAudioUrlDialogSermon(sermon);
+    setAudioUrlDialogOpen(true);
+  };
+
   const updateAudioUrl = async (sermon: Sermon, audioUrl: string, podbeanUrl?: string) => {
     try {
       setUpdatingAudio(true);
@@ -483,7 +491,22 @@ export default function Home() {
                             </div>
                           )}
                           
-                          <div className="flex items-center gap-3 mt-4">
+                          <div className="flex flex-col gap-2 mt-4">
+                            {!sermon.audio_url && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="font-mono text-xs uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAudioUrlDialogSermon(sermon);
+                                  setAudioUrlDialogOpen(true);
+                                }}
+                              >
+                                <Link2 className="size-3 mr-2" />
+                                Set Audio URL
+                              </Button>
+                            )}
                             {sermon.transcript ? (
                               <Button
                                 variant="ghost"
@@ -498,16 +521,21 @@ export default function Home() {
                               </Button>
                             ) : (
                               <Button
-                                variant="outline"
+                                variant={sermon.audio_url ? "outline" : "ghost"}
                                 size="sm"
                                 className="font-mono text-xs uppercase tracking-widest"
-                                disabled={generating.has(sermon.id)}
+                                disabled={generating.has(sermon.id) || !sermon.audio_url}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  generateTranscript(sermon);
+                                  if (!sermon.audio_url) {
+                                    setAudioUrlDialogSermon(sermon);
+                                    setAudioUrlDialogOpen(true);
+                                  } else {
+                                    generateTranscript(sermon);
+                                  }
                                 }}
                               >
-                                {generating.has(sermon.id) ? "Generating..." : "Generate"}
+                                {generating.has(sermon.id) ? "Generating..." : sermon.audio_url ? "Generate" : "Set Audio URL First"}
                               </Button>
                             )}
                           </div>
