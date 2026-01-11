@@ -9,8 +9,73 @@ const axios = require('axios'); // Still used for downloading audio
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
 /**
+ * Check if URL is a YouTube URL
+ */
+function isYouTubeUrl(url) {
+  return url && (url.includes('youtube.com/watch') || url.includes('youtu.be/'));
+}
+
+/**
+ * Extract video ID from YouTube URL
+ */
+function extractYouTubeVideoId(url) {
+  if (!url) return null;
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch) return watchMatch[1];
+  return null;
+}
+
+/**
+ * Download audio from YouTube using ytdl-core
+ */
+async function downloadYouTubeAudioBuffer(youtubeUrl) {
+  const ytdl = require('ytdl-core');
+  const videoId = extractYouTubeVideoId(youtubeUrl);
+  if (!videoId) {
+    throw new Error(`Invalid YouTube URL: ${youtubeUrl}`);
+  }
+
+  console.log(`[Transcribe] Extracting audio from YouTube video: ${videoId}`);
+  
+  const isValid = await ytdl.validateURL(youtubeUrl);
+  if (!isValid) {
+    throw new Error(`Invalid YouTube URL or video not available: ${youtubeUrl}`);
+  }
+
+  // Get video info
+  const info = await ytdl.getInfo(youtubeUrl);
+  console.log(`[Transcribe] YouTube video: ${info.videoDetails.title.substring(0, 60)}...`);
+
+  // Get audio stream and convert to buffer
+  const stream = ytdl(youtubeUrl, {
+    quality: 'highestaudio',
+    filter: 'audioonly',
+  });
+
+  const chunks = [];
+  return new Promise((resolve, reject) => {
+    stream.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    stream.on('end', () => {
+      const audioBuffer = Buffer.concat(chunks);
+      const audioSizeMB = audioBuffer.length / 1024 / 1024;
+      console.log(`[Transcribe] YouTube audio extracted: ${audioSizeMB.toFixed(2)} MB`);
+      resolve(audioBuffer);
+    });
+    stream.on('error', (error) => {
+      console.error(`[Transcribe] YouTube download error:`, error);
+      reject(new Error(`Failed to download YouTube audio: ${error.message}`));
+    });
+  });
+}
+
+/**
  * Transcribe audio file using Hugging Face Whisper API
  * Matches Vercel implementation exactly (uses fetch, not axios)
+ * Now supports both direct audio URLs (Podbean) and YouTube URLs
  */
 async function transcribeAudio(audioUrl, retries = 3) {
   if (!HUGGINGFACE_API_KEY) {
@@ -19,17 +84,27 @@ async function transcribeAudio(audioUrl, retries = 3) {
 
   console.log(`[Transcribe] Starting transcription for: ${audioUrl.substring(0, 80)}...`);
 
-  // Download audio (using axios for download, but fetch for API call)
-  const audioResponse = await axios({
-    url: audioUrl,
-    method: 'GET',
-    responseType: 'arraybuffer',
-    timeout: 300000, // 5 minutes
-  });
+  let audioBuffer;
+  let audioSizeMB;
 
-  const audioBuffer = Buffer.from(audioResponse.data);
-  const audioSizeMB = audioBuffer.length / 1024 / 1024;
-  console.log(`[Transcribe] Downloaded audio: ${audioSizeMB.toFixed(2)} MB`);
+  // Check if it's a YouTube URL
+  if (isYouTubeUrl(audioUrl)) {
+    // Extract audio from YouTube
+    audioBuffer = await downloadYouTubeAudioBuffer(audioUrl);
+    audioSizeMB = audioBuffer.length / 1024 / 1024;
+  } else {
+    // Download audio from direct URL (Podbean, etc.)
+    const audioResponse = await axios({
+      url: audioUrl,
+      method: 'GET',
+      responseType: 'arraybuffer',
+      timeout: 300000, // 5 minutes
+    });
+
+    audioBuffer = Buffer.from(audioResponse.data);
+    audioSizeMB = audioBuffer.length / 1024 / 1024;
+    console.log(`[Transcribe] Downloaded audio: ${audioSizeMB.toFixed(2)} MB`);
+  }
 
   // Convert Buffer to Uint8Array (matches Vercel implementation)
   const audioBytes = new Uint8Array(audioBuffer);

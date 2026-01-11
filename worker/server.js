@@ -19,6 +19,7 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
+const ytdl = require('ytdl-core');
 
 const app = express();
 app.use(express.json());
@@ -46,11 +47,93 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
 }
 
 /**
+ * Check if URL is a YouTube URL
+ */
+function isYouTubeUrl(url) {
+  return url && (url.includes('youtube.com/watch') || url.includes('youtu.be/'));
+}
+
+/**
+ * Extract video ID from YouTube URL
+ */
+function extractYouTubeVideoId(url) {
+  if (!url) return null;
+  
+  // Handle youtu.be/VIDEO_ID
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+  
+  // Handle youtube.com/watch?v=VIDEO_ID
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch) return watchMatch[1];
+  
+  return null;
+}
+
+/**
+ * Download audio from YouTube using ytdl-core
+ */
+async function downloadYouTubeAudio(youtubeUrl, tempDir) {
+  const videoId = extractYouTubeVideoId(youtubeUrl);
+  if (!videoId) {
+    throw new Error(`Invalid YouTube URL: ${youtubeUrl}`);
+  }
+
+  console.log(`[Worker] Extracting audio from YouTube video: ${videoId}`);
+  
+  // Validate URL first
+  const isValid = await ytdl.validateURL(youtubeUrl);
+  if (!isValid) {
+    throw new Error(`Invalid YouTube URL or video not available: ${youtubeUrl}`);
+  }
+
+  const tempFile = path.join(tempDir, `youtube_${videoId}_${uuidv4()}.m4a`);
+  const writer = require('fs').createWriteStream(tempFile);
+
+  return new Promise((resolve, reject) => {
+    // Get audio stream (best quality audio only)
+    const stream = ytdl(youtubeUrl, {
+      quality: 'highestaudio',
+      filter: 'audioonly',
+    });
+
+    stream.on('info', (info) => {
+      console.log(`[Worker] YouTube video info: ${info.videoDetails.title.substring(0, 60)}...`);
+      console.log(`[Worker] Duration: ${info.videoDetails.lengthSeconds}s`);
+    });
+
+    stream.on('error', (error) => {
+      console.error(`[Worker] YouTube download error:`, error);
+      reject(new Error(`Failed to download YouTube audio: ${error.message}`));
+    });
+
+    stream.pipe(writer);
+
+    writer.on('finish', () => {
+      console.log(`[Worker] YouTube audio extracted: ${tempFile}`);
+      resolve(tempFile);
+    });
+
+    writer.on('error', (error) => {
+      console.error(`[Worker] File write error:`, error);
+      reject(new Error(`Failed to save YouTube audio: ${error.message}`));
+    });
+  });
+}
+
+/**
  * Download audio file to temporary location
+ * Handles both direct audio URLs (Podbean) and YouTube URLs
  */
 async function downloadAudio(audioUrl, tempDir) {
   console.log(`[Worker] Downloading audio: ${audioUrl.substring(0, 100)}...`);
   
+  // Check if it's a YouTube URL
+  if (isYouTubeUrl(audioUrl)) {
+    return await downloadYouTubeAudio(audioUrl, tempDir);
+  }
+  
+  // Otherwise, download as direct audio URL (Podbean, etc.)
   const response = await axios({
     url: audioUrl,
     method: 'GET',
@@ -321,17 +404,21 @@ app.post('/transcribe', async (req, res) => {
       })
       .eq('id', sermonId);
 
-    // Check file size
+    // Check file size (skip for YouTube URLs - will check after extraction)
     let fileSizeMB = 0;
-    try {
-      const headResponse = await axios.head(audioUrl, { timeout: 10000 });
-      const contentLength = headResponse.headers['content-length'];
-      if (contentLength) {
-        fileSizeMB = parseInt(contentLength) / 1024 / 1024;
-        console.log(`[Worker] Audio file size: ${fileSizeMB.toFixed(2)} MB`);
+    if (!isYouTubeUrl(audioUrl)) {
+      try {
+        const headResponse = await axios.head(audioUrl, { timeout: 10000 });
+        const contentLength = headResponse.headers['content-length'];
+        if (contentLength) {
+          fileSizeMB = parseInt(contentLength) / 1024 / 1024;
+          console.log(`[Worker] Audio file size: ${fileSizeMB.toFixed(2)} MB`);
+        }
+      } catch (error) {
+        console.log(`[Worker] Could not determine file size, proceeding...`);
       }
-    } catch (error) {
-      console.log(`[Worker] Could not determine file size, proceeding...`);
+    } else {
+      console.log(`[Worker] YouTube URL detected - will check size after audio extraction`);
     }
 
     let transcript = '';

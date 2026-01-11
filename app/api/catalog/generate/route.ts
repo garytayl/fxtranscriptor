@@ -90,8 +90,18 @@ export async function POST(request: NextRequest) {
 
     // Check if Railway worker is configured - if so, delegate to it
     const workerUrl = process.env.AUDIO_WORKER_URL;
-    if (workerUrl && sermon.audio_url) {
+    
+    // Determine audio source: prefer audio_url, fallback to YouTube URL
+    let audioSource = sermon.audio_url;
+    if (!audioSource && sermon.youtube_url) {
+      // Use YouTube URL as fallback if no direct audio URL
+      audioSource = sermon.youtube_url;
+      console.log(`[Generate] No audio_url found, using YouTube URL for transcription: ${sermon.youtube_url}`);
+    }
+    
+    if (workerUrl && audioSource) {
       console.log(`[Generate] Delegating transcription to Railway worker for sermon ${sermonId}`);
+      console.log(`[Generate] Audio source: ${audioSource.substring(0, 100)}...`);
       
       // Update status to "generating"
       await supabase
@@ -105,7 +115,7 @@ export async function POST(request: NextRequest) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sermonId: sermonId,
-          audioUrl: sermon.audio_url,
+          audioUrl: audioSource, // Can be Podbean audio URL or YouTube URL
         }),
       }).catch(async (error) => {
         console.error(`[Generate] Error triggering worker:`, error);
@@ -177,19 +187,50 @@ export async function POST(request: NextRequest) {
     let transcriptResult = null;
     let transcriptSource: string | null = null;
 
-    // Check if we have audio_url (required for Whisper AI)
-    if (!sermon.audio_url) {
-      const errorMessage = `No audio_url available for this sermon. Cannot generate transcript.\n\n`;
-      + `Sermon URLs:\n`;
-      + `• YouTube: ${sermon.youtube_url || 'none'}\n`;
-      + `• Podbean: ${sermon.podbean_url || 'none'}\n`;
-      + `• Audio: ${sermon.audio_url || 'none'}\n\n`;
-      + `To fix:\n`;
-      + `1. Re-sync the catalog to match this sermon with a Podbean episode (date-based matching)\n`;
-      + `2. Check if Podbean RSS feed has <enclosure url="..."> for this episode\n`;
-      + `3. If this is a YouTube-only sermon, YouTube audio extraction would be needed (future feature)`;
+    // Check if we have audio_url or YouTube URL (required for Whisper AI)
+    // Note: YouTube URLs require worker service for extraction
+    if (!sermon.audio_url && !sermon.youtube_url) {
+      const errorMessage = `No audio_url or YouTube URL available for this sermon. Cannot generate transcript.\n\n` +
+        `Sermon URLs:\n` +
+        `• YouTube: ${sermon.youtube_url || 'none'}\n` +
+        `• Podbean: ${sermon.podbean_url || 'none'}\n` +
+        `• Audio: ${sermon.audio_url || 'none'}\n\n` +
+        `To fix:\n` +
+        `1. Re-sync the catalog to match this sermon with a Podbean episode (date-based matching)\n` +
+        `2. Check if Podbean RSS feed has <enclosure url="..."> for this episode\n` +
+        `3. Ensure AUDIO_WORKER_URL is set in Vercel to enable YouTube audio extraction`;
       
       console.log(`[Generate] ❌ Cannot generate transcript: ${errorMessage}`);
+      
+      await supabase
+        .from("sermons")
+        .update({
+          status: "failed",
+          error_message: errorMessage,
+        })
+        .eq("id", sermonId);
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: errorMessage,
+          sermon: {
+            ...sermon,
+            status: "failed",
+            error_message: errorMessage,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // For Vercel transcription, we can only use direct audio URLs (not YouTube)
+    // YouTube extraction requires the worker service
+    if (!sermon.audio_url && sermon.youtube_url) {
+      const errorMessage = `YouTube audio extraction requires the worker service. Please set AUDIO_WORKER_URL in Vercel environment variables.\n\n` +
+        `Alternatively, run the merge script to match this sermon with a Podbean episode to get an audio_url.`;
+      
+      console.log(`[Generate] ❌ Cannot extract YouTube audio on Vercel: ${errorMessage}`);
       
       await supabase
         .from("sermons")
