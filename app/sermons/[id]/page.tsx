@@ -30,18 +30,26 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     const extractId = async () => {
       try {
+        console.log("[SermonDetail] Extracting ID from params:", params);
         let id: string;
         if (params && typeof params === 'object' && 'then' in params && typeof (params as any).then === 'function') {
+          console.log("[SermonDetail] Params is a Promise, awaiting...");
           const resolved = await (params as Promise<{ id: string }>);
           id = resolved.id;
+          console.log("[SermonDetail] Resolved ID from Promise:", id);
         } else {
           id = (params as { id: string }).id;
+          console.log("[SermonDetail] Got ID from direct params:", id);
         }
         if (id) {
+          console.log("[SermonDetail] Setting sermonId:", id);
           setSermonId(id);
+        } else {
+          console.error("[SermonDetail] No ID found in params");
+          setLoading(false);
         }
       } catch (error) {
-        console.error("Error extracting ID from params:", error);
+        console.error("[SermonDetail] Error extracting ID from params:", error);
         setLoading(false);
       }
     };
@@ -90,31 +98,40 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
   const loadSermon = async (id: string) => {
     try {
+      console.log("[SermonDetail] Loading sermon with ID:", id);
       setLoading(true);
       if (!id) {
         throw new Error("Missing sermon ID");
       }
       
+      console.log("[SermonDetail] Fetching from /api/catalog/" + id);
       const response = await fetch(`/api/catalog/${id}`);
+      
+      console.log("[SermonDetail] Response status:", response.status);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error("[SermonDetail] API error:", errorData);
         throw new Error(errorData.error || "Failed to load sermon");
       }
 
       const data = await response.json();
+      console.log("[SermonDetail] Received data:", data);
       
       if (!data.sermon) {
+        console.error("[SermonDetail] No sermon in response:", data);
         throw new Error("Sermon not found");
       }
 
+      console.log("[SermonDetail] Setting sermon:", data.sermon.title);
       setSermon(data.sermon);
       setGenerating(data.sermon.status === "generating");
       if (data.sermon.progress_json) {
         setProgress(data.sermon.progress_json);
       }
     } catch (error) {
-      console.error("Error loading sermon:", error);
+      console.error("[SermonDetail] Error loading sermon:", error);
+      setSermon(null); // Set to null so error state shows
     } finally {
       setLoading(false);
     }
