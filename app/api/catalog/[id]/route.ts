@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     if (!supabase) {
@@ -21,15 +21,14 @@ export async function GET(
       );
     }
 
-    // Handle both Promise and direct params (Next.js 14 vs 15+ compatibility)
-    const resolvedParams = 'then' in params && typeof (params as any).then === 'function' 
-      ? await (params as Promise<{ id: string }>)
-      : params as { id: string };
-    const { id } = resolvedParams;
+    // Next.js 15+ requires awaiting params Promise
+    const params = await context.params;
+    const id = params?.id;
 
     if (!id || typeof id !== "string") {
+      console.error("[Sermon API] Missing or invalid ID:", { id, params, url: request.url });
       return NextResponse.json(
-        { error: "Missing or invalid sermon ID" },
+        { error: "Missing or invalid sermon ID", details: `ID received: ${id}, URL: ${request.url}` },
         { status: 400 }
       );
     }
