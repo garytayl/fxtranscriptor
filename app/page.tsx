@@ -661,8 +661,10 @@ export default function Home() {
               </>
             ) : (
               <div className="flex flex-col gap-6">
-                {/* Audio URL Override Section */}
-                {(!selectedSermon?.audio_url || selectedSermon.status === "failed") && (
+                {/* Audio URL Override Section - Only show if no audio_url AND no youtube_url */}
+                {/* If youtube_url exists, worker can handle it automatically */}
+                {(!selectedSermon?.audio_url && !selectedSermon?.youtube_url) || 
+                 (selectedSermon.status === "failed" && !selectedSermon?.youtube_url && !selectedSermon?.audio_url) ? (
                   <div className="border rounded-lg p-4 bg-card">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -809,18 +811,23 @@ export default function Home() {
                       <Button
                         className="font-mono text-xs uppercase tracking-widest"
                         onClick={() => selectedSermon && generateTranscript(selectedSermon)}
-                        disabled={generating.has(selectedSermon.id) || selectedSermon.status === "generating" || !selectedSermon.audio_url}
-                        variant={!selectedSermon.audio_url ? "outline" : "default"}
+                        disabled={generating.has(selectedSermon.id) || selectedSermon.status === "generating" || (!selectedSermon.audio_url && !selectedSermon.youtube_url)}
+                        variant={!selectedSermon.audio_url && !selectedSermon.youtube_url ? "outline" : "default"}
                       >
                         {generating.has(selectedSermon.id) || selectedSermon.status === "generating" ? (
                           <>
                             <Loader2 className="size-4 animate-spin mr-2" />
                             Generating...
                           </>
-                        ) : !selectedSermon.audio_url ? (
+                        ) : !selectedSermon.audio_url && !selectedSermon.youtube_url ? (
                           <>
                             <AlertCircle className="size-4 mr-2" />
                             No Audio URL - Set Above First
+                          </>
+                        ) : selectedSermon.youtube_url && !selectedSermon.audio_url ? (
+                          <>
+                            <Play className="size-4 mr-2" />
+                            Generate from YouTube
                           </>
                         ) : (
                           <>
