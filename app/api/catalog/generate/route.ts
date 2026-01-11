@@ -110,14 +110,17 @@ export async function POST(request: NextRequest) {
       }).catch(error => {
         console.error(`[Generate] Error triggering worker:`, error);
         // Update status to failed if worker trigger fails
-        supabase
-          .from("sermons")
-          .update({ 
-            status: "failed",
-            error_message: `Failed to trigger worker: ${error.message}`,
-            progress_json: null,
-          })
-          .eq("id", sermonId);
+        if (supabase) {
+          supabase
+            .from("sermons")
+            .update({ 
+              status: "failed",
+              error_message: `Failed to trigger worker: ${error.message}`,
+              progress_json: null,
+            })
+            .eq("id", sermonId)
+            .catch(err => console.error(`[Generate] Error updating status:`, err));
+        }
       });
 
       // Return immediately - worker will update database
