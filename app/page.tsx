@@ -472,7 +472,13 @@ export default function Home() {
         )}
 
         {/* Transcript Dialog */}
-        <Dialog open={!!selectedSermon} onOpenChange={(open) => !open && setSelectedSermon(null)}>
+        <Dialog open={!!selectedSermon} onOpenChange={(open) => {
+          if (!open) {
+            setSelectedSermon(null);
+            setShowAudioOverride(false);
+            setAudioOverrideUrl("");
+          }
+        }}>
           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-2xl">{selectedSermon?.title}</DialogTitle>
