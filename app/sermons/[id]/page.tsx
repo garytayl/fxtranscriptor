@@ -16,9 +16,10 @@ interface TranscriptionProgress {
   message?: string;
 }
 
-export default function SermonDetailPage({ params }: { params: { id: string } }) {
+export default function SermonDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const router = useRouter();
   const [sermon, setSermon] = useState<Sermon | null>(null);
+  const [sermonId, setSermonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState<TranscriptionProgress | null>(null);
@@ -60,13 +61,19 @@ export default function SermonDetailPage({ params }: { params: { id: string } })
   }, [generating, sermon]);
 
   useEffect(() => {
-    loadSermon();
-  }, [params.id]);
+    if (sermonId) {
+      loadSermon(sermonId);
+    }
+  }, [sermonId]);
 
-  const loadSermon = async () => {
+  const loadSermon = async (id: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/catalog/${params.id}`);
+      if (!id) {
+        throw new Error("Missing sermon ID");
+      }
+      
+      const response = await fetch(`/api/catalog/${id}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
