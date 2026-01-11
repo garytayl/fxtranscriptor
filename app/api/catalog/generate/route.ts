@@ -146,6 +146,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check file size to determine if chunking is needed
+    const CHUNKING_THRESHOLD_MB = 20; // Files >20MB must be chunked
+    
     // First, try to get file size from HEAD request (if supported)
     let fileSizeMB = 0;
     try {
