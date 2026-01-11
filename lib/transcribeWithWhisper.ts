@@ -87,13 +87,37 @@ export async function transcribeWithWhisper(
 
     console.log(`[Whisper] Starting transcription for audio: ${audioUrl.substring(0, 100)}...`);
     
-    // Download audio file
-    const audioBuffer = await downloadAudio(audioUrl);
+    // Size limits
+    const MAX_SIZE_MB = 25; // Hugging Face shared inference struggles with files >25MB
+    const NO_BASE64_FALLBACK_MB = 10; // Base64 adds 33% overhead, counterproductive for large files
     
-    // Check file size (free tier has limits, but 30 hours/month is generous)
+    // Download audio file (will check size during download)
+    const audioBuffer = await downloadAudio(audioUrl, MAX_SIZE_MB);
+    
+    // Check file size (double-check after download)
     const sizeMB = audioBuffer.length / 1024 / 1024;
-    if (sizeMB > 100) {
-      console.warn(`[Whisper] Audio file is large (${sizeMB.toFixed(2)} MB), transcription may take longer`);
+    if (sizeMB > MAX_SIZE_MB) {
+      const errorMsg = `Audio file too large (${sizeMB.toFixed(2)} MB, max ${MAX_SIZE_MB} MB) for Hugging Face shared inference.
+      
+Large audio files (>${MAX_SIZE_MB} MB) cause server timeouts (502 errors) on free shared infrastructure.
+
+Recommended solution for ${sizeMB > 40 ? '90-minute' : 'long'} sermons:
+1. **Chunk audio**: Split into ~10 minute segments using preprocessing worker (Railway/Render/Fly)
+   - Worker downloads audio, splits with ffmpeg, uploads chunks to storage
+   - Vercel orchestrates chunk transcription and merges results
+   - See AUDIO_PREPROCESSING.md for implementation details
+   
+Alternative solutions:
+2. Compress audio: Convert to MP3 16kHz mono 64kbps (reduces file size dramatically)
+3. Use paid transcription service: OpenAI Whisper API, AssemblyAI, or Deepgram (handles large files better)
+4. See AUDIO_PREPROCESSING.md for detailed implementation guide`;
+      
+      console.error(`[Whisper] ${errorMsg}`);
+      return {
+        success: false,
+        transcript: "",
+        error: errorMsg,
+      };
     }
     
     console.log(`[Whisper] Sending audio to Hugging Face Whisper API via Inference Providers router...`);
