@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -268,10 +269,8 @@ export default function Home() {
     setSelectedSeries(null);
   };
 
-  const handleViewTranscript = (sermon: Sermon) => {
-    setSelectedSermon(sermon);
-    setShowAudioOverride(false);
-    setAudioOverrideUrl("");
+  const handleViewSermon = (sermon: Sermon) => {
+    router.push(`/sermons/${sermon.id}`);
   };
 
   const handleSetAudioUrl = (sermon: Sermon) => {
@@ -384,14 +383,9 @@ export default function Home() {
           <SeriesDetailView
             series={selectedSeries}
             onClose={handleCloseSeriesDetail}
-            onGenerateTranscript={generateTranscript}
-            onViewTranscript={handleViewTranscript}
-            onDownload={handleDownload}
-            onCopyTranscript={handleCopyAll}
-            generating={generating}
+            onViewSermon={handleViewSermon}
             getStatusBadge={getStatusBadge}
             getSourceBadge={getSourceBadge}
-            copied={copied}
           />
         ) : (
           <>
@@ -475,7 +469,7 @@ export default function Home() {
                         <article
                           key={sermon.id}
                           className="group border border-border/30 p-6 hover:border-accent/50 transition-all duration-200 cursor-pointer"
-                          onClick={() => handleViewTranscript(sermon)}
+                          onClick={() => handleViewSermon(sermon)}
                         >
                           <div className="flex items-start justify-between gap-4 mb-4">
                             <h3 className="font-[var(--font-bebas)] text-xl tracking-tight line-clamp-2 flex-1 group-hover:text-accent transition-colors">
@@ -491,54 +485,14 @@ export default function Home() {
                             </div>
                           )}
                           
-                          <div className="flex flex-col gap-2 mt-4">
-                            {!sermon.audio_url && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="font-mono text-xs uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAudioUrlDialogSermon(sermon);
-                                  setAudioUrlDialogOpen(true);
-                                }}
-                              >
-                                <Link2 className="size-3 mr-2" />
-                                Set Audio URL
-                              </Button>
-                            )}
-                            {sermon.transcript ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="font-mono text-xs uppercase tracking-widest"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewTranscript(sermon);
-                                }}
-                              >
-                                View Transcript
-                              </Button>
-                            ) : (
-                              <Button
-                                variant={sermon.audio_url ? "outline" : "ghost"}
-                                size="sm"
-                                className="font-mono text-xs uppercase tracking-widest"
-                                disabled={generating.has(sermon.id) || !sermon.audio_url}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!sermon.audio_url) {
-                                    setAudioUrlDialogSermon(sermon);
-                                    setAudioUrlDialogOpen(true);
-                                  } else {
-                                    generateTranscript(sermon);
-                                  }
-                                }}
-                              >
-                                {generating.has(sermon.id) ? "Generating..." : sermon.audio_url ? "Generate" : "Set Audio URL First"}
-                              </Button>
-                            )}
-                          </div>
+                          {sermon.transcript && (
+                            <div className="mt-4">
+                              <span className="inline-flex items-center gap-2 text-xs font-mono text-muted-foreground">
+                                <CheckCircle2 className="size-3" />
+                                Transcript available
+                              </span>
+                            </div>
+                          )}
                         </article>
                       ))}
                     </div>

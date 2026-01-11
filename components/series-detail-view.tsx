@@ -16,28 +16,19 @@ gsap.registerPlugin(ScrollTrigger)
 interface SeriesDetailViewProps {
   series: SermonSeries | null
   onClose: () => void
-  onGenerateTranscript: (sermon: SermonType) => Promise<void>
-  onViewTranscript: (sermon: SermonType) => void
-  onDownload: (sermon: SermonType) => void
-  onCopyTranscript: (transcript: string) => Promise<void>
-  generating: Set<string>
+  onViewSermon: (sermon: SermonType) => void
   getStatusBadge: (sermon: SermonType) => ReactElement
   getSourceBadge: (source: string | null) => ReactElement | null
-  copied: boolean
 }
 
 export function SeriesDetailView({
   series,
   onClose,
-  onGenerateTranscript,
-  onViewTranscript,
-  onDownload,
-  onCopyTranscript,
-  generating,
+  onViewSermon,
   getStatusBadge,
   getSourceBadge,
-  copied,
 }: SeriesDetailViewProps) {
+  const sectionRef = useRef<HTMLElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const sermonsRef = useRef<HTMLDivElement>(null)
@@ -179,56 +170,14 @@ export function SeriesDetailView({
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col gap-2">
-              {sermon.transcript ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-2 font-mono text-xs uppercase tracking-widest border-foreground/20 hover:border-accent hover:text-accent"
-                    onClick={() => onViewTranscript(sermon)}
-                  >
-                    <Play className="size-4" />
-                    View Transcript
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full gap-2 font-mono text-xs uppercase tracking-widest"
-                    onClick={() => onDownload(sermon)}
-                  >
-                    <Download className="size-4" />
-                    Download
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant={sermon.status === "generating" ? "secondary" : "default"}
-                  size="sm"
-                  className="w-full gap-2 font-mono text-xs uppercase tracking-widest"
-                  disabled={generating.has(sermon.id) || sermon.status === "generating"}
-                  onClick={() => onGenerateTranscript(sermon)}
-                >
-                  {generating.has(sermon.id) || sermon.status === "generating" ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : sermon.status === "failed" ? (
-                    <>
-                      <AlertCircle className="size-4" />
-                      Retry Generate
-                    </>
-                  ) : (
-                    <>
-                      <Play className="size-4" />
-                      Generate Transcript
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            {sermon.transcript && (
+              <div className="mt-4">
+                <span className="inline-flex items-center gap-2 text-xs font-mono text-muted-foreground">
+                  <CheckCircle2 className="size-3" />
+                  Transcript available
+                </span>
+              </div>
+            )}
           </article>
         ))}
       </div>
