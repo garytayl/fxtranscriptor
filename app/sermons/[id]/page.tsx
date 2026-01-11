@@ -31,22 +31,21 @@ export default function SermonDetailPage({ params }: { params: { id: string } })
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/catalog/list`);
+        const response = await fetch(`/api/catalog/${sermon.id}`);
         if (response.ok) {
           const data = await response.json();
-          const updatedSermon = data.sermons?.find((s: Sermon) => s.id === sermon.id);
-          if (updatedSermon) {
-            setSermon(updatedSermon);
+          if (data.sermon) {
+            setSermon(data.sermon);
             
             // Update progress from database
-            if (updatedSermon.progress_json) {
-              setProgress(updatedSermon.progress_json);
+            if (data.sermon.progress_json) {
+              setProgress(data.sermon.progress_json);
             } else {
               setProgress(null);
             }
             
             // If status changed to completed or failed, stop polling
-            if (updatedSermon.status === "completed" || updatedSermon.status === "failed") {
+            if (data.sermon.status === "completed" || data.sermon.status === "failed") {
               setGenerating(false);
               setProgress(null);
             }
