@@ -28,13 +28,21 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'sermon-chunks';
 
+// Debug: Log environment variable status (without exposing secrets)
+console.log(`[Worker] Environment check:`);
+console.log(`[Worker]   SUPABASE_URL: ${SUPABASE_URL ? 'SET (' + SUPABASE_URL.substring(0, 30) + '...)' : 'NOT SET'}`);
+console.log(`[Worker]   SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY ? 'SET (' + SUPABASE_SERVICE_KEY.substring(0, 20) + '...)' : 'NOT SET'}`);
+console.log(`[Worker]   SUPABASE_STORAGE_BUCKET: ${STORAGE_BUCKET}`);
+
 // Initialize Supabase client (if configured)
 let supabase = null;
 if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  console.log(`[Worker] Supabase Storage configured: ${STORAGE_BUCKET}`);
+  console.log(`[Worker] ✅ Supabase Storage configured: ${STORAGE_BUCKET}`);
 } else {
-  console.warn('[Worker] Supabase Storage not configured - chunks will be stored locally (not recommended for production)');
+  console.warn('[Worker] ⚠️  Supabase Storage not configured - chunks will be stored locally (not recommended for production)');
+  if (!SUPABASE_URL) console.warn('[Worker]   Missing: SUPABASE_URL');
+  if (!SUPABASE_SERVICE_KEY) console.warn('[Worker]   Missing: SUPABASE_SERVICE_KEY');
 }
 
 /**
