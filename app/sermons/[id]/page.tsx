@@ -26,6 +26,28 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [copied, setCopied] = useState(false);
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
 
+  // Extract ID from params (handle both Promise and direct params)
+  useEffect(() => {
+    const extractId = async () => {
+      try {
+        let id: string;
+        if (params && typeof params === 'object' && 'then' in params && typeof (params as any).then === 'function') {
+          const resolved = await (params as Promise<{ id: string }>);
+          id = resolved.id;
+        } else {
+          id = (params as { id: string }).id;
+        }
+        if (id) {
+          setSermonId(id);
+        }
+      } catch (error) {
+        console.error("Error extracting ID from params:", error);
+        setLoading(false);
+      }
+    };
+    extractId();
+  }, [params]);
+
   // Poll for updates when generating
   useEffect(() => {
     if (!generating || !sermon) return;
