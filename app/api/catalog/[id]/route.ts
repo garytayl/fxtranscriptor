@@ -24,23 +24,34 @@ export async function GET(
     // Extract ID from URL path (most reliable method)
     const url = new URL(request.url);
     const urlPath = url.pathname;
-    const urlIdMatch = urlPath.match(/\/api\/catalog\/([^/?]+)/);
-    let id = urlIdMatch ? urlIdMatch[1] : null;
-
-    // Try params as fallback (Next.js 15+)
+    console.log("[Sermon API] Request URL:", request.url, "Pathname:", urlPath);
+    
+    // Try multiple patterns to extract ID
+    let id: string | null = null;
+    
+    // Pattern 1: /api/catalog/{id}
+    const match1 = urlPath.match(/\/api\/catalog\/([^/?]+)/);
+    if (match1 && match1[1]) {
+      id = match1[1];
+    }
+    
+    // Pattern 2: Try params as fallback (Next.js 15+)
     if (!id) {
       try {
         const params = await context.params;
+        console.log("[Sermon API] Params from context:", params);
         id = params?.id || null;
       } catch (paramsError) {
         console.error("[Sermon API] Error extracting from params:", paramsError);
       }
     }
 
-    if (!id || typeof id !== "string") {
+    console.log("[Sermon API] Extracted ID:", id);
+
+    if (!id || typeof id !== "string" || id === "undefined" || id.trim() === "") {
       console.error("[Sermon API] Missing or invalid ID:", { id, url: request.url, pathname: urlPath });
       return NextResponse.json(
-        { error: "Missing or invalid sermon ID", details: `ID received: ${id}, URL: ${request.url}` },
+        { error: "Missing or invalid sermon ID", details: `ID received: ${id}, URL: ${request.url}, Pathname: ${urlPath}` },
         { status: 400 }
       );
     }
