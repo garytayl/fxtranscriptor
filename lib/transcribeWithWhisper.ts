@@ -208,13 +208,13 @@ export async function transcribeWithWhisper(
           break;
         }
         
-        // If 502/503, server error or timeout - try next endpoint/format
-        if (response.status === 502 || response.status === 504) {
+        // If 502/503/504, server error or timeout - retry once, then try next endpoint/format
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
           lastError = `${response.status} - ${responseText.substring(0, 200)}`;
           console.log(`[Whisper] Endpoint ${apiUrl} returned ${response.status} (server error/timeout)`);
-          console.log(`[Whisper] This may be due to large file size. Trying next endpoint/format...`);
+          console.log(`[Whisper] This may be due to large file size or server overload. Will retry with different provider/format...`);
           response = null;
-          continue; // Try next endpoint/format
+          continue; // Try next endpoint/format or provider
         }
         
         // If 401/403, token permission issue - check if it's missing Inference Providers permission
@@ -241,9 +241,29 @@ export async function transcribeWithWhisper(
     }
     
     if (!response) {
-      const errorMsg = `Hugging Face Inference Providers API failed.
+      // Build error message based on last error
+      let errorMsg = `Hugging Face Inference Providers API failed.
 
-Last error: ${lastError || 'Unknown error'}
+Last error: ${lastError || 'Unknown error'}`;
+
+      // Check if it was a 502/503/504 (server error/timeout)
+      if (lastError?.includes('502') || lastError?.includes('503') || lastError?.includes('504')) {
+        errorMsg += `
+
+Possible causes:
+• Audio file too large for shared inference infrastructure (common for 60-90 min sermons)
+• Server timeout or overload
+• Provider gateway choked on payload size
+
+Solutions:
+1. Compress audio: Convert to MP3 16kHz mono 64kbps (reduces file size dramatically)
+2. Chunk audio: Split into ~10 minute segments and transcribe separately
+3. Use paid transcription service: OpenAI Whisper API, AssemblyAI, or Deepgram (handles large files better)
+4. Add preprocessing worker: Use Railway/Render/Fly with ffmpeg for compression/chunking
+
+For API documentation: https://huggingface.co/docs/inference-providers/en/tasks/automatic-speech-recognition`;
+      } else {
+        errorMsg += `
 
 Possible causes:
 • Token missing "Make calls to Inference Providers" permission (check token settings)
@@ -259,6 +279,7 @@ Solutions:
 4. Use an alternative transcription service (OpenAI Whisper API, AssemblyAI)
 
 For API documentation: https://huggingface.co/docs/inference-providers/en/tasks/automatic-speech-recognition`;
+      }
       
       return {
         success: false,
