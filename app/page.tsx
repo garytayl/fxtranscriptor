@@ -267,6 +267,56 @@ export default function Home() {
 
   const handleViewTranscript = (sermon: Sermon) => {
     setSelectedSermon(sermon);
+    setShowAudioOverride(false);
+    setAudioOverrideUrl("");
+  };
+
+  const updateAudioUrl = async (sermon: Sermon, audioUrl: string, podbeanUrl?: string) => {
+    try {
+      setUpdatingAudio(true);
+      
+      const response = await fetch("/api/catalog/update-audio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sermonId: sermon.id,
+          audioUrl: audioUrl || undefined,
+          podbeanUrl: podbeanUrl || undefined,
+          clearError: true, // Clear error message and reset status
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        const errorMsg = data.error || `HTTP ${response.status}`;
+        alert(`Failed to update audio URL: ${errorMsg}`);
+        return;
+      }
+
+      // Update sermon in local state
+      setSermons((prev) =>
+        prev.map((s) => (s.id === sermon.id ? data.sermon : s))
+      );
+      
+      // Update selected sermon if it's the same one
+      if (selectedSermon?.id === sermon.id) {
+        setSelectedSermon(data.sermon);
+      }
+
+      // Close override UI
+      setShowAudioOverride(false);
+      setAudioOverrideUrl("");
+      
+      alert(`✅ Audio URL updated successfully! You can now generate the transcript.`);
+    } catch (error) {
+      console.error("Error updating audio URL:", error);
+      alert(`Error updating audio URL: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setUpdatingAudio(false);
+    }
   };
 
   const handleDownload = (sermon: Sermon) => {
