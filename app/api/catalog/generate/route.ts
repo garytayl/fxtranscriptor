@@ -89,18 +89,54 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if Railway worker is configured - if so, delegate to it
-    const workerUrl = process.env.AUDIO_WORKER_URL;
+    const workerUrl = process.env.AUDIO_WORKER_URL?.trim();
+    
+    console.log(`[Generate] Worker URL configured: ${workerUrl ? 'YES (' + workerUrl.substring(0, 50) + '...)' : 'NO'}`);
+    console.log(`[Generate] Sermon has audio_url: ${sermon.audio_url ? 'YES' : 'NO'}`);
+    console.log(`[Generate] Sermon has youtube_url: ${sermon.youtube_url ? 'YES (' + sermon.youtube_url.substring(0, 50) + '...)' : 'NO'}`);
     
     // Determine audio source: prefer audio_url, fallback to YouTube URL
     let audioSource = sermon.audio_url;
     if (!audioSource && sermon.youtube_url) {
       // Use YouTube URL as fallback if no direct audio URL
       audioSource = sermon.youtube_url;
-      console.log(`[Generate] No audio_url found, using YouTube URL for transcription: ${sermon.youtube_url}`);
+      console.log(`[Generate] ✅ No audio_url found, using YouTube URL for transcription: ${sermon.youtube_url}`);
+    }
+    
+    // If we have a YouTube URL but no worker, show helpful error
+    if (!workerUrl && sermon.youtube_url && !sermon.audio_url) {
+      const errorMessage = `YouTube audio extraction requires the worker service.\n\n` +
+        `Please set AUDIO_WORKER_URL in Vercel environment variables to your Railway worker URL.\n\n` +
+        `Your Railway worker URL should look like: https://your-worker.railway.app\n\n` +
+        `Alternatively, run the merge script to match this sermon with a Podbean episode to get an audio_url.`;
+      
+      console.log(`[Generate] ❌ Worker not configured for YouTube transcription`);
+      
+      await supabase
+        .from("sermons")
+        .update({
+          status: "failed",
+          error_message: errorMessage,
+        })
+        .eq("id", sermonId);
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: errorMessage,
+          sermon: {
+            ...sermon,
+            status: "failed",
+            error_message: errorMessage,
+          },
+        },
+        { status: 200 }
+      );
     }
     
     if (workerUrl && audioSource) {
-      console.log(`[Generate] Delegating transcription to Railway worker for sermon ${sermonId}`);
+      console.log(`[Generate] ✅ Delegating transcription to Railway worker for sermon ${sermonId}`);
+      console.log(`[Generate] Worker URL: ${workerUrl}`);
       console.log(`[Generate] Audio source: ${audioSource.substring(0, 100)}...`);
       
       // Update status to "generating"
@@ -109,16 +145,31 @@ export async function POST(request: NextRequest) {
         .update({ status: "generating", progress_json: { step: "queued", message: "Queued for transcription..." } })
         .eq("id", sermonId);
 
+      // Ensure worker URL doesn't have trailing slash
+      const cleanWorkerUrl = workerUrl.replace(/\/$/, '');
+      
       // Trigger worker asynchronously (don't wait for response)
-      fetch(`${workerUrl}/transcribe`, {
+      console.log(`[Generate] Calling worker: ${cleanWorkerUrl}/transcribe`);
+      console.log(`[Generate] Payload: { sermonId: ${sermonId}, audioUrl: ${audioSource.substring(0, 80)}... }`);
+      
+      fetch(`${cleanWorkerUrl}/transcribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sermonId: sermonId,
           audioUrl: audioSource, // Can be Podbean audio URL or YouTube URL
         }),
-      }).catch(async (error) => {
-        console.error(`[Generate] Error triggering worker:`, error);
+      })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error(`[Generate] Worker returned error ${response.status}: ${errorText}`);
+          throw new Error(`Worker error: ${response.status} ${errorText}`);
+        }
+        console.log(`[Generate] ✅ Worker request sent successfully`);
+      })
+      .catch(async (error) => {
+        console.error(`[Generate] ❌ Error triggering worker:`, error);
         // Update status to failed if worker trigger fails
         if (supabase) {
           try {
@@ -126,7 +177,7 @@ export async function POST(request: NextRequest) {
               .from("sermons")
               .update({ 
                 status: "failed",
-                error_message: `Failed to trigger worker: ${error.message}`,
+                error_message: `Failed to trigger worker: ${error.message}. Check that ${cleanWorkerUrl} is accessible.`,
                 progress_json: null,
               })
               .eq("id", sermonId);
