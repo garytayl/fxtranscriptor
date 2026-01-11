@@ -92,6 +92,13 @@ export async function GET(request: NextRequest) {
     console.log(`[Sync] Matching complete: ${matchedSermons.length} total sermons`);
     console.log(`[Sync] Statistics: ${matchedCount} matched (both sources), ${podbeanOnlyCount} Podbean-only, ${youtubeOnlyCount} YouTube-only`);
     console.log(`[Sync] Audio URLs available: ${withAudioUrlCount}/${matchedSermons.length} (${(withAudioUrlCount / matchedSermons.length * 100).toFixed(1)}%)`);
+    
+    // Log Podbean episodes with/without audio URLs for debugging
+    const podbeanWithAudio = podbeanEpisodes.filter(ep => ep.audioUrl).length;
+    console.log(`[Sync] Podbean RSS: ${podbeanEpisodes.length} episodes, ${podbeanWithAudio} have audio_url in RSS feed`);
+    if (podbeanWithAudio < podbeanEpisodes.length) {
+      console.log(`[Sync] ⚠️ ${podbeanEpisodes.length - podbeanWithAudio} Podbean episodes missing audio_url - check RSS feed format`);
+    }
 
     if (matchedSermons.length === 0) {
       return NextResponse.json({

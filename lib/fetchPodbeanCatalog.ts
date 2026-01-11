@@ -92,6 +92,13 @@ export async function fetchPodbeanCatalog(
           audioUrl,
           guid: guid || url,
         });
+        
+        // Log summary for debugging
+        if (!audioUrl) {
+          console.log(`[Podbean RSS] ⚠️ Episode "${title.substring(0, 50)}..." has no audio_url in RSS feed`);
+        }
+      } else {
+        console.log(`[Podbean RSS] ⚠️ Skipping episode with missing title or URL`);
       }
     }
 
