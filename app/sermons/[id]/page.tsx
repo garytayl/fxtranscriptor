@@ -138,7 +138,9 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         
         setGenerating(false);
         // Reload sermon to get updated status
-        await loadSermon();
+        if (sermonId) {
+          await loadSermon(sermonId);
+        }
       }
     } catch (error) {
       console.error("Error generating transcript:", error);
