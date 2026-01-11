@@ -39,27 +39,24 @@ async function transcribeAudio(audioUrl, retries = 3) {
     contentType = 'audio/wav';
   }
 
-  // Try endpoints in order (direct inference API, then router with different providers)
+  // Try endpoints in order (router with hf-inference provider, using raw bytes like Vercel code)
   const endpoints = [
-    'https://api-inference.huggingface.co/models/openai/whisper-large-v3',
-    'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+    {
+      url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+      provider: 'hf-inference',
+    },
   ];
   
-  for (const endpoint of endpoints) {
+  for (const endpointConfig of endpoints) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${endpoint}...`);
+        console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${endpointConfig.url} (provider: ${endpointConfig.provider})...`);
 
-        const formData = new FormData();
-        formData.append('inputs', audioBuffer, {
-          filename: 'audio.mp3',
-          contentType: contentType,
-        });
-
-        const response = await axios.post(endpoint, formData, {
+        // Send raw audio bytes (not FormData) - matches Vercel implementation
+        const response = await axios.post(endpointConfig.url, audioBuffer, {
           headers: {
             'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
-            ...formData.getHeaders(),
+            'Content-Type': contentType,
           },
           timeout: 600000, // 10 minutes
         });
@@ -81,12 +78,13 @@ async function transcribeAudio(audioUrl, retries = 3) {
           throw new Error('Invalid response format from Hugging Face');
         }
       } catch (error) {
-        const isLastAttempt = attempt === retries && endpoint === endpoints[endpoints.length - 1];
+        const isLastAttempt = attempt === retries && endpointConfig === endpoints[endpoints.length - 1];
         if (isLastAttempt) {
           throw error;
         }
         const statusCode = error.response?.status || 'unknown';
-        console.log(`[Transcribe] Attempt ${attempt} failed: ${error.message} (status: ${statusCode})`);
+        const errorMsg = error.response?.data?.detail || error.response?.data?.error || error.message;
+        console.log(`[Transcribe] Attempt ${attempt} failed: ${errorMsg} (status: ${statusCode})`);
         await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
       }
     }
