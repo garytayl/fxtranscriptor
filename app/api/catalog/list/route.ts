@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     const status = searchParams.get("status") || undefined;
     const limit = parseInt(searchParams.get("limit") || "100");
     const offset = parseInt(searchParams.get("offset") || "0");
@@ -56,9 +60,32 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching catalog:", error);
+    
+    // Check for Supabase connection timeout errors
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorString = String(error);
+    
+    if (errorString.includes("522") || 
+        errorString.includes("Connection timed out") || 
+        errorMessage.includes("522") ||
+        errorMessage.includes("timed out") ||
+        errorString.includes("mfzrunlgkpbtiwuzmivq.supabase.co")) {
+      return NextResponse.json(
+        {
+          error: "Supabase database connection timed out. This usually means:\n\n" +
+                 "1. Your Supabase project is paused (free tier pauses after inactivity)\n" +
+                 "2. Go to https://supabase.com/dashboard and open your project to wake it up\n" +
+                 "3. Wait 30 seconds and try again",
+          sermons: [],
+          count: 0
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+    
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
         sermons: [],
         count: 0
       },
