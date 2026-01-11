@@ -214,9 +214,33 @@ export async function POST(request: NextRequest) {
         sermon: updatedSermon,
       });
     } else {
-      // Update with error status
-      const attemptedSources = attemptedUrls.length > 0 ? `\n\nAttempted sources:\n${attemptedUrls.map(u => `• ${u}`).join('\n')}` : '';
-      const errorMessage = transcriptResult?.error || `Failed to extract transcript from available sources.${attemptedSources}`;
+      // Update with error status - provide helpful guidance based on what's missing
+      let errorMessage = transcriptResult?.error || 'Failed to extract transcript from available sources.';
+      
+      if (!sermon.audio_url) {
+        errorMessage = `No transcript found. ⚠️ **Main issue: No audio_url available.**\n\n`;
+        errorMessage += `This sermon needs an audio_url from Podbean RSS feed to use Whisper AI transcription (most reliable method).\n\n`;
+        errorMessage += `Sermon URLs:\n`;
+        errorMessage += `• YouTube: ${sermon.youtube_url || 'none'}\n`;
+        errorMessage += `• Podbean: ${sermon.podbean_url || 'none'}\n`;
+        errorMessage += `• Audio: ${sermon.audio_url || 'none'}\n\n`;
+        errorMessage += `To fix:\n`;
+        errorMessage += `1. Re-sync the catalog to match this sermon with a Podbean episode\n`;
+        errorMessage += `2. Check if Podbean RSS feed has <enclosure url="..."> for this episode\n`;
+        if (attemptedUrls.length > 0) {
+          errorMessage += `\nAlso attempted (optional optimizations):\n${attemptedUrls.map(u => `• ${u}`).join('\n')}`;
+        }
+      } else {
+        // Has audio_url but Whisper AI failed
+        const attemptedSources = attemptedUrls.length > 0 ? `\n\nAttempted sources:\n${attemptedUrls.map(u => `• ${u}`).join('\n')}` : '';
+        errorMessage = `Whisper AI transcription failed despite having audio_url.${attemptedSources}\n\n`;
+        errorMessage += `Possible reasons:\n`;
+        errorMessage += `• Hugging Face API token missing or incorrect permissions (check HUGGINGFACE_API_KEY)\n`;
+        errorMessage += `• Token needs "Make calls to Inference Providers" permission\n`;
+        errorMessage += `• Audio file is corrupted or unreadable\n`;
+        errorMessage += `• Hugging Face API rate limit or quota exceeded\n`;
+        errorMessage += `• Audio URL not accessible: ${sermon.audio_url.substring(0, 80)}...`;
+      }
       
       console.log(`[Generate] Transcript generation failed for sermon "${sermon.title}": ${errorMessage}`);
       
