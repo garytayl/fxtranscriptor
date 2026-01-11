@@ -129,13 +129,15 @@ export async function transcribeWithWhisper(
       try {
         // Method 1: Send raw audio bytes (preferred - simpler, faster)
         if (useRawBytes) {
+          // Convert Buffer to Uint8Array for TypeScript compatibility (Buffer extends Uint8Array)
+          const audioBytes = new Uint8Array(audioBuffer);
           response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
               'Content-Type': audioFormat,
             },
-            body: audioBuffer, // Send raw buffer directly
+            body: audioBytes, // Send raw bytes as Uint8Array
           });
         } 
         // Method 2: Send base64 JSON (for timestamps or if raw bytes fail)
