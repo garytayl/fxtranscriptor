@@ -140,20 +140,71 @@ export async function GET(request: NextRequest) {
         };
         
         for (const existingSermon of existingYouTubeOnlySermons) {
-          // Try to find matching Podbean episode by title/date
-          const bestMatch = podbeanEpisodes.find(pb => {
-            const normalizedExisting = normalizeTitleForMatch(existingSermon.title || '');
-            const normalizedPodbean = normalizeTitleForMatch(pb.title);
-            const titleSimilarity = calculateSimpleTitleSimilarity(normalizedExisting, normalizedPodbean);
+          // DATE-FIRST MATCHING: Find closest Podbean episode within ±3 days (deterministic)
+          const sermonDate = existingSermon.date ? new Date(existingSermon.date) : null;
+          const DATE_WINDOW_DAYS = 3;
+          
+          let bestMatch: typeof podbeanEpisodes[0] | undefined;
+          let bestDaysDiff = Infinity;
+          let bestTitleSimilarity = 0;
+          
+          if (sermonDate) {
+            // Find all candidates within date window, sorted by date proximity then title similarity
+            const candidates = podbeanEpisodes
+              .filter(pb => pb.date) // Only episodes with dates
+              .map(pb => {
+                const pbDate = pb.date!; // Safe because we filtered above
+                const daysDiff = Math.abs((sermonDate.getTime() - pbDate.getTime()) / (1000 * 60 * 60 * 24));
+                const normalizedExisting = normalizeTitleForMatch(existingSermon.title || '');
+                const normalizedPodbean = normalizeTitleForMatch(pb.title);
+                const titleSimilarity = calculateSimpleTitleSimilarity(normalizedExisting, normalizedPodbean);
+                
+                return { episode: pb, daysDiff, titleSimilarity };
+              })
+              .filter(c => c.daysDiff <= DATE_WINDOW_DAYS)
+              .sort((a, b) => {
+                // Sort by: 1) closest date, 2) highest title similarity
+                if (Math.abs(a.daysDiff - b.daysDiff) > 0.1) {
+                  return a.daysDiff - b.daysDiff;
+                }
+                return b.titleSimilarity - a.titleSimilarity;
+              });
             
-            const titleMatch = titleSimilarity >= 0.6;
+            if (candidates.length > 0) {
+              bestMatch = candidates[0].episode;
+              bestDaysDiff = candidates[0].daysDiff;
+              bestTitleSimilarity = candidates[0].titleSimilarity;
+              console.log(`[Sync] ✅ Date-first match: "${existingSermon.title?.substring(0, 50)}..." ↔ "${bestMatch.title.substring(0, 50)}..." (${bestDaysDiff.toFixed(1)} days apart, title similarity: ${(bestTitleSimilarity * 100).toFixed(0)}%, ${candidates.length} candidate(s))`);
+            } else {
+              // Log available dates for debugging
+              const availableDates = podbeanEpisodes
+                .filter(pb => pb.date)
+                .map(pb => ({ title: pb.title.substring(0, 40), date: pb.date!.toISOString().split('T')[0] }))
+                .slice(0, 5); // Show first 5 for debugging
+              console.log(`[Sync] ❌ No Podbean episode found within ±${DATE_WINDOW_DAYS} days of "${existingSermon.title?.substring(0, 50)}..." (sermon date: ${sermonDate.toISOString().split('T')[0]})`);
+              if (availableDates.length > 0) {
+                console.log(`[Sync] Available Podbean dates: ${availableDates.map(d => `${d.date} (${d.title}...)`).join(', ')}`);
+              }
+            }
+          }
+          
+          // Fallback to title-based matching if no date match
+          if (!bestMatch) {
+            bestMatch = podbeanEpisodes.find(pb => {
+              const normalizedExisting = normalizeTitleForMatch(existingSermon.title || '');
+              const normalizedPodbean = normalizeTitleForMatch(pb.title);
+              const titleSimilarity = calculateSimpleTitleSimilarity(normalizedExisting, normalizedPodbean);
+              
+              return titleSimilarity >= 0.6;
+            });
             
-            const dateMatch = existingSermon.date && pb.date
-              ? calculateSimpleDateProximity(new Date(existingSermon.date), pb.date) > 0.5
-              : false;
-            
-            return titleMatch && dateMatch;
-          });
+            if (bestMatch) {
+              const normalizedExisting = normalizeTitleForMatch(existingSermon.title || '');
+              const normalizedPodbean = normalizeTitleForMatch(bestMatch.title);
+              bestTitleSimilarity = calculateSimpleTitleSimilarity(normalizedExisting, normalizedPodbean);
+              console.log(`[Sync] Title-based fallback match: "${existingSermon.title?.substring(0, 50)}..." ↔ "${bestMatch.title.substring(0, 50)}..." (title similarity: ${(bestTitleSimilarity * 100).toFixed(0)}%)`);
+            }
+          }
           
           if (bestMatch) {
             // Update existing sermon with Podbean data

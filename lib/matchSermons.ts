@@ -181,8 +181,81 @@ function findBestMatch(
 
 /**
  * Reverse matching: Find best Podbean match for a YouTube video
+ * NEW: Date-first matching (deterministic)
  */
 function findBestPodbeanMatch(
+  ytVideo: YouTubeVideo,
+  podbeanEpisodes: PodbeanEpisode[],
+  excludeGuids: Set<string>
+): MatchResult | null {
+  // DATE-FIRST MATCHING: Find closest Podbean episode within ±3 days
+  const youtubeDate = ytVideo.publishedAt || null;
+  const DATE_WINDOW_DAYS = 3; // ±3 days window
+  
+  if (!youtubeDate) {
+    console.log(`[MatchSermons] YouTube video "${ytVideo.title.substring(0, 50)}..." has no published date, falling back to title-based matching`);
+    // Fall back to title-based matching if no date
+    return findBestPodbeanMatchByTitle(ytVideo, podbeanEpisodes, excludeGuids);
+  }
+  
+  // Find all Podbean episodes within date window
+  const candidates: Array<{ episode: PodbeanEpisode; daysDiff: number; titleSimilarity: number }> = [];
+  
+  for (const podbeanEp of podbeanEpisodes) {
+    if (excludeGuids.has(podbeanEp.guid)) continue;
+    if (!podbeanEp.date) continue;
+    
+    const daysDiff = Math.abs((youtubeDate.getTime() - podbeanEp.date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff <= DATE_WINDOW_DAYS) {
+      // Calculate title similarity as tie-breaker
+      const normalizedPodbeanTitle = normalizeTitle(podbeanEp.title);
+      const normalizedYouTubeTitle = normalizeTitle(ytVideo.title);
+      const titleSimilarity = calculateTitleSimilarity(normalizedPodbeanTitle, normalizedYouTubeTitle);
+      
+      candidates.push({
+        episode: podbeanEp,
+        daysDiff,
+        titleSimilarity,
+      });
+    }
+  }
+  
+  // Sort by: 1) closest date, 2) highest title similarity
+  candidates.sort((a, b) => {
+    if (Math.abs(a.daysDiff - b.daysDiff) > 0.1) {
+      return a.daysDiff - b.daysDiff; // Closer date wins
+    }
+    return b.titleSimilarity - a.titleSimilarity; // Better title match wins tie
+  });
+  
+  if (candidates.length > 0) {
+    const best = candidates[0];
+    const confidence = 0.9 - (best.daysDiff / DATE_WINDOW_DAYS) * 0.3; // 0.9 to 0.6 based on date proximity
+    const reason = `date match: ${best.daysDiff.toFixed(1)} days apart${best.titleSimilarity > 0.5 ? `, title similarity: ${(best.titleSimilarity * 100).toFixed(0)}%` : ''}`;
+    
+    console.log(`[MatchSermons] ✅ Date-first match: "${ytVideo.title.substring(0, 50)}..." ↔ "${best.episode.title.substring(0, 50)}..." (${best.daysDiff.toFixed(1)} days apart, ${candidates.length} candidate(s))`);
+    
+    return {
+      video: ytVideo,
+      episode: best.episode,
+      confidence: Math.max(0.6, confidence), // Ensure at least 0.6 confidence
+      reason,
+    };
+  }
+  
+  // No date match found - log why
+  console.log(`[MatchSermons] ❌ No Podbean episode found within ±${DATE_WINDOW_DAYS} days of YouTube video "${ytVideo.title.substring(0, 50)}..." (date: ${youtubeDate.toISOString().split('T')[0]})`);
+  console.log(`[MatchSermons] Available Podbean dates: ${podbeanEpisodes.filter(ep => ep.date && !excludeGuids.has(ep.guid)).map(ep => ep.date?.toISOString().split('T')[0]).join(', ')}`);
+  
+  // Fall back to title-based matching if no date match
+  return findBestPodbeanMatchByTitle(ytVideo, podbeanEpisodes, excludeGuids);
+}
+
+/**
+ * Fallback: Title-based matching for videos without dates or when date matching fails
+ */
+function findBestPodbeanMatchByTitle(
   ytVideo: YouTubeVideo,
   podbeanEpisodes: PodbeanEpisode[],
   excludeGuids: Set<string>
@@ -213,7 +286,7 @@ function findBestPodbeanMatch(
         video: ytVideo,
         episode: podbeanEp,
         confidence: matchResult.confidence,
-        reason: matchResult.reason,
+        reason: `title-based: ${matchResult.reason}`,
       };
     }
   }
@@ -235,10 +308,10 @@ function calculateWeightedConfidence(
   // Strategy 1: Title similarity (40% weight)
   const titleSimilarity = calculateTitleSimilarity(normalizedPodbeanTitle, normalizedYouTubeTitle);
   
-  // Strategy 2: Date proximity (30% weight if within 7 days)
-  const dateProximity = calculateDateProximity(podbeanEp.date, ytVideo.publishedAt);
+  // Strategy 2: Date proximity (50% weight if within 3 days - PRIMARY MATCHER)
+  const dateProximity = calculateDateProximity(podbeanEp.date, ytVideo.publishedAt, 3); // Use 3-day window
   
-  // Strategy 3: Episode number match (20% weight if both have episode numbers)
+  // Strategy 3: Episode number match (15% weight if both have episode numbers)
   let episodeMatch = 0;
   let episodeMatchReason = '';
   if (podbeanEpisodeNum && youtubeEpisodeNum) {
@@ -252,17 +325,17 @@ function calculateWeightedConfidence(
     episodeMatchReason = 'no episode numbers';
   }
   
-  // Strategy 4: Description similarity (10% weight if titles don't match well)
+  // Strategy 4: Description similarity (5% weight if titles don't match well)
   let descriptionSimilarity = 0;
   if (titleSimilarity < 0.7 && podbeanEp.description && ytVideo.description) {
     descriptionSimilarity = calculateDescriptionSimilarity(podbeanEp.description, ytVideo.description);
   }
   
-  // Calculate weighted confidence
-  let totalConfidence = titleSimilarity * 0.4;
-  totalConfidence += dateProximity * 0.3;
-  totalConfidence += episodeMatch * 0.2;
-  totalConfidence += descriptionSimilarity * 0.1;
+  // NEW WEIGHTS: Date is primary (50%), title is secondary (30%)
+  let totalConfidence = dateProximity * 0.5; // Date is now PRIMARY
+  totalConfidence += titleSimilarity * 0.3;  // Title is tie-breaker
+  totalConfidence += episodeMatch * 0.15;
+  totalConfidence += descriptionSimilarity * 0.05;
   
   // Build reason string
   const reasons: string[] = [];
@@ -306,17 +379,22 @@ function calculateTitleSimilarity(title1: string, title2: string): number {
 }
 
 /**
- * Calculate date proximity score (1.0 if same day, decreasing over 7 days)
+ * Calculate date proximity score (1.0 if same day, decreasing over window)
+ * @param date1 First date
+ * @param date2 Second date  
+ * @param windowDays Window in days (default: 7, but we use 3 for stricter matching)
  */
-function calculateDateProximity(date1: Date | null, date2: Date | null): number {
+function calculateDateProximity(date1: Date | null, date2: Date | null, windowDays: number = 7): number {
   if (!date1 || !date2) return 0;
   
   const diffMs = Math.abs(date1.getTime() - date2.getTime());
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   
-  // Same day = 1.0, within 7 days = decreasing score, beyond 7 days = 0
+  // Same day = 1.0, within window = decreasing score, beyond window = 0
   if (diffDays <= 1) return 1.0;
-  if (diffDays <= 7) return 1.0 - (diffDays - 1) / 6; // Linear decrease from 1.0 to 0 over 6 days
+  if (diffDays <= windowDays) {
+    return 1.0 - (diffDays - 1) / (windowDays - 1); // Linear decrease from 1.0 to 0 over (windowDays-1) days
+  }
   return 0;
 }
 
