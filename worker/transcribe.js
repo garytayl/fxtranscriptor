@@ -1,15 +1,16 @@
 /**
  * Transcription module for Railway worker
  * Handles Whisper AI transcription via Hugging Face
+ * Uses fetch() instead of axios to match Vercel implementation exactly
  */
 
-const axios = require('axios');
+const axios = require('axios'); // Still used for downloading audio
 
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const HUGGINGFACE_ENDPOINT = 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3';
 
 /**
  * Transcribe audio file using Hugging Face Whisper API
+ * Matches Vercel implementation exactly (uses fetch, not axios)
  */
 async function transcribeAudio(audioUrl, retries = 3) {
   if (!HUGGINGFACE_API_KEY) {
@@ -18,7 +19,7 @@ async function transcribeAudio(audioUrl, retries = 3) {
 
   console.log(`[Transcribe] Starting transcription for: ${audioUrl.substring(0, 80)}...`);
 
-  // Download audio
+  // Download audio (using axios for download, but fetch for API call)
   const audioResponse = await axios({
     url: audioUrl,
     method: 'GET',
@@ -30,15 +31,19 @@ async function transcribeAudio(audioUrl, retries = 3) {
   const audioSizeMB = audioBuffer.length / 1024 / 1024;
   console.log(`[Transcribe] Downloaded audio: ${audioSizeMB.toFixed(2)} MB`);
 
-  // Determine content type
-  let contentType = 'audio/mpeg';
-  if (audioUrl.includes('.m4a') || audioUrl.includes('.mp4')) {
-    contentType = 'audio/mp4';
-  } else if (audioUrl.includes('.wav')) {
-    contentType = 'audio/wav';
-  }
+  // Convert Buffer to Uint8Array (matches Vercel implementation)
+  const audioBytes = new Uint8Array(audioBuffer);
 
-  // Try endpoints in order (router with hf-inference provider, using raw bytes like Vercel code)
+  // Determine content type (matches Vercel logic)
+  const contentType = audioUrl.includes('.m4a') ? 'audio/mp4' : 
+                     audioUrl.includes('.mp3') ? 'audio/mpeg' :
+                     audioUrl.includes('.wav') ? 'audio/wav' :
+                     audioUrl.includes('.ogg') ? 'audio/ogg' :
+                     'audio/mpeg'; // Default fallback
+
+  console.log(`[Transcribe] Sending ${audioBytes.length} bytes (${audioSizeMB.toFixed(2)} MB) with Content-Type: ${contentType}`);
+
+  // Try endpoints in order (matches Vercel implementation)
   const endpoints = [
     {
       url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
@@ -51,45 +56,98 @@ async function transcribeAudio(audioUrl, retries = 3) {
       try {
         console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${endpointConfig.url} (provider: ${endpointConfig.provider})...`);
 
-        // Send raw audio bytes (not FormData) - matches Vercel implementation
-        // Pass Buffer directly - axios accepts Buffer and will send it as raw bytes
-        // when Content-Type is set to audio/* (not application/json)
-        const response = await axios.post(endpointConfig.url, audioBuffer, {
+        // Use fetch() instead of axios - matches Vercel implementation exactly
+        // fetch() doesn't add unwanted default headers like axios does
+        const response = await fetch(endpointConfig.url, {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
             'Content-Type': contentType,
-            'Accept': 'application/json', // API requires explicit Accept header (not the default "application/json, text/plain, */*")
+            // Note: fetch() doesn't add default Accept header, which is what we want
           },
-          timeout: 600000, // 10 minutes
-          // Don't let axios auto-detect and convert to JSON or FormData
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
+          body: audioBytes, // Send raw bytes as Uint8Array (matches Vercel)
         });
 
-        // Handle different response formats
-        let transcript = null;
-        if (response.data && response.data.text) {
-          transcript = response.data.text.trim();
-        } else if (typeof response.data === 'string') {
-          transcript = response.data.trim();
-        } else if (response.data && Array.isArray(response.data) && response.data[0] && response.data[0].text) {
-          transcript = response.data[0].text.trim();
+        // Read response text (can only read once)
+        const responseText = await response.text();
+
+        // Handle 503 (model loading) - retry
+        if (response.status === 503) {
+          console.log(`[Transcribe] Model is loading (503), will retry...`);
+          await new Promise(resolve => setTimeout(resolve, 5000 * attempt)); // Wait longer for model loading
+          continue;
         }
 
-        if (transcript && transcript.length > 0) {
-          console.log(`[Transcribe] ✅ Successfully transcribed (${transcript.length} chars)`);
-          return transcript;
-        } else {
-          throw new Error('Invalid response format from Hugging Face');
+        // Handle 200 (success)
+        if (response.status === 200) {
+          console.log(`[Transcribe] ✅ API returned 200, parsing response...`);
+          
+          // Parse JSON response
+          let responseData;
+          try {
+            responseData = JSON.parse(responseText);
+          } catch (parseError) {
+            console.log(`[Transcribe] Response is not JSON, treating as plain text`);
+            responseData = responseText;
+          }
+
+          // Extract transcript from response (handle different formats)
+          let transcript = null;
+          if (responseData && responseData.text) {
+            transcript = responseData.text.trim();
+          } else if (typeof responseData === 'string') {
+            transcript = responseData.trim();
+          } else if (Array.isArray(responseData) && responseData[0] && responseData[0].text) {
+            transcript = responseData[0].text.trim();
+          }
+
+          if (transcript && transcript.length > 0) {
+            console.log(`[Transcribe] ✅ Successfully transcribed (${transcript.length} chars)`);
+            return transcript;
+          } else {
+            throw new Error(`Invalid response format: ${responseText.substring(0, 200)}`);
+          }
         }
+
+        // Handle 400 (bad request) - log details and fail
+        if (response.status === 400) {
+          const errorMsg = responseText.substring(0, 500);
+          console.log(`[Transcribe] 400 Bad Request: ${errorMsg}`);
+          throw new Error(`400 Bad Request: ${errorMsg}`);
+        }
+
+        // Handle 404 (not found) - try next endpoint
+        if (response.status === 404) {
+          console.log(`[Transcribe] 404 Not Found, trying next endpoint...`);
+          continue;
+        }
+
+        // Handle 502/504 (server error) - retry
+        if (response.status === 502 || response.status === 504) {
+          console.log(`[Transcribe] ${response.status} Server Error, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          continue;
+        }
+
+        // Handle 401/403 (auth error) - fail immediately
+        if (response.status === 401 || response.status === 403) {
+          const errorMsg = responseText.substring(0, 200);
+          console.log(`[Transcribe] ${response.status} Auth Error: ${errorMsg}`);
+          throw new Error(`${response.status} Auth Error: ${errorMsg}`);
+        }
+
+        // Other status codes
+        throw new Error(`Unexpected status ${response.status}: ${responseText.substring(0, 200)}`);
+
       } catch (error) {
         const isLastAttempt = attempt === retries && endpointConfig === endpoints[endpoints.length - 1];
         if (isLastAttempt) {
+          // Log full error details on final attempt
+          console.error(`[Transcribe] Final attempt failed:`, error);
           throw error;
         }
-        const statusCode = error.response?.status || 'unknown';
-        const errorMsg = error.response?.data?.detail || error.response?.data?.error || error.message;
-        console.log(`[Transcribe] Attempt ${attempt} failed: ${errorMsg} (status: ${statusCode})`);
+        const errorMsg = error.message || String(error);
+        console.log(`[Transcribe] Attempt ${attempt} failed: ${errorMsg}`);
         await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
       }
     }
