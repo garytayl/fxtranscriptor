@@ -26,23 +26,15 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [copied, setCopied] = useState(false);
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
 
-  // Extract ID from params (handle both Promise and direct params)
+  // Extract ID from params (Next.js 15+ always uses Promise)
   useEffect(() => {
     const extractId = async () => {
       try {
-        console.log("[SermonDetail] Extracting ID from params:", params);
-        let id: string;
-        if (params && typeof params === 'object' && 'then' in params && typeof (params as any).then === 'function') {
-          console.log("[SermonDetail] Params is a Promise, awaiting...");
-          const resolved = await (params as Promise<{ id: string }>);
-          id = resolved.id;
-          console.log("[SermonDetail] Resolved ID from Promise:", id);
-        } else {
-          id = (params as { id: string }).id;
-          console.log("[SermonDetail] Got ID from direct params:", id);
-        }
+        console.log("[SermonDetail] Extracting ID from params (Promise)...");
+        const resolved = await params;
+        const id = resolved?.id;
         if (id) {
-          console.log("[SermonDetail] Setting sermonId:", id);
+          console.log("[SermonDetail] Resolved ID:", id);
           setSermonId(id);
         } else {
           console.error("[SermonDetail] No ID found in params");
