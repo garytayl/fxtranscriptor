@@ -21,12 +21,24 @@ export async function GET(
       );
     }
 
-    // Next.js 15+ requires awaiting params Promise
-    const params = await context.params;
-    const id = params?.id;
+    // Extract ID from URL path (most reliable method)
+    const url = new URL(request.url);
+    const urlPath = url.pathname;
+    const urlIdMatch = urlPath.match(/\/api\/catalog\/([^/?]+)/);
+    let id = urlIdMatch ? urlIdMatch[1] : null;
+
+    // Try params as fallback (Next.js 15+)
+    if (!id) {
+      try {
+        const params = await context.params;
+        id = params?.id || null;
+      } catch (paramsError) {
+        console.error("[Sermon API] Error extracting from params:", paramsError);
+      }
+    }
 
     if (!id || typeof id !== "string") {
-      console.error("[Sermon API] Missing or invalid ID:", { id, params, url: request.url });
+      console.error("[Sermon API] Missing or invalid ID:", { id, url: request.url, pathname: urlPath });
       return NextResponse.json(
         { error: "Missing or invalid sermon ID", details: `ID received: ${id}, URL: ${request.url}` },
         { status: 400 }
