@@ -23,20 +23,28 @@ export async function GET(request: NextRequest) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     const status = searchParams.get("status") || undefined;
-    const limit = parseInt(searchParams.get("limit") || "100");
+    const limitParam = searchParams.get("limit");
+    const limit = limitParam ? parseInt(limitParam) : undefined; // No default limit - fetch all
     const offset = parseInt(searchParams.get("offset") || "0");
 
     let query = supabase
       .from("sermons")
       .select("*")
-      .order("date", { ascending: false, nullsFirst: false })
-      .range(offset, offset + limit - 1);
+      .order("date", { ascending: false, nullsFirst: false });
+    
+    // Only apply range if limit is explicitly provided
+    if (limit !== undefined) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
     if (status) {
       query = query.eq("status", status);
     }
 
     const { data: sermons, error } = await query;
+    
+    // Clear timeout on success
+    clearTimeout(timeout);
 
     if (error) {
       console.error("Error fetching sermons:", error);
