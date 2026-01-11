@@ -107,19 +107,22 @@ export async function POST(request: NextRequest) {
           sermonId: sermonId,
           audioUrl: sermon.audio_url,
         }),
-      }).catch(error => {
+      }).catch(async (error) => {
         console.error(`[Generate] Error triggering worker:`, error);
         // Update status to failed if worker trigger fails
         if (supabase) {
-          supabase
-            .from("sermons")
-            .update({ 
-              status: "failed",
-              error_message: `Failed to trigger worker: ${error.message}`,
-              progress_json: null,
-            })
-            .eq("id", sermonId)
-            .catch(err => console.error(`[Generate] Error updating status:`, err));
+          try {
+            await supabase
+              .from("sermons")
+              .update({ 
+                status: "failed",
+                error_message: `Failed to trigger worker: ${error.message}`,
+                progress_json: null,
+              })
+              .eq("id", sermonId);
+          } catch (err) {
+            console.error(`[Generate] Error updating status:`, err);
+          }
         }
       });
 
