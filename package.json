@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "populate-john-series": "npx tsx scripts/populate-john-series.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

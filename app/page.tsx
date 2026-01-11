@@ -43,6 +43,54 @@ export default function Home() {
     loadPlaylistSeries();
   }, []);
 
+  // Poll for progress updates on generating sermons
+  useEffect(() => {
+    // Find all sermons that are generating
+    const generatingSermonIds = sermons
+      .filter((s) => s.status === "generating")
+      .map((s) => s.id);
+
+    if (generatingSermonIds.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        // Fetch updated sermons
+        const response = await fetch("/api/catalog/list");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.sermons) {
+            // Update sermons that are still generating or have changed status
+            setSermons((prev) => {
+              const updated = [...prev];
+              let changed = false;
+
+              for (const updatedSermon of data.sermons) {
+                const index = updated.findIndex((s) => s.id === updatedSermon.id);
+                if (index >= 0) {
+                  // Update if status or progress changed
+                  const prevSermon = updated[index];
+                  const statusChanged = prevSermon.status !== updatedSermon.status;
+                  const progressChanged = JSON.stringify(prevSermon.progress_json) !== JSON.stringify(updatedSermon.progress_json);
+                  
+                  if (statusChanged || progressChanged) {
+                    updated[index] = updatedSermon;
+                    changed = true;
+                  }
+                }
+              }
+
+              return changed ? updated : prev;
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error polling for progress updates:", error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [sermons.map((s) => `${s.id}:${s.status}`).join(",")]); // Only re-run when generating status changes
+
   const loadPlaylistSeries = async () => {
     try {
       // Playlists from FX Church's sermon series
@@ -346,10 +394,11 @@ export default function Home() {
       case "completed":
         return <Badge variant="default">Completed</Badge>;
       case "generating":
+        const progressMessage = sermon.progress_json?.message || "Generating...";
         return (
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="secondary" className="gap-1" title={progressMessage}>
             <Loader2 className="size-3 animate-spin" />
-            Generating
+            {progressMessage}
           </Badge>
         );
       case "failed":
@@ -730,29 +779,50 @@ export default function Home() {
                   )}
                   
                   {selectedSermon && (
-                    <Button
-                      className="font-mono text-xs uppercase tracking-widest"
-                      onClick={() => selectedSermon && generateTranscript(selectedSermon)}
-                      disabled={generating.has(selectedSermon.id) || !selectedSermon.audio_url}
-                      variant={!selectedSermon.audio_url ? "outline" : "default"}
-                    >
-                      {generating.has(selectedSermon.id) ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin mr-2" />
-                          Generating...
-                        </>
-                      ) : !selectedSermon.audio_url ? (
-                        <>
-                          <AlertCircle className="size-4 mr-2" />
-                          No Audio URL - Set Above First
-                        </>
-                      ) : (
-                        <>
-                          <Play className="size-4 mr-2" />
-                          Generate Transcript
-                        </>
+                    <>
+                      {/* Progress Display */}
+                      {(selectedSermon.status === "generating" || generating.has(selectedSermon.id)) && selectedSermon.progress_json?.message && (
+                        <div className="mb-4 p-4 border border-border/30 rounded-lg bg-card/50">
+                          <div className="flex items-start gap-3">
+                            <Loader2 className="size-4 animate-spin text-accent mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-mono text-muted-foreground">
+                                {selectedSermon.progress_json.message}
+                                {selectedSermon.progress_json.current && selectedSermon.progress_json.total && (
+                                  <span className="ml-2 text-xs text-muted-foreground/70">
+                                    ({selectedSermon.progress_json.current}/{selectedSermon.progress_json.total})
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </Button>
+                      
+                      <Button
+                        className="font-mono text-xs uppercase tracking-widest"
+                        onClick={() => selectedSermon && generateTranscript(selectedSermon)}
+                        disabled={generating.has(selectedSermon.id) || selectedSermon.status === "generating" || !selectedSermon.audio_url}
+                        variant={!selectedSermon.audio_url ? "outline" : "default"}
+                      >
+                        {generating.has(selectedSermon.id) || selectedSermon.status === "generating" ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin mr-2" />
+                            Generating...
+                          </>
+                        ) : !selectedSermon.audio_url ? (
+                          <>
+                            <AlertCircle className="size-4 mr-2" />
+                            No Audio URL - Set Above First
+                          </>
+                        ) : (
+                          <>
+                            <Play className="size-4 mr-2" />
+                            Generate Transcript
+                          </>
+                        )}
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>

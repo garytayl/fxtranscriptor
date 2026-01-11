@@ -317,7 +317,7 @@ app.post('/transcribe', async (req, res) => {
       .from('sermons')
       .update({ 
         status: 'generating',
-        progress_json: { step: 'downloading', message: 'Downloading audio...' }
+        progress_json: { step: 'downloading', message: 'Downloading audio file...' }
       })
       .eq('id', sermonId);
 
@@ -343,7 +343,7 @@ app.post('/transcribe', async (req, res) => {
       await supabase
         .from('sermons')
         .update({ 
-          progress_json: { step: 'chunking', message: 'Chunking audio file...' }
+          progress_json: { step: 'chunking', message: 'Chunking audio into 10-minute segments...' }
         })
         .eq('id', sermonId);
 
@@ -371,7 +371,7 @@ app.post('/transcribe', async (req, res) => {
               step: 'transcribing',
               current: i + 1,
               total: chunks.length,
-              message: `Transcribing chunk ${i + 1}/${chunks.length}...`
+              message: `Transcribing chunk ${i + 1} of ${chunks.length}...`
             }
           })
           .eq('id', sermonId);
@@ -380,6 +380,17 @@ app.post('/transcribe', async (req, res) => {
         const chunkTranscript = await transcribeAudio(chunks[i]);
         transcripts.push(chunkTranscript);
       }
+      
+      // Update progress before combining
+      await supabase
+        .from('sermons')
+        .update({ 
+          progress_json: { 
+            step: 'combining',
+            message: 'Combining transcripts from all chunks...'
+          }
+        })
+        .eq('id', sermonId);
 
       transcript = transcripts.join('\n\n');
     } else {
@@ -387,12 +398,20 @@ app.post('/transcribe', async (req, res) => {
       await supabase
         .from('sermons')
         .update({ 
-          progress_json: { step: 'transcribing', message: 'Transcribing audio...' }
+          progress_json: { step: 'transcribing', message: 'Transcribing audio with Whisper AI...' }
         })
         .eq('id', sermonId);
 
       transcript = await transcribeAudio(audioUrl);
     }
+    
+    // Final step before saving
+    await supabase
+      .from('sermons')
+      .update({ 
+        progress_json: { step: 'saving', message: 'Saving transcript to database...' }
+      })
+      .eq('id', sermonId);
 
     // Update database with transcript
     await supabase
