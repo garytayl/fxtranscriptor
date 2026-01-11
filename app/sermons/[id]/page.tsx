@@ -38,6 +38,13 @@ export default function SermonDetailPage({ params }: { params: { id: string } })
           if (updatedSermon) {
             setSermon(updatedSermon);
             
+            // Update progress from database
+            if (updatedSermon.progress_json) {
+              setProgress(updatedSermon.progress_json);
+            } else {
+              setProgress(null);
+            }
+            
             // If status changed to completed or failed, stop polling
             if (updatedSermon.status === "completed" || updatedSermon.status === "failed") {
               setGenerating(false);
@@ -75,6 +82,9 @@ export default function SermonDetailPage({ params }: { params: { id: string } })
 
       setSermon(foundSermon);
       setGenerating(foundSermon.status === "generating");
+      if (foundSermon.progress_json) {
+        setProgress(foundSermon.progress_json);
+      }
     } catch (error) {
       console.error("Error loading sermon:", error);
     } finally {

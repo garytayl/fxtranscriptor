@@ -10,6 +10,22 @@ import { transcribeChunks } from "@/lib/transcribeChunks";
 
 export const runtime = "nodejs";
 
+// Helper function to update progress in database
+async function updateProgress(
+  sermonId: string,
+  progress: { step: string; current?: number; total?: number; message?: string; details?: string[] }
+) {
+  if (!supabase) return;
+  try {
+    await supabase
+      .from("sermons")
+      .update({ progress_json: progress })
+      .eq("id", sermonId);
+  } catch (error) {
+    console.error(`[Generate] Error updating progress:`, error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!supabase) {
@@ -75,7 +91,7 @@ export async function POST(request: NextRequest) {
     // Update status to "generating"
     await supabase
       .from("sermons")
-      .update({ status: "generating" })
+      .update({ status: "generating", progress_json: { step: "initializing", message: "Initializing transcription..." } })
       .eq("id", sermonId);
 
     // Check if sermon has any way to generate transcript (audio_url is primary, URLs are secondary)
@@ -148,6 +164,8 @@ export async function POST(request: NextRequest) {
     // Check file size to determine if chunking is needed
     const CHUNKING_THRESHOLD_MB = 20; // Files >20MB must be chunked
     
+    await updateProgress(sermonId, { step: "checking_size", message: "Checking audio file size..." });
+    
     // First, try to get file size from HEAD request (if supported)
     let fileSizeMB = 0;
     try {
@@ -156,6 +174,7 @@ export async function POST(request: NextRequest) {
       if (contentLength) {
         fileSizeMB = parseInt(contentLength) / 1024 / 1024;
         console.log(`[Generate] Audio file size: ${fileSizeMB.toFixed(2)} MB (from Content-Length header)`);
+        await updateProgress(sermonId, { step: "checked_size", message: `Audio file size: ${fileSizeMB.toFixed(2)} MB` });
       }
     } catch (error) {
       console.log(`[Generate] Could not determine file size from HEAD request, will check after download if needed`);
@@ -225,16 +244,19 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[Generate] ✅ Audio chunked into ${chunkData.chunks.length} chunks`);
+        await updateProgress(sermonId, { step: "chunked", message: `Audio chunked into ${chunkData.chunks.length} chunks`, total: chunkData.chunks.length });
 
         // Step 2: Transcribe each chunk
         const chunks = chunkData.chunks;
         console.log(`[Generate] Starting transcription of ${chunks.length} chunks...`);
+        await updateProgress(sermonId, { step: "transcribing_chunks", message: "Starting transcription...", current: 0, total: chunks.length });
         
         const chunksResult = await transcribeChunks(
           chunks,
           huggingFaceKey,
-          (chunkNum, totalChunks) => {
+          async (chunkNum, totalChunks) => {
             console.log(`[Generate] Progress: Chunk ${chunkNum}/${totalChunks} completed`);
+            await updateProgress(sermonId, { step: "transcribing_chunks", message: `Transcribing chunk ${chunkNum}/${totalChunks}...`, current: chunkNum, total: totalChunks });
           }
         );
 
@@ -292,6 +314,7 @@ export async function POST(request: NextRequest) {
     // Use direct transcription for smaller files or if chunking was skipped
     if (!transcriptResult || !transcriptResult.success) {
       console.log(`[Generate] 🎯 Using direct Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
+      await updateProgress(sermonId, { step: "transcribing", message: "Transcribing audio..." });
       
       try {
         const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
@@ -334,6 +357,7 @@ export async function POST(request: NextRequest) {
           transcript_generated_at: new Date().toISOString(),
           status: "completed",
           error_message: null,
+          progress_json: null, // Clear progress on completion
         })
         .eq("id", sermonId)
         .select()
@@ -356,6 +380,7 @@ export async function POST(request: NextRequest) {
         .update({
           status: "failed",
           error_message: errorMessage,
+          progress_json: null, // Clear progress on error
         })
         .eq("id", sermonId);
 
