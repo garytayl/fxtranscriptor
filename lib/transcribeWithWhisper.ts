@@ -80,51 +80,86 @@ export async function transcribeWithWhisper(
       console.warn(`[Whisper] Audio file is large (${sizeMB.toFixed(2)} MB), transcription may take longer`);
     }
     
-    console.log(`[Whisper] Sending audio to Hugging Face Whisper API...`);
+    console.log(`[Whisper] Sending audio to Hugging Face Whisper API via Inference Providers router...`);
     
-    // Use Hugging Face Router API - free tier, no credit card required
+    // Use Hugging Face Inference Providers router (api-inference.huggingface.co is decommissioned)
+    // Correct endpoint format: https://router.huggingface.co/{provider}/models/{model_id}
+    // Provider: hf-inference (HF's own provider) or fal-ai (third-party fallback)
     // Model: openai/whisper-large-v3 (most accurate)
-    // Updated to use router.huggingface.co (api-inference.huggingface.co is deprecated as of 2024)
-    // Hugging Face accepts audio as base64-encoded string in JSON format
-    // Note: This works for Node.js serverless environments
-    const base64Audio = audioBuffer.toString('base64');
+    // 
+    // Request format: Send raw audio bytes with correct Content-Type (preferred)
+    // OR send base64 JSON with inputs field (for timestamps)
+    //
+    // IMPORTANT: Token must have "Make calls to Inference Providers" permission (not just Read)
     
-    // Try multiple endpoint formats - Hugging Face has been migrating endpoints
-    // Try the old endpoint first (may still work despite deprecation warning)
-    // Then try router endpoints with different formats
+    // Detect audio format from buffer or default to mpeg
+    const audioFormat = 'audio/mpeg'; // M4A files work with mpeg Content-Type
+    const audioBase64 = audioBuffer.toString('base64');
+    
+    // Try endpoints in order: hf-inference (primary), fal-ai (fallback)
     const endpoints = [
-      'https://api-inference.huggingface.co/models/openai/whisper-large-v3', // Original (try first - may still work)
-      'https://router.huggingface.co/models/openai/whisper-large-v3', // Router format 1
-      'https://router.huggingface.co/openai/whisper-large-v3', // Router format 2
-      'https://api-inference.huggingface.co/models/whisper-large-v3', // Alternative model path
+      {
+        url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+        provider: 'hf-inference',
+        useRawBytes: true, // Try raw bytes first (simpler, faster)
+      },
+      {
+        url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+        provider: 'hf-inference',
+        useRawBytes: false, // Fallback to JSON if raw bytes fail
+      },
+      {
+        url: 'https://router.huggingface.co/fal-ai/models/openai/whisper-large-v3',
+        provider: 'fal-ai',
+        useRawBytes: true, // Try fal-ai provider as fallback
+      },
     ];
     
     let response: Response | null = null;
     let apiUrl = '';
     let lastError: string | null = null;
     
-    for (const endpoint of endpoints) {
-      apiUrl = endpoint;
-      console.log(`[Whisper] Trying Hugging Face endpoint: ${apiUrl}`);
+    for (const endpointConfig of endpoints) {
+      apiUrl = endpointConfig.url;
+      const provider = endpointConfig.provider;
+      const useRawBytes = endpointConfig.useRawBytes;
+      
+      console.log(`[Whisper] Trying Hugging Face endpoint: ${apiUrl} (provider: ${provider}, format: ${useRawBytes ? 'raw bytes' : 'JSON base64'})`);
       
       try {
-        response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: base64Audio,
-          }),
-        });
+        // Method 1: Send raw audio bytes (preferred - simpler, faster)
+        if (useRawBytes) {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': audioFormat,
+            },
+            body: audioBuffer, // Send raw buffer directly
+          });
+        } 
+        // Method 2: Send base64 JSON (for timestamps or if raw bytes fail)
+        else {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              inputs: audioBase64,
+              // Optional: uncomment for timestamps
+              // parameters: { return_timestamps: true },
+            }),
+          });
+        }
         
         // Read the response body once (we can't read it multiple times)
         const responseText = await response.text();
         
         // If we get a valid response (200) or a model-loading response (503), use this endpoint
         if (response.status === 200 || response.status === 503) {
-          console.log(`[Whisper] Using Hugging Face endpoint: ${apiUrl} (status: ${response.status})`);
+          console.log(`[Whisper] ✅ Using Hugging Face endpoint: ${apiUrl} (provider: ${provider}, format: ${useRawBytes ? 'raw bytes' : 'JSON'}, status: ${response.status})`);
           // Reconstruct response with text for downstream processing
           response = new Response(responseText, { 
             status: response.status, 
@@ -133,49 +168,27 @@ export async function transcribeWithWhisper(
           break;
         }
         
-        // If 404, try next endpoint
+        // If 404, provider/model not found - try next endpoint
         if (response.status === 404) {
           lastError = `${response.status} - ${responseText.substring(0, 200)}`;
-          console.log(`[Whisper] Endpoint ${apiUrl} returned 404, trying next...`);
+          console.log(`[Whisper] Endpoint ${apiUrl} returned 404 (provider or model not found), trying next...`);
           response = null;
           continue;
         }
         
-        // If 410 (Gone) - deprecated endpoint, but might still return valid data
-        // Some APIs return 410 but still process the request successfully
-        if (response.status === 410) {
-          console.log(`[Whisper] Endpoint ${apiUrl} returned 410 (deprecated), checking if response contains valid data...`);
+        // If 401/403, token permission issue - check if it's missing Inference Providers permission
+        if (response.status === 401 || response.status === 403) {
           lastError = `${response.status} - ${responseText.substring(0, 200)}`;
-          
-          // Check if response mentions router endpoint (true deprecation)
-          if (responseText.includes('router.huggingface.co') && !responseText.includes('"text"')) {
-            console.log(`[Whisper] Endpoint ${apiUrl} is truly deprecated (410 with migration message), trying next...`);
-            response = null;
-            continue;
+          console.log(`[Whisper] Endpoint ${apiUrl} returned ${response.status} (authentication/permission error)`);
+          if (responseText.includes('Inference Providers') || responseText.includes('permission')) {
+            console.log(`[Whisper] Token may be missing "Make calls to Inference Providers" permission. Check token settings.`);
           }
-          
-          // Try to parse as JSON - if it contains transcript data, use it despite 410 status
-          try {
-            const jsonData = JSON.parse(responseText);
-            if (jsonData.text || (Array.isArray(jsonData) && jsonData.length > 0) || jsonData.chunks) {
-              console.log(`[Whisper] Deprecated endpoint (410) returned valid transcript data, using it...`);
-              // Create a new Response object with status 200 for downstream processing
-              response = new Response(responseText, { 
-                status: 200, 
-                headers: { 'Content-Type': 'application/json' }
-              });
-              break;
-            }
-          } catch (parseError) {
-            // Not valid JSON, try next endpoint
-            console.log(`[Whisper] Endpoint ${apiUrl} returned 410 without valid JSON transcript data, trying next...`);
-          }
-          
+          // Don't try other endpoints if it's a token issue - same token will fail everywhere
           response = null;
-          continue;
+          break;
         }
         
-        // For other status codes (like 401, 403, 429), break and handle error below
+        // For other status codes (like 429 rate limit, 500 server error), break and handle error below
         lastError = `${response.status} - ${responseText.substring(0, 200)}`;
         break;
       } catch (fetchError) {
@@ -187,22 +200,24 @@ export async function transcribeWithWhisper(
     }
     
     if (!response) {
-      const errorMsg = `Hugging Face Inference API endpoints are currently unavailable or migrated.
+      const errorMsg = `Hugging Face Inference Providers API failed.
 
 Last error: ${lastError || 'Unknown error'}
 
 Possible causes:
-• Hugging Face is migrating from api-inference.huggingface.co to router.huggingface.co
-• The router endpoint format may have changed
-• The model may require license acceptance (visit https://huggingface.co/openai/whisper-large-v3)
+• Token missing "Make calls to Inference Providers" permission (check token settings)
+• All endpoint attempts failed (hf-inference and fal-ai providers)
+• Rate limit or quota exceeded (free tier has limited monthly credits)
 
 Solutions:
-1. Check Hugging Face status: https://status.huggingface.co
-2. Try again later (migration may be in progress)
-3. Use an alternative transcription service (OpenAI Whisper API, AssemblyAI)
-4. Accept model license on Hugging Face if required
+1. Check token permissions at https://huggingface.co/settings/tokens
+   - Create new token with "Make calls to Inference Providers" enabled
+   - Update HUGGINGFACE_API_KEY in Vercel
+2. Check Hugging Face status: https://status.huggingface.co
+3. Verify free tier credits: https://huggingface.co/pricing
+4. Use an alternative transcription service (OpenAI Whisper API, AssemblyAI)
 
-For updates, check: https://huggingface.co/docs/api-inference`;
+For API documentation: https://huggingface.co/docs/inference-providers/en/tasks/automatic-speech-recognition`;
       
       return {
         success: false,
@@ -238,15 +253,14 @@ For updates, check: https://huggingface.co/docs/api-inference`;
         return {
           success: false,
           transcript: "",
-          error: `Hugging Face endpoint not found (404). The API endpoint format may have changed. 
+          error: `Hugging Face endpoint not found (404). Provider or model may not be available.
 
 Current endpoint: ${apiUrl}
 
-Please check Hugging Face documentation for the latest endpoint format:
-https://huggingface.co/docs/api-inference
-
-Or check if the model requires license acceptance:
-https://huggingface.co/openai/whisper-large-v3`,
+Please check:
+• Model availability: https://huggingface.co/openai/whisper-large-v3
+• API documentation: https://huggingface.co/docs/inference-providers/en/tasks/automatic-speech-recognition
+• Try alternative provider (fal-ai) if hf-inference fails`,
         };
       }
       

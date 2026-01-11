@@ -21,7 +21,8 @@ YouTube Data API v3 requires OAuth2 authentication (not practical for serverless
 4. Go to: https://huggingface.co/settings/tokens
 5. Click **"New token"**
 6. Enter token name: `fxtranscriptor` (or any name)
-7. Select **"Read"** access (default)
+7. **IMPORTANT**: Select **"Make calls to Inference Providers"** permission (required for router endpoints)
+   - ⚠️ **"Read" only tokens will NOT work** - they can pass whoami but fail on Inference Provider calls
 8. Click **"Generate token"**
 9. **Copy the token** (it will look like: `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
    - ⚠️ **Important**: You can only see this token once! Copy it now.
@@ -44,9 +45,13 @@ YouTube Data API v3 requires OAuth2 authentication (not practical for serverless
 When YouTube and Podbean transcripts fail, the app will:
 
 1. **Download audio file** from Podbean `audio_url` (if available)
-2. **Send to Hugging Face Whisper API** for transcription
+2. **Send to Hugging Face Inference Providers router** (`router.huggingface.co/hf-inference/models/openai/whisper-large-v3`)
+   - Uses raw audio bytes format (preferred) or base64 JSON fallback
+   - Falls back to `fal-ai` provider if `hf-inference` fails
 3. **Store transcript** in database with `transcript_source = "generated"`
 4. **Use same transcript** for all users (no re-transcription needed)
+
+**Note**: The old `api-inference.huggingface.co` endpoint is decommissioned (410). We now use the Inference Providers router format.
 
 ### Supported Audio Sources
 
@@ -56,13 +61,17 @@ Currently, Whisper AI works with:
 
 ## Free Tier Limits
 
-**Hugging Face Free Tier**:
-- **30 hours/month** of transcription
-- Rate limits apply (but generous)
-- No credit card required
-- Automatic throttling when limit reached
+**Hugging Face Inference Providers Free Tier**:
+- **Limited monthly credits** (varies by account)
+- **No pay-as-you-go** on free tier (credits must be available)
+- Rate limits apply
+- No credit card required for free tier
 
-**Cost after free tier**: $0.006 per 1000 characters (~$0.06 per hour of audio)
+**Important**: Whisper Large v3 consumes credits quickly. Free tier may not be sufficient for high-volume transcription.
+
+**Cost after free tier**: Check https://huggingface.co/docs/inference-providers/en/pricing for current pricing
+
+**Recommendation**: Use YouTube transcripts when available (cheapest), and cache all generated transcripts to avoid re-transcription.
 
 ## Troubleshooting
 
@@ -84,6 +93,22 @@ Currently, Whisper AI works with:
 ### "Hugging Face API key not configured"
 - **Cause**: `HUGGINGFACE_API_KEY` environment variable not set in Vercel
 - **Solution**: Follow Step 2 above to add the API key
+
+### "401/403 Authentication/Authorization Error"
+- **Cause**: Token missing **"Make calls to Inference Providers"** permission
+- **Solution**: 
+  1. Go to https://huggingface.co/settings/tokens
+  2. Create a **new token** with **"Make calls to Inference Providers"** enabled
+  3. Update `HUGGINGFACE_API_KEY` in Vercel with the new token
+  4. Redeploy your project
+- **Note**: Read-only tokens will NOT work with Inference Providers router endpoints
+
+### "404 Not Found" Error
+- **Cause**: Provider or model not available, or endpoint format incorrect
+- **Solution**: 
+  - Check endpoint format: `https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3`
+  - Try fallback provider (`fal-ai`) if `hf-inference` fails
+  - Verify model availability: https://huggingface.co/openai/whisper-large-v3
 
 ## Testing
 
