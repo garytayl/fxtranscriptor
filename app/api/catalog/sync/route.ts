@@ -26,6 +26,33 @@ export async function GET(request: NextRequest) {
     const { error: testError } = await supabase.from("sermons").select("id").limit(1);
     if (testError) {
       console.error("Database connection error:", testError);
+      
+      // Check for Supabase connection timeout (522 error from Cloudflare)
+      const errorMessage = testError.message || String(testError);
+      const errorString = String(testError);
+      
+      if (errorString.includes("522") || 
+          errorString.includes("Connection timed out") || 
+          errorMessage.includes("522") ||
+          errorMessage.includes("timed out") ||
+          errorString.includes("mfzrunlgkpbtiwuzmivq.supabase.co") ||
+          errorString.includes("<!DOCTYPE html>")) {
+        return NextResponse.json(
+          { 
+            error: "Supabase database connection timed out (Error 522).\n\n" +
+                   "Your Supabase project is paused or not responding. To fix:\n\n" +
+                   "1. Go to https://supabase.com/dashboard\n" +
+                   "2. Open your project (mfzrunlgkpbtiwuzmivq)\n" +
+                   "3. If you see 'Paused' or 'Resume' button, click it\n" +
+                   "4. Wait 1-2 minutes for the database to fully wake up\n" +
+                   "5. Try again\n\n" +
+                   "Free tier projects pause after ~1 week of inactivity.",
+            details: "Cloudflare Error 522: Connection timed out"
+          },
+          { status: 503 } // Service Unavailable
+        );
+      }
+      
       if (testError.message.includes("relation") || testError.message.includes("does not exist")) {
         return NextResponse.json(
           { 
