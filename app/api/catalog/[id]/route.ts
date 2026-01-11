@@ -1,6 +1,7 @@
 /**
  * API Route: Get Single Sermon by ID
  * Returns a single sermon from the database by ID
+ * Compatible with Next.js 15+ async params
  */
 
 import { NextRequest, NextResponse } from "next/server";
