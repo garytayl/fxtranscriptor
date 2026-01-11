@@ -29,7 +29,6 @@ export function SeriesDetailView({
   getSourceBadge,
 }: SeriesDetailViewProps) {
   const sectionRef = useRef<HTMLElement>(null)
-  const sectionRef = useRef<HTMLElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const sermonsRef = useRef<HTMLDivElement>(null)
 
