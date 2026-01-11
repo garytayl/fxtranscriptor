@@ -114,6 +114,19 @@ export function groupSermonsBySeries(
     "john: pisteuo",
   ];
 
+  // Debug logging
+  if (playlistSeriesMap && playlistSeriesMap.size > 0) {
+    console.log(`[Group Series] Processing ${sermons.length} sermons with ${playlistSeriesMap.size} series mappings`);
+    const sermonIdsInMap = Array.from(playlistSeriesMap.keys());
+    const sermonIdsInArray = sermons.map(s => s.id);
+    const matchedIds = sermonIdsInArray.filter(id => sermonIdsInMap.includes(id));
+    console.log(`[Group Series] Found ${matchedIds.length} matching sermon IDs out of ${sermonIdsInMap.length} in map`);
+    if (matchedIds.length < sermonIdsInMap.length) {
+      const missingIds = sermonIdsInMap.filter(id => !sermonIdsInArray.includes(id));
+      console.log(`[Group Series] Missing ${missingIds.length} sermon IDs from sermons array:`, missingIds.slice(0, 5));
+    }
+  }
+
   for (const sermon of sermons) {
     // ONLY use playlist-based series name - no title extraction
     const seriesName = playlistSeriesMap?.get(sermon.id);
@@ -153,6 +166,11 @@ export function groupSermonsBySeries(
       // All non-playlist sermons go to ungrouped
       ungrouped.push(sermon);
     }
+  }
+
+  // Debug logging after grouping
+  for (const [seriesId, series] of seriesMap.entries()) {
+    console.log(`[Group Series] Series "${series.name}": ${series.sermonCount} sermons`);
   }
 
   // Sort sermons within each series by date (newest first)
