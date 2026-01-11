@@ -89,7 +89,7 @@ export default function Home() {
     }, 2000); // Poll every 2 seconds
 
     return () => clearInterval(interval);
-  }, [sermons.map((s) => `${s.id}:${s.status}`).join(",")]); // Only re-run when generating status changes
+  }, [sermons]);
 
   const loadPlaylistSeries = async () => {
     try {
