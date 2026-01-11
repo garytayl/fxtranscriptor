@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { transcribeWithWhisper } from "@/lib/transcribeWithWhisper";
+import { transcribeChunks } from "@/lib/transcribeChunks";
 
 export const runtime = "nodejs";
 
@@ -144,16 +145,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use Whisper AI (Hugging Face) - the only transcription method
-    console.log(`[Generate] 🎯 Generating transcript using Whisper AI (Hugging Face) for: ${sermon.audio_url.substring(0, 100)}...`);
-    
+    // Check file size to determine if chunking is needed
+    // First, try to get file size from HEAD request (if supported)
+    let fileSizeMB = 0;
+    try {
+      const headResponse = await fetch(sermon.audio_url, { method: "HEAD" });
+      const contentLength = headResponse.headers.get("content-length");
+      if (contentLength) {
+        fileSizeMB = parseInt(contentLength) / 1024 / 1024;
+        console.log(`[Generate] Audio file size: ${fileSizeMB.toFixed(2)} MB (from Content-Length header)`);
+      }
+    } catch (error) {
+      console.log(`[Generate] Could not determine file size from HEAD request, will check after download if needed`);
+    }
+
     const huggingFaceKey = process.env.HUGGINGFACE_API_KEY;
     if (!huggingFaceKey || huggingFaceKey.trim().length === 0) {
-      const errorMessage = `Hugging Face API key not configured (HUGGINGFACE_API_KEY missing).\n\n`;
-      + `See HUGGINGFACE_SETUP.md for setup instructions:\n`;
-      + `1. Get token at https://huggingface.co/settings/tokens\n`;
-      + `2. Enable "Make calls to Inference Providers" permission\n`;
-      + `3. Add to Vercel environment variables`;
+      const errorMessage = `Hugging Face API key not configured (HUGGINGFACE_API_KEY missing).\n\n` +
+        `See HUGGINGFACE_SETUP.md for setup instructions:\n` +
+        `1. Get token at https://huggingface.co/settings/tokens\n` +
+        `2. Enable "Make calls to Inference Providers" permission\n` +
+        `3. Add to Vercel environment variables`;
       
       console.log(`[Generate] ❌ ${errorMessage}`);
       
@@ -179,35 +191,119 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transcribe with Whisper AI
-    try {
-      const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
+    // Use chunking for large files (>20MB), single transcription for smaller files
+    if (fileSizeMB > CHUNKING_THRESHOLD_MB || fileSizeMB === 0) {
+      // File is large or size unknown - use chunking pipeline
+      console.log(`[Generate] 🎯 File is ${fileSizeMB > 0 ? fileSizeMB.toFixed(2) + ' MB' : 'unknown size'}, using chunking pipeline`);
       
-      if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
-        console.log(`[Generate] ✅ Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
-        transcriptResult = {
-          success: true,
-          transcript: whisperResult.transcript,
-          source: "generated" as const,
-        };
-        transcriptSource = "generated";
-      } else {
-        const errorMessage = whisperResult.error || "Whisper AI transcription returned empty result";
-        console.log(`[Generate] ❌ Whisper AI transcription failed: ${errorMessage}`);
+      try {
+        // Step 1: Call chunking worker service
+        const workerUrl = process.env.AUDIO_WORKER_URL;
+        if (!workerUrl) {
+          throw new Error("AUDIO_WORKER_URL not configured. Set environment variable to worker service URL.");
+        }
+        
+        const chunkResponse = await fetch(`${workerUrl}/chunk`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ audioUrl: sermon.audio_url }),
+        });
+
+        if (!chunkResponse.ok) {
+          const chunkError = await chunkResponse.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(`Chunking failed: ${chunkError.error || chunkResponse.statusText}`);
+        }
+
+        const chunkData = await chunkResponse.json();
+        
+        if (!chunkData.success || !chunkData.chunks || chunkData.chunks.length === 0) {
+          throw new Error("No chunks returned from worker service");
+        }
+
+        console.log(`[Generate] ✅ Audio chunked into ${chunkData.chunks.length} chunks`);
+
+        // Step 2: Transcribe each chunk
+        const chunks = chunkData.chunks;
+        console.log(`[Generate] Starting transcription of ${chunks.length} chunks...`);
+        
+        const chunksResult = await transcribeChunks(
+          chunks,
+          huggingFaceKey,
+          (chunkNum, totalChunks) => {
+            console.log(`[Generate] Progress: Chunk ${chunkNum}/${totalChunks} completed`);
+          }
+        );
+
+        if (chunksResult.success && chunksResult.transcript.trim().length > 100) {
+          console.log(`[Generate] ✅ All chunks transcribed successfully (${chunksResult.transcript.length} chars total)`);
+          transcriptResult = {
+            success: true,
+            transcript: chunksResult.transcript,
+            source: "generated" as const,
+          };
+          transcriptSource = "generated";
+        } else {
+          const errorMessage = chunksResult.error || "Chunk transcription returned empty result";
+          console.log(`[Generate] ❌ Chunk transcription failed: ${errorMessage}`);
+          transcriptResult = {
+            success: false,
+            transcript: "",
+            error: errorMessage,
+          };
+        }
+      } catch (chunkError) {
+        const errorMessage = `Chunking pipeline error: ${chunkError instanceof Error ? chunkError.message : "Unknown error"}`;
+        console.error(`[Generate] ❌ ${errorMessage}`);
+        
+        // If chunking fails and file might be small enough, try direct transcription as fallback
+        if (fileSizeMB > 0 && fileSizeMB <= CHUNKING_THRESHOLD_MB * 1.5) {
+          console.log(`[Generate] Chunking failed but file might be small enough, trying direct transcription...`);
+          // Fall through to direct transcription below
+        } else {
+          transcriptResult = {
+            success: false,
+            transcript: "",
+            error: errorMessage,
+          };
+        }
+      }
+    }
+
+    // Use direct transcription for smaller files or if chunking was skipped
+    if (!transcriptResult || !transcriptResult.success) {
+      console.log(`[Generate] 🎯 Using direct Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
+      
+      try {
+        const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
+        
+        if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
+          console.log(`[Generate] ✅ Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
+          transcriptResult = {
+            success: true,
+            transcript: whisperResult.transcript,
+            source: "generated" as const,
+          };
+          transcriptSource = "generated";
+        } else {
+          const errorMessage = whisperResult.error || "Whisper AI transcription returned empty result";
+          console.log(`[Generate] ❌ Whisper AI transcription failed: ${errorMessage}`);
+          transcriptResult = {
+            success: false,
+            transcript: "",
+            error: errorMessage,
+          };
+        }
+      } catch (whisperError) {
+        const errorMessage = `Whisper AI transcription error: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`;
+        console.error(`[Generate] ❌ ${errorMessage}`);
         transcriptResult = {
           success: false,
           transcript: "",
           error: errorMessage,
         };
       }
-    } catch (whisperError) {
-      const errorMessage = `Whisper AI transcription error: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`;
-      console.error(`[Generate] ❌ ${errorMessage}`);
-      transcriptResult = {
-        success: false,
-        transcript: "",
-        error: errorMessage,
-      };
     }
 
     // Update sermon with transcript or error

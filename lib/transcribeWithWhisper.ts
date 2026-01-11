@@ -20,7 +20,7 @@ export interface WhisperTranscribeResult {
 /**
  * Downloads audio from a URL and converts to format suitable for Whisper
  */
-async function downloadAudio(audioUrl: string, maxSizeMB: number = 25): Promise<Buffer> {
+async function downloadAudio(audioUrl: string, maxSizeMB: number = 20): Promise<Buffer> {
   try {
     console.log(`[Whisper] Downloading audio from: ${audioUrl.substring(0, 100)}...`);
     
@@ -87,30 +87,21 @@ export async function transcribeWithWhisper(
 
     console.log(`[Whisper] Starting transcription for audio: ${audioUrl.substring(0, 100)}...`);
     
-    // Size limits
-    const MAX_SIZE_MB = 25; // Hugging Face shared inference struggles with files >25MB
-    const NO_BASE64_FALLBACK_MB = 10; // Base64 adds 33% overhead, counterproductive for large files
+    // Size limit for single-file transcription (chunking required for larger files)
+    const CHUNKING_THRESHOLD_MB = 20; // Files >20MB must be chunked
     
     // Download audio file (will check size during download)
-    const audioBuffer = await downloadAudio(audioUrl, MAX_SIZE_MB);
+    const audioBuffer = await downloadAudio(audioUrl, CHUNKING_THRESHOLD_MB);
     
     // Check file size (double-check after download)
     const sizeMB = audioBuffer.length / 1024 / 1024;
-    if (sizeMB > MAX_SIZE_MB) {
-      const errorMsg = `Audio file too large (${sizeMB.toFixed(2)} MB, max ${MAX_SIZE_MB} MB) for Hugging Face shared inference.
+    if (sizeMB > CHUNKING_THRESHOLD_MB) {
+      const errorMsg = `Audio file too large (${sizeMB.toFixed(2)} MB, max ${CHUNKING_THRESHOLD_MB} MB for single-file transcription).
       
-Large audio files (>${MAX_SIZE_MB} MB) cause server timeouts (502 errors) on free shared infrastructure.
+Large audio files (>${CHUNKING_THRESHOLD_MB} MB) must be chunked before transcription.
+This file should be processed via the chunking pipeline (see /api/audio/chunk).
 
-Recommended solution for ${sizeMB > 40 ? '90-minute' : 'long'} sermons:
-1. **Chunk audio**: Split into ~10 minute segments using preprocessing worker (Railway/Render/Fly)
-   - Worker downloads audio, splits with ffmpeg, uploads chunks to storage
-   - Vercel orchestrates chunk transcription and merges results
-   - See AUDIO_PREPROCESSING.md for implementation details
-   
-Alternative solutions:
-2. Compress audio: Convert to MP3 16kHz mono 64kbps (reduces file size dramatically)
-3. Use paid transcription service: OpenAI Whisper API, AssemblyAI, or Deepgram (handles large files better)
-4. See AUDIO_PREPROCESSING.md for detailed implementation guide`;
+Chunking is automatically handled for files >${CHUNKING_THRESHOLD_MB}MB in the transcript generation route.`;
       
       console.error(`[Whisper] ${errorMsg}`);
       return {
@@ -132,35 +123,21 @@ Alternative solutions:
     //
     // IMPORTANT: Token must have "Make calls to Inference Providers" permission (not just Read)
     
-    // Detect audio format from buffer or default to mpeg
-    const audioFormat = 'audio/mpeg'; // M4A files work with mpeg Content-Type
-    const audioBase64 = audioBuffer.toString('base64');
-    
     // Try endpoints in order: hf-inference (primary), fal-ai (fallback)
-    // Note: Base64 fallback disabled for large files (>10MB) - adds 33% overhead, makes 502s worse
+    // NOTE: Base64 JSON fallback removed entirely - provider interprets base64 string as filename, causing "File name too long" errors
+    // Only raw bytes are used (simpler, faster, more reliable)
     const endpoints: Array<{ url: string; provider: string; useRawBytes: boolean }> = [
       {
         url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
         provider: 'hf-inference',
-        useRawBytes: true, // Try raw bytes first (simpler, faster)
+        useRawBytes: true, // Raw bytes only (base64 removed - causes "File name too long" errors)
+      },
+      {
+        url: 'https://router.huggingface.co/fal-ai/models/openai/whisper-large-v3',
+        provider: 'fal-ai',
+        useRawBytes: true, // Try fal-ai provider as fallback
       },
     ];
-    
-    // Only add base64 fallback for small files (base64 adds 33% overhead, counterproductive for large files)
-    if (sizeMB <= NO_BASE64_FALLBACK_MB) {
-      endpoints.push({
-        url: 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
-        provider: 'hf-inference',
-        useRawBytes: false, // Fallback to JSON only for small files
-      });
-    }
-    
-    // Add fal-ai provider fallback (always try, regardless of size)
-    endpoints.push({
-      url: 'https://router.huggingface.co/fal-ai/models/openai/whisper-large-v3',
-      provider: 'fal-ai',
-      useRawBytes: true, // Try fal-ai provider as fallback
-    });
     
     let response: Response | null = null;
     let apiUrl = '';
@@ -174,44 +151,27 @@ Alternative solutions:
       console.log(`[Whisper] Trying Hugging Face endpoint: ${apiUrl} (provider: ${provider}, format: ${useRawBytes ? 'raw bytes' : 'JSON base64'})`);
       
       try {
-        // Method 1: Send raw audio bytes (preferred - simpler, faster)
-        if (useRawBytes) {
-          // Convert Buffer to Uint8Array for TypeScript compatibility (Buffer extends Uint8Array)
-          const audioBytes = new Uint8Array(audioBuffer);
-          
-          // Detect correct Content-Type from URL extension
-          const contentType = audioUrl.includes('.m4a') ? 'audio/mp4' : 
-                             audioUrl.includes('.mp3') ? 'audio/mpeg' :
-                             audioUrl.includes('.wav') ? 'audio/wav' :
-                             audioUrl.includes('.ogg') ? 'audio/ogg' :
-                             'audio/mpeg'; // Default fallback
-          
-          console.log(`[Whisper] Sending ${audioBytes.length} bytes (${(audioBytes.length / 1024 / 1024).toFixed(2)} MB) with Content-Type: ${contentType}`);
-          
-          response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': contentType,
-            },
-            body: audioBytes, // Send raw bytes as Uint8Array
-          });
-        } 
-        // Method 2: Send base64 JSON (for timestamps or if raw bytes fail)
-        else {
-          response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              inputs: audioBase64,
-              // Optional: uncomment for timestamps
-              // parameters: { return_timestamps: true },
-            }),
-          });
-        }
+        // Send raw audio bytes (base64 JSON removed - causes "File name too long" errors)
+        // Convert Buffer to Uint8Array for TypeScript compatibility (Buffer extends Uint8Array)
+        const audioBytes = new Uint8Array(audioBuffer);
+        
+        // Detect correct Content-Type from URL extension
+        const contentType = audioUrl.includes('.m4a') ? 'audio/mp4' : 
+                           audioUrl.includes('.mp3') ? 'audio/mpeg' :
+                           audioUrl.includes('.wav') ? 'audio/wav' :
+                           audioUrl.includes('.ogg') ? 'audio/ogg' :
+                           'audio/mpeg'; // Default fallback
+        
+        console.log(`[Whisper] Sending ${audioBytes.length} bytes (${(audioBytes.length / 1024 / 1024).toFixed(2)} MB) with Content-Type: ${contentType}`);
+        
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': contentType,
+          },
+          body: audioBytes, // Send raw bytes as Uint8Array
+        });
         
         // Read the response body once (we can't read it multiple times)
         const responseText = await response.text();
