@@ -16,7 +16,7 @@ interface TranscriptionProgress {
   message?: string;
 }
 
-export default function SermonDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+export default function SermonDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [sermon, setSermon] = useState<Sermon | null>(null);
   const [sermonId, setSermonId] = useState<string | null>(null);
