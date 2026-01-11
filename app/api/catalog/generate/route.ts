@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
       .update({ status: "generating" })
       .eq("id", sermonId);
 
-    // Check if sermon has any URLs to extract from
-    if (!sermon.youtube_url && !sermon.podbean_url) {
-      const errorMessage = "No YouTube or Podbean URL available for this sermon. Cannot generate transcript.";
+    // Check if sermon has any way to generate transcript (audio_url is primary, URLs are secondary)
+    if (!sermon.audio_url && !sermon.youtube_url && !sermon.podbean_url) {
+      const errorMessage = "No audio_url, YouTube URL, or Podbean URL available for this sermon. Cannot generate transcript.\n\nTo fix: Re-sync the catalog to populate audio_url from Podbean RSS feed.";
       
       await supabase
         .from("sermons")
@@ -104,95 +104,91 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try to fetch transcript from available sources (YouTube preferred, then Podbean)
+    // Try to fetch transcript from available sources
+    // NEW PRIORITY: audio_url → Whisper AI FIRST (most reliable), then optional transcript extraction
     let transcriptResult = null;
     let transcriptSource: string | null = null;
     const attemptedUrls: string[] = [];
 
-    // Priority 1: Try YouTube
-    if (sermon.youtube_url) {
-      console.log(`[Generate] Attempting YouTube transcript for: ${sermon.youtube_url}`);
-      attemptedUrls.push(`YouTube: ${sermon.youtube_url}`);
-      try {
-        transcriptResult = await fetchTranscript(sermon.youtube_url);
-        if (transcriptResult.success && transcriptResult.transcript.trim().length > 100) {
-          transcriptSource = transcriptResult.source || "youtube";
-          console.log(`[Generate] YouTube transcript extracted successfully (${transcriptResult.transcript.length} chars)`);
-        } else {
-          console.log(`[Generate] YouTube extraction failed: ${transcriptResult.error || "No transcript found"}`);
-        }
-      } catch (youtubeError) {
-        console.error(`[Generate] YouTube extraction error:`, youtubeError);
-        transcriptResult = {
-          success: false,
-          transcript: "",
-          error: `YouTube extraction failed: ${youtubeError instanceof Error ? youtubeError.message : "Unknown error"}`,
-        };
-      }
-    }
-
-    // Priority 2: Try Podbean if YouTube failed
-    if (!transcriptResult?.success && sermon.podbean_url) {
-      console.log(`[Generate] Attempting Podbean transcript for: ${sermon.podbean_url}`);
-      attemptedUrls.push(`Podbean: ${sermon.podbean_url}`);
-      try {
-        transcriptResult = await fetchTranscript(sermon.podbean_url);
-        if (transcriptResult.success && transcriptResult.transcript.trim().length > 100) {
-          transcriptSource = transcriptResult.source || "podbean";
-          console.log(`[Generate] Podbean transcript extracted successfully (${transcriptResult.transcript.length} chars)`);
-        } else {
-          console.log(`[Generate] Podbean extraction failed: ${transcriptResult.error || "No transcript found"}`);
-        }
-      } catch (podbeanError) {
-        console.error(`[Generate] Podbean extraction error:`, podbeanError);
-        transcriptResult = {
-          success: false,
-          transcript: "",
-          error: `Podbean extraction failed: ${podbeanError instanceof Error ? podbeanError.message : "Unknown error"}`,
-        };
-      }
-    }
-
-    // Priority 3: Whisper AI fallback (if YouTube and Podbean both failed, and we have audio URL)
-    if (!transcriptResult?.success) {
-      if (!sermon.audio_url) {
-        console.log(`[Generate] Whisper AI fallback skipped: No audio_url available. Sermon has YouTube URL but no Podbean audio URL.`);
-        console.log(`[Generate] Sermon URLs - YouTube: ${sermon.youtube_url || 'none'}, Podbean: ${sermon.podbean_url || 'none'}, Audio: ${sermon.audio_url || 'none'}`);
+    // 🥇 PRIORITY 1: Whisper AI transcription (if audio_url exists - MOST RELIABLE)
+    // This is the primary path - transcripts from YouTube/Podbean are just optimizations
+    if (sermon.audio_url) {
+      console.log(`[Generate] 🎯 Priority 1: Attempting Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
+      attemptedUrls.push(`Whisper AI: ${sermon.audio_url.substring(0, 50)}...`);
+      
+      const huggingFaceKey = process.env.HUGGINGFACE_API_KEY;
+      if (!huggingFaceKey || huggingFaceKey.trim().length === 0) {
+        console.log(`[Generate] Whisper AI not configured (HUGGINGFACE_API_KEY missing). Will try transcript extraction as fallback.`);
       } else {
-        console.log(`[Generate] Attempting Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
-        attemptedUrls.push(`Whisper AI: ${sermon.audio_url.substring(0, 50)}...`);
-        
-        const huggingFaceKey = process.env.HUGGINGFACE_API_KEY;
-        if (!huggingFaceKey || huggingFaceKey.trim().length === 0) {
-          console.log(`[Generate] Whisper AI not configured (HUGGINGFACE_API_KEY missing). See HUGGINGFACE_SETUP.md for setup instructions.`);
-        } else {
-          try {
-            const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
-            if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
-              console.log(`[Generate] Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
-              transcriptResult = {
-                success: true,
-                transcript: whisperResult.transcript,
-                source: "generated" as const,
-              };
-              transcriptSource = "generated";
-            } else {
-              console.log(`[Generate] Whisper AI transcription failed: ${whisperResult.error || "No transcript"}`);
-              transcriptResult = {
-                success: false,
-                transcript: "",
-                error: whisperResult.error || "Whisper AI transcription failed",
-              };
-            }
-          } catch (whisperError) {
-            console.error(`[Generate] Whisper AI transcription error:`, whisperError);
+        try {
+          const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
+          if (whisperResult.success && whisperResult.transcript.trim().length > 100) {
+            console.log(`[Generate] ✅ Whisper AI transcription succeeded (${whisperResult.transcript.length} chars)`);
+            transcriptResult = {
+              success: true,
+              transcript: whisperResult.transcript,
+              source: "generated" as const,
+            };
+            transcriptSource = "generated";
+          } else {
+            console.log(`[Generate] Whisper AI transcription failed: ${whisperResult.error || "No transcript"}. Will try transcript extraction as fallback.`);
             transcriptResult = {
               success: false,
               transcript: "",
-              error: `Whisper AI transcription failed: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`,
+              error: whisperResult.error || "Whisper AI transcription failed",
             };
           }
+        } catch (whisperError) {
+          console.error(`[Generate] Whisper AI transcription error:`, whisperError);
+          console.log(`[Generate] Will try transcript extraction as fallback.`);
+          transcriptResult = {
+            success: false,
+            transcript: "",
+            error: `Whisper AI transcription failed: ${whisperError instanceof Error ? whisperError.message : "Unknown error"}`,
+          };
         }
+      }
+    } else {
+      console.log(`[Generate] ⚠️ No audio_url available. Sermon URLs - YouTube: ${sermon.youtube_url || 'none'}, Podbean: ${sermon.podbean_url || 'none'}, Audio: ${sermon.audio_url || 'none'}`);
+      console.log(`[Generate] Will attempt transcript extraction as fallback (less reliable).`);
+    }
+
+    // 🥈 PRIORITY 2: Try YouTube transcript extraction (OPTIONAL - only if Whisper failed or no audio_url)
+    // This is a fast optimization when it works, but unreliable for many videos
+    if (!transcriptResult?.success && sermon.youtube_url) {
+      console.log(`[Generate] 🥈 Priority 2: Attempting YouTube transcript extraction (optional optimization): ${sermon.youtube_url}`);
+      attemptedUrls.push(`YouTube: ${sermon.youtube_url}`);
+      try {
+        const youtubeResult = await fetchTranscript(sermon.youtube_url);
+        if (youtubeResult.success && youtubeResult.transcript.trim().length > 100) {
+          transcriptSource = youtubeResult.source || "youtube";
+          console.log(`[Generate] ✅ YouTube transcript extracted successfully (${youtubeResult.transcript.length} chars) - used as optimization`);
+          transcriptResult = youtubeResult;
+        } else {
+          console.log(`[Generate] YouTube transcript extraction failed (expected for many videos): ${youtubeResult.error || "Transcript disabled on video"}`);
+        }
+      } catch (youtubeError) {
+        console.log(`[Generate] YouTube extraction error (non-critical):`, youtubeError);
+        // Don't set transcriptResult here - let it fail through to next attempt
+      }
+    }
+
+    // 🥉 PRIORITY 3: Try Podbean transcript extraction (OPTIONAL - only if both above failed)
+    if (!transcriptResult?.success && sermon.podbean_url) {
+      console.log(`[Generate] 🥉 Priority 3: Attempting Podbean transcript extraction (optional optimization): ${sermon.podbean_url}`);
+      attemptedUrls.push(`Podbean: ${sermon.podbean_url}`);
+      try {
+        const podbeanResult = await fetchTranscript(sermon.podbean_url);
+        if (podbeanResult.success && podbeanResult.transcript.trim().length > 100) {
+          transcriptSource = podbeanResult.source || "podbean";
+          console.log(`[Generate] ✅ Podbean transcript extracted successfully (${podbeanResult.transcript.length} chars) - used as optimization`);
+          transcriptResult = podbeanResult;
+        } else {
+          console.log(`[Generate] Podbean transcript extraction failed: ${podbeanResult.error || "No transcript found in Podbean metadata"}`);
+        }
+      } catch (podbeanError) {
+        console.log(`[Generate] Podbean extraction error (non-critical):`, podbeanError);
+        // Don't set transcriptResult here - let it fail through
       }
     }
 

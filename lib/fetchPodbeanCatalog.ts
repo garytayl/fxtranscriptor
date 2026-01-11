@@ -60,9 +60,24 @@ export async function fetchPodbeanCatalog(
       const linkMatch = itemContent.match(/<link[^>]*>(.*?)<\/link>/i);
       const url = linkMatch ? linkMatch[1].trim() : '';
 
-      // Extract enclosure (audio URL)
-      const enclosureMatch = itemContent.match(/<enclosure[^>]*url="([^"]+)"[^>]*>/i);
-      const audioUrl = enclosureMatch ? enclosureMatch[1] : '';
+      // Extract enclosure (audio URL) - this is the source of truth for audio
+      // Try multiple patterns to catch different RSS formats
+      const enclosureMatch = itemContent.match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*>/i) ||
+                            itemContent.match(/<enclosure[^>]*url=([^\s>]+)[^>]*>/i);
+      let audioUrl = enclosureMatch ? enclosureMatch[1].trim() : '';
+      
+      // Also check for itunes:enclosure (some RSS feeds use this)
+      if (!audioUrl) {
+        const itunesEnclosureMatch = itemContent.match(/<itunes:enclosure[^>]*url=["']([^"']+)["'][^>]*>/i);
+        audioUrl = itunesEnclosureMatch ? itunesEnclosureMatch[1].trim() : '';
+      }
+      
+      // Log if we found audio URL (for debugging)
+      if (audioUrl) {
+        console.log(`[Podbean RSS] Found audio_url for "${title.substring(0, 50)}...": ${audioUrl.substring(0, 80)}...`);
+      } else {
+        console.log(`[Podbean RSS] ⚠️ No audio_url found for "${title.substring(0, 50)}..." - check RSS feed format`);
+      }
 
       // Extract GUID (unique identifier)
       const guidMatch = itemContent.match(/<guid[^>]*>(.*?)<\/guid>/i);
