@@ -20,7 +20,7 @@ export interface WhisperTranscribeResult {
 /**
  * Downloads audio from a URL and converts to format suitable for Whisper
  */
-async function downloadAudio(audioUrl: string): Promise<Buffer> {
+async function downloadAudio(audioUrl: string, maxSizeMB: number = 25): Promise<Buffer> {
   try {
     console.log(`[Whisper] Downloading audio from: ${audioUrl.substring(0, 100)}...`);
     
@@ -41,10 +41,26 @@ async function downloadAudio(audioUrl: string): Promise<Buffer> {
       throw new Error(`Failed to download audio: ${response.status} ${response.statusText}`);
     }
     
+    // Check Content-Length header before downloading (if available)
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) {
+      const sizeMB = parseInt(contentLength) / 1024 / 1024;
+      if (sizeMB > maxSizeMB) {
+        throw new Error(`Audio file too large (${sizeMB.toFixed(2)} MB, max ${maxSizeMB} MB). File must be chunked or compressed before transcription.`);
+      }
+    }
+    
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    console.log(`[Whisper] Downloaded audio (${buffer.length} bytes, ~${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+    const sizeMB = buffer.length / 1024 / 1024;
+    console.log(`[Whisper] Downloaded audio (${buffer.length} bytes, ~${sizeMB.toFixed(2)} MB)`);
+    
+    // Double-check size after download (in case Content-Length was missing or wrong)
+    if (sizeMB > maxSizeMB) {
+      throw new Error(`Audio file too large (${sizeMB.toFixed(2)} MB, max ${maxSizeMB} MB). File must be chunked or compressed before transcription.`);
+    }
+    
     return buffer;
   } catch (error) {
     console.error(`[Whisper] Error downloading audio:`, error);
