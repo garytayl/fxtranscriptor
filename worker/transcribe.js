@@ -58,6 +58,7 @@ async function transcribeAudio(audioUrl, retries = 3) {
           headers: {
             'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
             'Content-Type': contentType,
+            'Accept': 'application/json', // API requires explicit Accept header (not the default "application/json, text/plain, */*")
           },
           timeout: 600000, // 10 minutes
           // Don't let axios auto-detect and convert to JSON or FormData
