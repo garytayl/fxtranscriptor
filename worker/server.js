@@ -84,7 +84,6 @@ function chunkAudio(inputFile, outputDir, chunkDuration = 600) {
         '-segment_time', chunkDuration.toString(),
         '-segment_format', 'mp3',
         '-reset_timestamps', '1',
-        '-c', 'copy', // Try copy first for speed
       ])
       .output(outputPattern)
       .on('start', (commandLine) => {
