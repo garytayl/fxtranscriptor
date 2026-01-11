@@ -4,7 +4,6 @@
  */
 
 const axios = require('axios');
-const FormData = require('form-data');
 
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 const HUGGINGFACE_ENDPOINT = 'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3';
@@ -53,12 +52,16 @@ async function transcribeAudio(audioUrl, retries = 3) {
         console.log(`[Transcribe] Attempt ${attempt}/${retries} with ${endpointConfig.url} (provider: ${endpointConfig.provider})...`);
 
         // Send raw audio bytes (not FormData) - matches Vercel implementation
-        const response = await axios.post(endpointConfig.url, audioBuffer, {
+        // Convert Buffer to Uint8Array to ensure axios sends it as raw bytes
+        const audioBytes = new Uint8Array(audioBuffer);
+        const response = await axios.post(endpointConfig.url, audioBytes, {
           headers: {
             'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
             'Content-Type': contentType,
           },
           timeout: 600000, // 10 minutes
+          // Ensure axios doesn't convert to FormData
+          transformRequest: [(data) => data],
         });
 
         // Handle different response formats
