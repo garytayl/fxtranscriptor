@@ -131,11 +131,21 @@ export async function transcribeWithWhisper(
         if (useRawBytes) {
           // Convert Buffer to Uint8Array for TypeScript compatibility (Buffer extends Uint8Array)
           const audioBytes = new Uint8Array(audioBuffer);
+          
+          // Detect correct Content-Type from URL extension
+          const contentType = audioUrl.includes('.m4a') ? 'audio/mp4' : 
+                             audioUrl.includes('.mp3') ? 'audio/mpeg' :
+                             audioUrl.includes('.wav') ? 'audio/wav' :
+                             audioUrl.includes('.ogg') ? 'audio/ogg' :
+                             'audio/mpeg'; // Default fallback
+          
+          console.log(`[Whisper] Sending ${audioBytes.length} bytes (${(audioBytes.length / 1024 / 1024).toFixed(2)} MB) with Content-Type: ${contentType}`);
+          
           response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': audioFormat,
+              'Content-Type': contentType,
             },
             body: audioBytes, // Send raw bytes as Uint8Array
           });
@@ -176,6 +186,26 @@ export async function transcribeWithWhisper(
           console.log(`[Whisper] Endpoint ${apiUrl} returned 404 (provider or model not found), trying next...`);
           response = null;
           continue;
+        }
+        
+        // If 400, bad request - likely format or size issue
+        if (response.status === 400) {
+          lastError = `${response.status} - ${responseText.substring(0, 500)}`;
+          console.log(`[Whisper] Endpoint ${apiUrl} returned 400 (bad request)`);
+          console.log(`[Whisper] Error details: ${responseText.substring(0, 500)}`);
+          
+          // Try to extract specific error message
+          try {
+            const errorJson = JSON.parse(responseText);
+            const errorMsg = errorJson.error || errorJson.message || errorJson.details || responseText.substring(0, 200);
+            lastError = `${response.status} - ${errorMsg}`;
+          } catch {
+            // Not JSON, use text as-is
+          }
+          
+          // Don't try other endpoints if it's a 400 (format issue won't be fixed by different endpoint)
+          response = null;
+          break;
         }
         
         // If 401/403, token permission issue - check if it's missing Inference Providers permission
