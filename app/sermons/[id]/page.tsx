@@ -67,23 +67,23 @@ export default function SermonDetailPage({ params }: { params: { id: string } })
   const loadSermon = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/catalog/list");
+      const response = await fetch(`/api/catalog/${params.id}`);
       
       if (!response.ok) {
-        throw new Error("Failed to load sermon");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to load sermon");
       }
 
       const data = await response.json();
-      const foundSermon = data.sermons?.find((s: Sermon) => s.id === params.id);
       
-      if (!foundSermon) {
+      if (!data.sermon) {
         throw new Error("Sermon not found");
       }
 
-      setSermon(foundSermon);
-      setGenerating(foundSermon.status === "generating");
-      if (foundSermon.progress_json) {
-        setProgress(foundSermon.progress_json);
+      setSermon(data.sermon);
+      setGenerating(data.sermon.status === "generating");
+      if (data.sermon.progress_json) {
+        setProgress(data.sermon.progress_json);
       }
     } catch (error) {
       console.error("Error loading sermon:", error);
