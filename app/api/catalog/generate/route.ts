@@ -256,18 +256,34 @@ export async function POST(request: NextRequest) {
           };
         }
       } catch (chunkError) {
-        const errorMessage = `Chunking pipeline error: ${chunkError instanceof Error ? chunkError.message : "Unknown error"}`;
-        console.error(`[Generate] ❌ ${errorMessage}`);
+        const errorMessage = chunkError instanceof Error ? chunkError.message : "Unknown error";
+        console.error(`[Generate] ❌ Chunking pipeline error: ${errorMessage}`);
         
-        // If chunking fails and file might be small enough, try direct transcription as fallback
-        if (fileSizeMB > 0 && fileSizeMB <= CHUNKING_THRESHOLD_MB * 1.5) {
-          console.log(`[Generate] Chunking failed but file might be small enough, trying direct transcription...`);
-          // Fall through to direct transcription below
-        } else {
+        // If chunking fails because worker isn't configured, don't fall through to direct transcription
+        // Large files (>20MB) MUST be chunked - direct transcription will fail
+        if (errorMessage.includes("AUDIO_WORKER_URL not configured")) {
+          const workerErrorMsg = `Audio file requires chunking (${fileSizeMB > 0 ? fileSizeMB.toFixed(2) + ' MB' : 'large file'}), but worker service is not configured.\n\n` +
+            `To transcribe large files (>20MB), you need to:\n` +
+            `1. Deploy the audio chunking worker service (see WORKER_SETUP.md)\n` +
+            `2. Set AUDIO_WORKER_URL environment variable in Vercel\n` +
+            `3. Create Supabase Storage bucket: sermon-chunks\n\n` +
+            `Alternative: Wait for the worker service to be deployed, or use a paid transcription service.`;
+          
           transcriptResult = {
             success: false,
             transcript: "",
-            error: errorMessage,
+            error: workerErrorMsg,
+          };
+        } else if (fileSizeMB > 0 && fileSizeMB <= CHUNKING_THRESHOLD_MB * 1.5) {
+          // File might be small enough - try direct transcription as fallback
+          console.log(`[Generate] Chunking failed but file might be small enough (${fileSizeMB.toFixed(2)} MB), trying direct transcription...`);
+          // Fall through to direct transcription below
+        } else {
+          // File is definitely too large - don't try direct transcription
+          transcriptResult = {
+            success: false,
+            transcript: "",
+            error: `Chunking failed: ${errorMessage}. File is ${fileSizeMB > 0 ? fileSizeMB.toFixed(2) + ' MB' : 'too large'} and cannot be transcribed without chunking.`,
           };
         }
       }
