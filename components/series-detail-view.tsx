@@ -49,18 +49,21 @@ export function SeriesDetailView({
       // Sermons fade in with stagger
       if (sermonsRef.current) {
         const sermonCards = sermonsRef.current.querySelectorAll("article")
-        gsap.from(sermonCards, {
-          opacity: 0,
-          y: 30,
-          duration: 0.4, // Reduced for snappier animations
-          stagger: 0.08, // Reduced stagger
+        // Set initial state
+        gsap.set(sermonCards, { opacity: 0, y: 30 })
+        // Animate in
+        gsap.to(sermonCards, {
+          opacity: 1,
+          y: 0,
+          duration: 0.4,
+          stagger: 0.08,
           ease: "power2.out",
           scrollTrigger: {
             trigger: sermonsRef.current,
-            start: "top 85%",
-            toggleActions: "play none none reverse",
-            markers: false, // Disable debug markers
-            refreshPriority: -1, // Lower priority
+            start: "top 90%",
+            toggleActions: "play none none none", // Don't reverse on scroll out
+            markers: false,
+            refreshPriority: -1,
           },
         })
       }
@@ -107,7 +110,8 @@ export function SeriesDetailView({
         {series.sermons.map((sermon) => (
           <article
             key={sermon.id}
-            className="group relative border border-border/40 p-6 flex flex-col justify-between transition-all duration-300 hover:border-accent/60 hover:bg-accent/5"
+            onClick={() => onViewSermon(sermon)}
+            className="group relative border border-border/40 p-6 flex flex-col justify-between transition-all duration-300 hover:border-accent/60 hover:bg-accent/5 cursor-pointer"
           >
             {/* Sermon Title */}
             <div className="mb-4">
