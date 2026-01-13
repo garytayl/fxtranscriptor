@@ -44,6 +44,29 @@ export default function Home() {
     loadPlaylistSeries();
   }, []);
 
+  // Refresh selected sermon when sermons state updates to ensure we have latest data
+  useEffect(() => {
+    if (selectedSermon) {
+      // Find the latest version of this sermon from the sermons state
+      const latestSermon = sermons.find(s => s.id === selectedSermon.id);
+      if (latestSermon) {
+        // Only update if critical fields actually changed to avoid unnecessary re-renders
+        const hasNewData = 
+          latestSermon.youtube_url !== selectedSermon.youtube_url ||
+          latestSermon.audio_url !== selectedSermon.audio_url ||
+          latestSermon.status !== selectedSermon.status ||
+          latestSermon.transcript !== selectedSermon.transcript ||
+          JSON.stringify(latestSermon.progress_json) !== JSON.stringify(selectedSermon.progress_json);
+        
+        if (hasNewData) {
+          console.log('[Dialog] Refreshing selected sermon with latest data');
+          setSelectedSermon(latestSermon);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sermons, selectedSermon?.id]);
+
   // Light polling for progress updates (only when page is visible and has generating sermons)
   // Less aggressive - checks every 10 seconds, and only if page is visible
   useEffect(() => {
@@ -359,11 +382,21 @@ export default function Home() {
   };
 
   const handleViewSermon = (sermon: Sermon) => {
-    // Set the selected sermon to open the dialog
-    console.log('[View Sermon] Setting selected sermon:', sermon.id, 'youtube_url:', sermon.youtube_url ? 'YES' : 'NO');
-    setSelectedSermon(sermon);
-    // Update URL for sharing/bookmarking (optional - doesn't affect dialog)
-    window.history.pushState({}, '', `/sermons/${sermon.id}`);
+    // Navigate to the dedicated sermon page instead of opening dialog
+    router.push(`/sermons/${sermon.id}`);
+  };
+
+  const handleViewSermonDialog = (sermon: Sermon, e?: React.MouseEvent) => {
+    // Optional: Open in dialog (for quick previews)
+    // Can be triggered by a button or modifier key
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // Always use the latest sermon data from the sermons state to ensure we have all fields
+    const latestSermon = sermons.find(s => s.id === sermon.id) || sermon;
+    console.log('[View Sermon Dialog] Setting selected sermon:', latestSermon.id, 'youtube_url:', latestSermon.youtube_url ? 'YES' : 'NO', 'audio_url:', latestSermon.audio_url ? 'YES' : 'NO');
+    setSelectedSermon(latestSermon);
   };
 
   const handleSetAudioUrl = (sermon: Sermon) => {

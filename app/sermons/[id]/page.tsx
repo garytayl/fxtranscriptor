@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2 } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -48,11 +48,19 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     extractId();
   }, [params]);
 
-  // Poll for updates when generating
+  // Poll for updates when generating (only when page is visible)
   useEffect(() => {
-    if (!generating || !sermon) return;
+    if (!sermon || sermon.status !== "generating") {
+      setGenerating(false);
+      return;
+    }
+
+    setGenerating(true);
 
     const interval = setInterval(async () => {
+      // Skip if page is hidden
+      if (document.hidden) return;
+      
       try {
         const response = await fetch(`/api/catalog/${sermon.id}`);
         if (response.ok) {
@@ -77,10 +85,10 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       } catch (error) {
         console.error("Error polling for updates:", error);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 10000); // Poll every 10 seconds (less aggressive)
 
     return () => clearInterval(interval);
-  }, [generating, sermon]);
+  }, [sermon?.id, sermon?.status]);
 
   useEffect(() => {
     if (sermonId) {
@@ -132,54 +140,57 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const generateTranscript = async () => {
     if (!sermon || generating) return;
 
+    // Immediately update status to "generating" in UI
+    setSermon((prev) => prev ? { ...prev, status: "generating" as const, progress_json: { step: "queued", message: "Queued for transcription..." } } : null);
     setGenerating(true);
-    setProgress({ step: "starting", message: "Initializing transcription..." });
+    setProgress({ step: "queued", message: "Queued for transcription..." });
 
     try {
-      // Update progress
-      setProgress({ step: "checking", message: "Checking audio file size..." });
-
-      const response = await fetch("/api/catalog/generate", {
+      // Fire and forget - don't wait for response
+      fetch("/api/catalog/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sermonId: sermon.id }),
-      });
+      })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({ error: "Failed to parse response" }));
 
-      const data = await response.json();
+        if (!response.ok && response.status !== 200) {
+          const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
+          
+          // Update sermon status to failed
+          setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: errorMsg, progress_json: null } : null);
+          setGenerating(false);
+          setProgress(null);
+          return;
+        }
 
-      if (data.success && data.sermon) {
-        setSermon(data.sermon);
-        setProgress(null);
-        setGenerating(false);
-      } else {
-        // Parse error to show progress
-        const errorMsg = data.error || "Unknown error";
-        
-        if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
-          setProgress({
-            step: "timeout",
-            message: "Transcription is taking longer than expected. It may continue in the background. Please refresh the page to check status.",
-          });
+        if (data.success && data.sermon) {
+          // Update sermon in local state
+          setSermon(data.sermon);
+          setGenerating(false);
+          setProgress(null);
         } else {
-          setProgress({
-            step: "error",
-            message: errorMsg,
-          });
+          // Handle case where transcript generation failed
+          const errorMsg = data.error || "Unknown error";
+          
+          // Update sermon status to failed
+          setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: errorMsg, progress_json: null } : null);
+          setGenerating(false);
+          setProgress(null);
         }
-        
+      })
+      .catch((error) => {
+        console.error("Error generating transcript:", error);
+        setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: error instanceof Error ? error.message : "Unknown error occurred", progress_json: null } : null);
         setGenerating(false);
-        // Reload sermon to get updated status
-        if (sermonId) {
-          await loadSermon(sermonId);
-        }
-      }
-    } catch (error) {
-      console.error("Error generating transcript:", error);
-      setProgress({
-        step: "error",
-        message: error instanceof Error ? error.message : "Unknown error occurred",
+        setProgress(null);
       });
+    } catch (error) {
+      console.error("Error initiating transcript generation:", error);
+      setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: error instanceof Error ? error.message : "Unknown error occurred", progress_json: null } : null);
       setGenerating(false);
+      setProgress(null);
     }
   };
 
@@ -389,7 +400,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         )}
 
         {/* Progress Display */}
-        {(generating || progress) && (
+        {(generating || progress || sermon.status === "generating") && (
           <div className="mb-12 p-6 border border-border/30 rounded-lg bg-card/50">
             <div className="flex items-start gap-4">
               <Loader2 className="size-5 animate-spin text-accent mt-0.5" />
@@ -398,8 +409,32 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 {progress?.message && (
                   <p className="text-sm text-muted-foreground font-mono">{progress.message}</p>
                 )}
-                {!progress?.message && sermon.status === "generating" && (
+                {sermon.progress_json?.message && (
+                  <p className="text-sm text-muted-foreground font-mono">
+                    {sermon.progress_json.message}
+                    {sermon.progress_json.current && sermon.progress_json.total && (
+                      <span className="ml-2 text-xs text-muted-foreground/70">
+                        ({sermon.progress_json.current}/{sermon.progress_json.total})
+                      </span>
+                    )}
+                  </p>
+                )}
+                {!progress?.message && !sermon.progress_json?.message && sermon.status === "generating" && (
                   <p className="text-sm text-muted-foreground font-mono">Processing... Please wait.</p>
+                )}
+                {/* Show completed chunks if available */}
+                {sermon.progress_json?.completedChunks && 
+                 Object.keys(sermon.progress_json.completedChunks).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border/30">
+                    <p className="text-xs font-mono text-muted-foreground mb-2">
+                      ✅ Completed chunks: {Object.keys(sermon.progress_json.completedChunks).length}
+                      {sermon.progress_json.total && 
+                       ` / ${sermon.progress_json.total}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 italic">
+                      Progress is saved automatically. If transcription fails, you can retry and it will resume from the last completed chunk.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -423,7 +458,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
         {/* Actions */}
         <div className="mb-12 flex flex-wrap gap-4">
-          {!sermon.audio_url && (
+          {!sermon.audio_url && !sermon.youtube_url && (
             <Button
               variant="outline"
               size="lg"
@@ -470,18 +505,23 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               variant={sermon.status === "generating" ? "secondary" : "default"}
               size="lg"
               className="font-mono text-xs uppercase tracking-widest gap-2"
-              disabled={generating || sermon.status === "generating" || !sermon.audio_url}
+              disabled={generating || sermon.status === "generating" || (!sermon.audio_url && !sermon.youtube_url)}
               onClick={generateTranscript}
             >
               {generating || sermon.status === "generating" ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Generating...
+                  Generating... (you can leave)
                 </>
               ) : sermon.status === "failed" ? (
                 <>
                   <AlertCircle className="size-4" />
                   Retry Generate
+                </>
+              ) : sermon.youtube_url && !sermon.audio_url ? (
+                <>
+                  <Play className="size-4" />
+                  Generate from YouTube
                 </>
               ) : (
                 <>
