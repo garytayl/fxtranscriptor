@@ -467,9 +467,45 @@ app.post('/transcribe', async (req, res) => {
 
       console.log(`[Worker] ✅ Chunked into ${chunks.length} chunks, starting transcription...`);
 
-      // Transcribe each chunk with delays to avoid overwhelming Hugging Face
-      const transcripts = [];
+      // Check for existing progress (resume from last completed chunk)
+      const { data: currentSermon } = await supabase
+        .from('sermons')
+        .select('progress_json')
+        .eq('id', sermonId)
+        .single();
+      
+      const existingProgress = currentSermon?.progress_json || {};
+      const completedChunks = existingProgress.completedChunks || {};
+      const failedChunks = existingProgress.failedChunks || {};
+      
+      // Find chunks that need transcription:
+      // 1. Chunks that failed (retry them)
+      // 2. Chunks that haven't been started yet
+      const failedIndices = Object.keys(failedChunks).map(Number);
+      const completedIndices = Object.keys(completedChunks).map(Number);
+      const allCompletedIndices = new Set([...completedIndices]);
+      
+      if (completedIndices.length > 0 || failedIndices.length > 0) {
+        console.log(`[Worker] Resuming transcription:`);
+        console.log(`[Worker]   - ${completedIndices.length} chunks already completed: [${completedIndices.sort((a,b) => a-b).join(', ')}]`);
+        if (failedIndices.length > 0) {
+          console.log(`[Worker]   - ${failedIndices.length} chunks to retry: [${failedIndices.sort((a,b) => a-b).join(', ')}]`);
+        }
+      }
+
+      // Transcribe each chunk - skip only if successfully completed
       for (let i = 0; i < chunks.length; i++) {
+        // Skip if already successfully completed
+        if (completedChunks[i]) {
+          console.log(`[Worker] Chunk ${i + 1}/${chunks.length} already completed, skipping...`);
+          continue;
+        }
+        
+        // Retry failed chunks or transcribe new ones
+        if (failedChunks[i]) {
+          console.log(`[Worker] Retrying failed chunk ${i + 1}/${chunks.length}...`);
+        }
+
         await supabase
           .from('sermons')
           .update({ 
@@ -477,7 +513,8 @@ app.post('/transcribe', async (req, res) => {
               step: 'transcribing',
               current: i + 1,
               total: chunks.length,
-              message: `Transcribing chunk ${i + 1} of ${chunks.length}...`
+              message: `Transcribing chunk ${i + 1} of ${chunks.length}...`,
+              completedChunks: completedChunks, // Preserve existing chunks
             }
           })
           .eq('id', sermonId);
@@ -492,8 +529,67 @@ app.post('/transcribe', async (req, res) => {
           await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
         }
         
-        const chunkTranscript = await transcribeAudio(chunks[i]);
-        transcripts.push(chunkTranscript);
+        try {
+          const chunkTranscript = await transcribeAudio(chunks[i]);
+          
+          // Save this chunk immediately so we don't lose progress
+          completedChunks[i] = chunkTranscript;
+          await supabase
+            .from('sermons')
+            .update({ 
+              progress_json: { 
+                step: 'transcribing',
+                current: i + 1,
+                total: chunks.length,
+                message: `Chunk ${i + 1}/${chunks.length} completed. ${chunks.length - (i + 1)} remaining...`,
+                completedChunks: completedChunks,
+              }
+            })
+            .eq('id', sermonId);
+          
+          console.log(`[Worker] ✅ Chunk ${i + 1}/${chunks.length} saved (${chunkTranscript.length} chars)`);
+        } catch (error) {
+          console.error(`[Worker] ❌ Chunk ${i + 1}/${chunks.length} failed:`, error.message);
+          
+          // Save error but continue with next chunk
+          await supabase
+            .from('sermons')
+            .update({ 
+              progress_json: { 
+                step: 'transcribing',
+                current: i + 1,
+                total: chunks.length,
+                message: `Chunk ${i + 1}/${chunks.length} failed: ${error.message}. Continuing with remaining chunks...`,
+                completedChunks: completedChunks,
+                failedChunks: { ...(existingProgress.failedChunks || {}), [i]: error.message },
+              }
+            })
+            .eq('id', sermonId);
+        }
+      }
+      
+      // Reconstruct full transcripts array from completedChunks (in case we resumed)
+      // This ensures we have all chunks in order, including ones completed in previous runs
+      const allTranscripts = [];
+      for (let i = 0; i < chunks.length; i++) {
+        if (completedChunks[i]) {
+          allTranscripts.push(completedChunks[i]);
+        } else {
+          // This chunk failed or wasn't completed - add empty string to maintain order
+          allTranscripts.push('');
+        }
+      }
+      
+      // Filter out empty strings (failed chunks) and combine
+      const validTranscripts = allTranscripts.filter(t => t && t.length > 0);
+      
+      if (validTranscripts.length === 0) {
+        throw new Error('All chunks failed to transcribe. Please try again later.');
+      }
+      
+      if (validTranscripts.length < chunks.length) {
+        const failedCount = chunks.length - validTranscripts.length;
+        console.log(`[Worker] ⚠️  Only ${validTranscripts.length}/${chunks.length} chunks succeeded. ${failedCount} chunks failed. Combining available chunks...`);
       }
       
       // Update progress before combining
@@ -502,12 +598,13 @@ app.post('/transcribe', async (req, res) => {
         .update({ 
           progress_json: { 
             step: 'combining',
-            message: 'Combining transcripts from all chunks...'
+            message: `Combining ${validTranscripts.length}/${chunks.length} completed chunks...`,
+            completedChunks: completedChunks,
           }
         })
         .eq('id', sermonId);
 
-      transcript = transcripts.join('\n\n');
+      transcript = validTranscripts.join('\n\n');
       
       // Cleanup temp directory
       if (tempDir) {

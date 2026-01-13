@@ -39,7 +39,15 @@ export interface Sermon {
   transcript_generated_at: string | null;
   status: 'pending' | 'generating' | 'completed' | 'failed';
   error_message: string | null;
-  progress_json: { step: string; current?: number; total?: number; message?: string; details?: string[] } | null;
+  progress_json: { 
+    step: string; 
+    current?: number; 
+    total?: number; 
+    message?: string; 
+    details?: string[];
+    completedChunks?: Record<number, string>; // Chunk index -> transcript text
+    failedChunks?: Record<number, string>; // Chunk index -> error message
+  } | null;
   created_at: string;
   updated_at: string;
 }
