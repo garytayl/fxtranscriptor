@@ -6,8 +6,16 @@
  * columns to extract metadata from sermons that already have transcripts.
  * 
  * Usage:
+ *   npm run extract-metadata
+ * 
+ * Or directly:
  *   npx tsx scripts/extract-metadata-from-existing.ts
  */
+
+// Load environment variables from .env.local
+import dotenv from 'dotenv';
+import { resolve } from 'path';
+dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 import { createClient } from '@supabase/supabase-js';
 import { extractMetadata } from '../lib/extractMetadata';
