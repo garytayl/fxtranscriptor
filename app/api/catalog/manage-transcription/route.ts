@@ -59,18 +59,31 @@ export async function POST(request: NextRequest) {
     let updateData: any = {};
 
     if (action === "cancel") {
-      // Cancel transcription: set status to pending, but keep completed chunks
+      // Cancel transcription: set status to pending, but keep completed chunks if any exist
       const currentProgress = sermon.progress_json || {};
-      updateData = {
-        status: "pending",
-        error_message: null,
-        progress_json: {
-          ...currentProgress,
-          step: "cancelled",
-          message: "Transcription cancelled by user. Completed chunks preserved.",
-        },
-      };
-      console.log(`[ManageTranscription] Cancelling transcription for sermon ${sermonId}, preserving ${Object.keys(currentProgress.completedChunks || {}).length} chunks`);
+      const hasChunks = currentProgress.completedChunks && Object.keys(currentProgress.completedChunks).length > 0;
+      
+      if (hasChunks) {
+        // Preserve chunks
+        updateData = {
+          status: "pending",
+          error_message: null,
+          progress_json: {
+            ...currentProgress,
+            step: "cancelled",
+            message: "Transcription cancelled by user. Completed chunks preserved.",
+          },
+        };
+        console.log(`[ManageTranscription] Cancelling transcription for sermon ${sermonId}, preserving ${Object.keys(currentProgress.completedChunks).length} chunks`);
+      } else {
+        // No chunks to preserve, clear progress
+        updateData = {
+          status: "pending",
+          error_message: null,
+          progress_json: null,
+        };
+        console.log(`[ManageTranscription] Cancelling transcription for sermon ${sermonId}, no chunks to preserve`);
+      }
     } else if (action === "delete-chunks") {
       // Delete chunks: clear completedChunks and failedChunks from progress_json
       const currentProgress = sermon.progress_json || {};

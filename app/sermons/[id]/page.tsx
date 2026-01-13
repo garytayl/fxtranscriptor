@@ -438,9 +438,12 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                         ❌ Failed chunks: {Object.keys(sermon.progress_json.failedChunks).length}
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground/70 italic mb-4">
-                      Progress is saved automatically. If transcription fails, you can retry and it will resume from the last completed chunk.
-                    </p>
+                    {sermon.progress_json?.completedChunks && 
+                     Object.keys(sermon.progress_json.completedChunks).length > 0 && (
+                      <p className="text-xs text-muted-foreground/70 italic mb-4">
+                        Progress is saved automatically. If transcription fails, you can retry and it will resume from the last completed chunk.
+                      </p>
+                    )}
                     {/* Cancel and Delete buttons */}
                     <div className="flex gap-2 mt-4">
                       {sermon.status === "generating" && (
@@ -449,7 +452,13 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                           size="sm"
                           className="text-xs font-mono uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500"
                           onClick={async () => {
-                            if (!confirm("Cancel transcription? Completed chunks will be preserved.")) {
+                            const hasChunks = sermon.progress_json?.completedChunks && 
+                                             Object.keys(sermon.progress_json.completedChunks).length > 0;
+                            const confirmMsg = hasChunks 
+                              ? "Cancel transcription? Completed chunks will be preserved."
+                              : "Cancel transcription? No chunks have been completed yet.";
+                            
+                            if (!confirm(confirmMsg)) {
                               return;
                             }
                             try {
