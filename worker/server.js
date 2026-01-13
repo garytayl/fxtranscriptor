@@ -24,12 +24,11 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 
 const app = express();
-app.use(express.json());
 
-// Register health check endpoints FIRST (before other routes)
-// Railway checks /health immediately on startup - must respond quickly with 200 OK
+// Register health check endpoints FIRST (before ANY middleware)
+// Railway checks /health immediately on startup - must respond quickly
 app.get('/health', (req, res) => {
-  // Ultra-simple health check - Railway just needs 200 OK
+  console.log('[Worker] ✅ Health check hit - responding with 200 OK');
   res.status(200).send('ok');
 });
 
@@ -40,6 +39,9 @@ app.get('/', (req, res) => {
     endpoints: ['/health', '/chunk', '/transcribe'],
   });
 });
+
+// Add JSON middleware AFTER health checks (so health check is fastest)
+app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 const SUPABASE_URL = process.env.SUPABASE_URL;
