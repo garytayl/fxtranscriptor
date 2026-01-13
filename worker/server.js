@@ -27,24 +27,16 @@ const app = express();
 app.use(express.json());
 
 // Register health check endpoints FIRST (before other routes)
-// Railway checks /health immediately on startup - must respond quickly
-let serverReady = false;
-
+// Railway checks /health immediately on startup - must respond quickly with 200 OK
 app.get('/health', (req, res) => {
-  // Simple health check - just verify server is running
-  res.status(200).json({ 
-    status: 'ok', 
-    service: 'audio-chunking-worker',
-    ready: serverReady,
-    timestamp: new Date().toISOString(),
-  });
+  // Ultra-simple health check - Railway just needs 200 OK
+  res.status(200).send('ok');
 });
 
 app.get('/', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     service: 'audio-chunking-worker',
-    ready: serverReady,
     endpoints: ['/health', '/chunk', '/transcribe'],
   });
 });
@@ -833,16 +825,16 @@ app.post('/transcribe', async (req, res) => {
  */
 // Health check endpoints are registered at the top of the file (before other routes)
 
-// Start server
+// Start server immediately - health check is already registered
 const server = app.listen(PORT, '0.0.0.0', () => {
-  serverReady = true;
-  console.log(`[Worker] Audio chunking worker service listening on port ${PORT}`);
+  console.log(`[Worker] ✅ Server listening on 0.0.0.0:${PORT}`);
+  console.log(`[Worker] ✅ Health check: http://0.0.0.0:${PORT}/health`);
   console.log(`[Worker] Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!supabase) {
-    console.warn('[Worker] WARNING: Supabase Storage not configured - chunks will be stored locally');
+    console.warn('[Worker] ⚠️  WARNING: Supabase Storage not configured - chunks will be stored locally');
+  } else {
+    console.log(`[Worker] ✅ Supabase Storage: ${STORAGE_BUCKET}`);
   }
-  console.log(`[Worker] Health check available at http://0.0.0.0:${PORT}/health`);
-  console.log(`[Worker] Server ready and accepting connections`);
 });
 
 // Graceful shutdown handling
