@@ -734,6 +734,29 @@ app.post('/transcribe', async (req, res) => {
       }
     }
     
+    // Validate transcript quality before saving
+    const transcriptTrimmed = transcript.trim();
+    if (!transcriptTrimmed || transcriptTrimmed.length < 50) {
+      throw new Error(`Transcript too short (${transcriptTrimmed.length} chars). Audio may be corrupted or silent.`);
+    }
+    
+    // Check for repetitive patterns (like "avgjord avgjord..." which indicates bad transcription)
+    const words = transcriptTrimmed.toLowerCase().split(/\s+/);
+    if (words.length > 10) {
+      // Check if more than 50% of words are the same (indicates repetition/hallucination)
+      const wordCounts = {};
+      words.forEach(word => {
+        wordCounts[word] = (wordCounts[word] || 0) + 1;
+      });
+      const maxCount = Math.max(...Object.values(wordCounts));
+      const repetitionRatio = maxCount / words.length;
+      
+      if (repetitionRatio > 0.5) {
+        const repeatedWord = Object.keys(wordCounts).find(w => wordCounts[w] === maxCount);
+        throw new Error(`Transcript appears to be corrupted (repetitive pattern detected: "${repeatedWord}" repeated ${maxCount} times). This usually indicates audio quality issues or transcription errors.`);
+      }
+    }
+
     // Final step before saving
     await supabase
       .from('sermons')
