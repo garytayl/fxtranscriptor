@@ -406,9 +406,22 @@ app.post('/transcribe', async (req, res) => {
       })
       .eq('id', sermonId);
 
-    // Check file size (skip for YouTube URLs - will check after extraction)
+    // Download audio first to check size (needed for YouTube URLs)
     let fileSizeMB = 0;
-    if (!isYouTubeUrl(audioUrl)) {
+    let tempDir = null;
+    let inputFile = null;
+    
+    if (isYouTubeUrl(audioUrl)) {
+      console.log(`[Worker] YouTube URL detected - downloading audio to check size...`);
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'transcribe-'));
+      inputFile = await downloadAudio(audioUrl, tempDir);
+      
+      // Get file size
+      const stats = await fs.stat(inputFile);
+      fileSizeMB = stats.size / 1024 / 1024;
+      console.log(`[Worker] YouTube audio extracted: ${fileSizeMB.toFixed(2)} MB`);
+    } else {
+      // For direct URLs, try to get size from headers
       try {
         const headResponse = await axios.head(audioUrl, { timeout: 10000 });
         const contentLength = headResponse.headers['content-length'];
@@ -417,16 +430,15 @@ app.post('/transcribe', async (req, res) => {
           console.log(`[Worker] Audio file size: ${fileSizeMB.toFixed(2)} MB`);
         }
       } catch (error) {
-        console.log(`[Worker] Could not determine file size, proceeding...`);
+        console.log(`[Worker] Could not determine file size, will download to check...`);
       }
-    } else {
-      console.log(`[Worker] YouTube URL detected - will check size after audio extraction`);
     }
 
     let transcript = '';
+    const CHUNKING_THRESHOLD_MB = 20;
 
     // If file is large, chunk it first
-    if (fileSizeMB > 20) {
+    if (fileSizeMB > CHUNKING_THRESHOLD_MB) {
       console.log(`[Worker] File is large (${fileSizeMB.toFixed(2)} MB), chunking first...`);
       
       await supabase
@@ -436,9 +448,14 @@ app.post('/transcribe', async (req, res) => {
         })
         .eq('id', sermonId);
 
-      // Chunk the audio
-      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'transcribe-'));
-      const inputFile = await downloadAudio(audioUrl, tempDir);
+      // If we haven't downloaded yet (non-YouTube URL), download now
+      if (!inputFile) {
+        if (!tempDir) {
+          tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'transcribe-'));
+        }
+        inputFile = await downloadAudio(audioUrl, tempDir);
+      }
+      
       const chunkFiles = await chunkAudio(inputFile, tempDir, 600);
       
       // Upload chunks
@@ -482,6 +499,19 @@ app.post('/transcribe', async (req, res) => {
         .eq('id', sermonId);
 
       transcript = transcripts.join('\n\n');
+      
+      // Cleanup temp directory
+      if (tempDir) {
+        try {
+          const files = await fs.readdir(tempDir);
+          for (const file of files) {
+            await fs.unlink(path.join(tempDir, file)).catch(() => {});
+          }
+          await fs.rmdir(tempDir).catch(() => {});
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+        }
+      }
     } else {
       // Small file, transcribe directly
       await supabase
@@ -491,7 +521,26 @@ app.post('/transcribe', async (req, res) => {
         })
         .eq('id', sermonId);
 
-      transcript = await transcribeAudio(audioUrl);
+      // If we downloaded for size check, use the file; otherwise use URL
+      if (inputFile && isYouTubeUrl(audioUrl)) {
+        // For YouTube, we already have the file, but transcribeAudio expects a URL
+        // We need to upload it first or modify transcribeAudio to accept a buffer
+        // For now, let's upload it to storage and use that URL
+        const uploadedUrl = await uploadChunk(inputFile, 0);
+        transcript = await transcribeAudio(uploadedUrl);
+        
+        // Cleanup
+        if (tempDir) {
+          try {
+            await fs.unlink(inputFile).catch(() => {});
+            await fs.rmdir(tempDir).catch(() => {});
+          } catch (cleanupError) {
+            // Ignore cleanup errors
+          }
+        }
+      } else {
+        transcript = await transcribeAudio(audioUrl);
+      }
     }
     
     // Final step before saving
