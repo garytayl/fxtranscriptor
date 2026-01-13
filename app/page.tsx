@@ -23,7 +23,6 @@ export default function Home() {
   const [syncing, setSyncing] = useState(false);
   const [selectedSermon, setSelectedSermon] = useState<Sermon | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<SermonSeries | null>(null);
-  const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [playlistSeriesMap, setPlaylistSeriesMap] = useState<Map<string, string>>(new Map());
   const [showAudioOverride, setShowAudioOverride] = useState(false);
@@ -44,7 +43,8 @@ export default function Home() {
     loadPlaylistSeries();
   }, []);
 
-  // Poll for progress updates on generating sermons
+  // Light polling for progress updates (only when page is visible and has generating sermons)
+  // Less aggressive - checks every 10 seconds, and only if page is visible
   useEffect(() => {
     // Find all sermons that are generating
     const generatingSermonIds = sermons
@@ -53,7 +53,20 @@ export default function Home() {
 
     if (generatingSermonIds.length === 0) return;
 
+    // Only poll if page is visible (user is on the page)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden - stop polling, will resume when visible
+        return;
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const interval = setInterval(async () => {
+      // Skip if page is hidden
+      if (document.hidden) return;
+      
       try {
         // Fetch updated sermons
         const response = await fetch("/api/catalog/list");
@@ -76,6 +89,11 @@ export default function Home() {
                   if (statusChanged || progressChanged) {
                     updated[index] = updatedSermon;
                     changed = true;
+                    
+                    // If dialog is open for this sermon, update it
+                    if (selectedSermon?.id === updatedSermon.id) {
+                      setSelectedSermon(updatedSermon);
+                    }
                   }
                 }
               }
@@ -87,10 +105,13 @@ export default function Home() {
       } catch (error) {
         console.error("Error polling for progress updates:", error);
       }
-    }, 2000); // Poll every 2 seconds
+    }, 10000); // Poll every 10 seconds (less aggressive)
 
-    return () => clearInterval(interval);
-  }, [sermons]);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sermons, selectedSermon]);
 
   const loadPlaylistSeries = async () => {
     try {
@@ -161,7 +182,16 @@ export default function Home() {
       }
       
       const data = await response.json();
-      setSermons(data.sermons || []);
+      const loadedSermons = data.sermons || [];
+      setSermons(loadedSermons);
+      
+      // If a sermon dialog is open, refresh its data from the loaded sermons
+      if (selectedSermon) {
+        const updatedSermon = loadedSermons.find((s: Sermon) => s.id === selectedSermon.id);
+        if (updatedSermon) {
+          setSelectedSermon(updatedSermon);
+        }
+      }
       
       // Reload playlist series after sermons load to ensure proper matching
       // This ensures the series map is created with the latest sermon data
@@ -217,91 +247,93 @@ export default function Home() {
 
   const generateTranscript = async (sermon: Sermon) => {
     try {
-      setGenerating((prev) => new Set(prev).add(sermon.id));
+      // Immediately update status to "generating" in UI
+      setSermons((prev) =>
+        prev.map((s) =>
+          s.id === sermon.id
+            ? { ...s, status: "generating" as const, progress_json: { step: "queued", message: "Queued for transcription..." } }
+            : s
+        )
+      );
       
-      const response = await fetch("/api/catalog/generate", {
+      // Fire and forget - don't wait for response
+      fetch("/api/catalog/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ sermonId: sermon.id }),
-      });
+      })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({ error: "Failed to parse response" }));
 
-      const data = await response.json().catch(() => ({ error: "Failed to parse response" }));
+        if (!response.ok && response.status !== 200) {
+          const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
+          
+          // Update sermon status to failed
+          setSermons((prev) =>
+            prev.map((s) =>
+              s.id === sermon.id
+                ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
+                : s
+            )
+          );
+          return;
+        }
 
-      if (!response.ok && response.status !== 200) {
-        const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
-        const details = data.details ? `\n\nDetails: ${data.details}` : "";
-        
-        if (errorMsg.includes("not found") && !errorMsg.includes("tables")) {
-          alert(`Sermon not found: ${errorMsg}\n\nTry syncing the catalog first.`);
-        } else if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
-          alert(`❌ Database Setup Required\n\n${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`);
+        if (data.success && data.sermon) {
+          // Update sermon in local state
+          setSermons((prev) =>
+            prev.map((s) => (s.id === sermon.id ? data.sermon : s))
+          );
+          
+          // If dialog is open for this sermon, update it
+          if (selectedSermon?.id === sermon.id) {
+            setSelectedSermon(data.sermon);
+          }
         } else {
-          alert(`Failed to generate transcript: ${errorMsg}${details}`);
+          // Handle case where transcript generation failed
+          const errorMsg = data.error || "Unknown error";
+          
+          // Update sermon status to failed
+          setSermons((prev) =>
+            prev.map((s) =>
+              s.id === sermon.id
+                ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
+                : s
+            )
+          );
         }
+      })
+      .catch((error) => {
+        console.error("Error generating transcript:", error);
+        const errorMsg = error instanceof Error ? error.message : "Network error";
         
         // Update sermon status to failed
         setSermons((prev) =>
           prev.map((s) =>
             s.id === sermon.id
-              ? { ...s, status: "failed" as const, error_message: errorMsg }
+              ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
               : s
           )
         );
-        return;
-      }
-
-      if (data.success && data.sermon) {
-        // Update sermon in local state
-        setSermons((prev) =>
-          prev.map((s) => (s.id === sermon.id ? data.sermon : s))
-        );
-        setSelectedSermon(data.sermon);
-      } else {
-        // Handle case where transcript generation failed (status 200, but success: false)
-        const errorMsg = data.error || "Unknown error";
-        const attemptedUrls = data.attemptedUrls ? `\n\n${data.attemptedUrls.map((u: string) => `• ${u}`).join('\n')}` : '';
-        
-        // More helpful error message
-        let userMessage = `Failed to generate transcript: ${errorMsg}${attemptedUrls}`;
-        
-        if (!sermon.youtube_url && !sermon.podbean_url) {
-          userMessage = "No YouTube or Podbean URL available for this sermon. Cannot generate transcript.";
-        } else if (errorMsg.includes("Unable to extract transcript") || errorMsg.includes("Unable to extract captions")) {
-          userMessage = `Unable to extract transcript from this sermon.${attemptedUrls}\n\nPossible reasons:\n• YouTube captions load via JavaScript (not accessible to automated tools)\n• Video captions require authentication\n• Podbean episode has no transcript\n\nSolutions:\n• YouTube Data API v3 can access these captions (requires free API key)\n• Whisper AI transcription can generate transcript from audio (free via Hugging Face)\n• See YOUTUBE_CAPTION_LIMITATION.md for details\n\nNote: Even if you can see captions on YouTube, they may not be accessible to automated extraction.`;
-        }
-        
-        alert(userMessage);
-        
-        // Update sermon status to failed
-        setSermons((prev) =>
-          prev.map((s) =>
-            s.id === sermon.id
-              ? { ...s, status: "failed" as const, error_message: errorMsg }
-              : s
-          )
-        );
-      }
+      });
+      
+      // Show immediate feedback
+      console.log(`[Generate] Transcription queued for "${sermon.title}". You can leave this page and check back later.`);
+      
     } catch (error) {
-      console.error("Error generating transcript:", error);
+      console.error("Error queuing transcript:", error);
       const errorMsg = error instanceof Error ? error.message : "Network error";
-      alert(`Error generating transcript: ${errorMsg}\n\nMake sure you're connected to the internet and the server is running.`);
       
       // Update sermon status to failed
       setSermons((prev) =>
         prev.map((s) =>
           s.id === sermon.id
-            ? { ...s, status: "failed" as const, error_message: errorMsg }
+            ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
             : s
         )
       );
-    } finally {
-      setGenerating((prev) => {
-        const next = new Set(prev);
-        next.delete(sermon.id);
-        return next;
-      });
     }
   };
 
@@ -802,7 +834,7 @@ export default function Home() {
                   {selectedSermon && (
                     <>
                       {/* Progress Display */}
-                      {(selectedSermon.status === "generating" || generating.has(selectedSermon.id)) && selectedSermon.progress_json?.message && (
+                      {selectedSermon.status === "generating" && selectedSermon.progress_json?.message && (
                         <div className="mb-4 p-4 border border-border/30 rounded-lg bg-card/50">
                           <div className="flex items-start gap-3">
                             <Loader2 className="size-4 animate-spin text-accent mt-0.5 flex-shrink-0" />
@@ -823,13 +855,13 @@ export default function Home() {
                       <Button
                         className="font-mono text-xs uppercase tracking-widest"
                         onClick={() => selectedSermon && generateTranscript(selectedSermon)}
-                        disabled={generating.has(selectedSermon.id) || selectedSermon.status === "generating" || (!selectedSermon.audio_url && !selectedSermon.youtube_url)}
+                        disabled={selectedSermon.status === "generating" || (!selectedSermon.audio_url && !selectedSermon.youtube_url)}
                         variant={!selectedSermon.audio_url && !selectedSermon.youtube_url ? "outline" : "default"}
                       >
-                        {generating.has(selectedSermon.id) || selectedSermon.status === "generating" ? (
+                        {selectedSermon.status === "generating" ? (
                           <>
                             <Loader2 className="size-4 animate-spin mr-2" />
-                            Generating...
+                            Generating... (you can leave)
                           </>
                         ) : !selectedSermon.audio_url && !selectedSermon.youtube_url ? (
                           <>
