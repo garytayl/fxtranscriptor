@@ -18,7 +18,6 @@ import { SermonCard } from "@/components/sermon-card";
 import { SermonSkeleton } from "@/components/sermon-skeleton";
 import { Sermon } from "@/lib/supabase";
 import { SermonMetadata } from "@/components/sermon-metadata";
-import { TranscriptionQueue } from "@/components/transcription-queue";
 
 // Lazy load heavy components
 const BatchOperations = dynamic(() => import("@/components/batch-operations").then(mod => ({ default: mod.BatchOperations })), {
@@ -743,11 +742,6 @@ export default function Home() {
           />
         ) : (
           <>
-            {/* Transcription Queue */}
-            <div className="relative py-6 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12 border-b border-border/30">
-              <TranscriptionQueue />
-            </div>
-
             {/* Actions */}
             <div className="relative py-6 sm:py-12 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12 border-b border-border/30">
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
