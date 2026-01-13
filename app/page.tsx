@@ -1016,43 +1016,45 @@ export default function Home() {
                 {selectedSermon && (
                   <SermonMetadata series={selectedSermon.series} speaker={selectedSermon.speaker} />
                 )}
-              </DialogDescription>
-                {selectedSermon?.podbean_url && selectedSermon.podbean_url.trim() && (
-                  <a
-                    href={selectedSermon.podbean_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-accent transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (selectedSermon?.podbean_url) {
-                        window.open(selectedSermon.podbean_url, '_blank', 'noopener,noreferrer')
-                      }
-                    }}
-                  >
-                    <ExternalLink className="size-3" />
-                    Podbean
-                  </a>
-                )}
-                {selectedSermon?.youtube_url && selectedSermon.youtube_url.trim() && (
-                  <a
-                    href={selectedSermon.youtube_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-accent transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (selectedSermon?.youtube_url) {
-                        window.open(selectedSermon.youtube_url, '_blank', 'noopener,noreferrer')
-                      }
-                    }}
-                  >
-                    <ExternalLink className="size-3" />
-                    YouTube
-                  </a>
-                )}
+                {/* Links */}
+                <div className="flex flex-wrap gap-4">
+                  {selectedSermon?.podbean_url && selectedSermon.podbean_url.trim() && (
+                    <a
+                      href={selectedSermon.podbean_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-accent transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (selectedSermon?.podbean_url) {
+                          window.open(selectedSermon.podbean_url, '_blank', 'noopener,noreferrer')
+                        }
+                      }}
+                    >
+                      <ExternalLink className="size-3" />
+                      Podbean
+                    </a>
+                  )}
+                  {selectedSermon?.youtube_url && selectedSermon.youtube_url.trim() && (
+                    <a
+                      href={selectedSermon.youtube_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground hover:text-accent transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (selectedSermon?.youtube_url) {
+                          window.open(selectedSermon.youtube_url, '_blank', 'noopener,noreferrer')
+                        }
+                      }}
+                    >
+                      <ExternalLink className="size-3" />
+                      YouTube
+                    </a>
+                  )}
+                </div>
               </DialogDescription>
             </DialogHeader>
 
