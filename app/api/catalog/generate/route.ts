@@ -154,13 +154,19 @@ export async function POST(request: NextRequest) {
 
         if (!queueResponse.ok) {
           const errorData = await queueResponse.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to add to queue");
+          const errorMsg = errorData.error || "Failed to add to queue";
+          const errorDetails = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
+          const migrationHint = errorData.migrationFile ? `\n\nPlease run: ${errorData.migrationFile}` : "";
+          throw new Error(`${errorMsg}${errorDetails}${migrationHint}`);
         }
 
         const queueData = await queueResponse.json();
         
         if (!queueData.success) {
-          throw new Error(queueData.error || "Failed to add to queue");
+          const errorMsg = queueData.error || "Failed to add to queue";
+          const errorDetails = queueData.details ? `\n\nDetails: ${queueData.details}` : "";
+          const migrationHint = queueData.migrationFile ? `\n\nPlease run: ${queueData.migrationFile}` : "";
+          throw new Error(`${errorMsg}${errorDetails}${migrationHint}`);
         }
 
         // Get updated sermon with queue info

@@ -85,60 +85,67 @@ export async function POST(request: NextRequest) {
     }
 
     // Get next position in queue
+    let position = 1;
     const { data: positionData, error: positionError } = await supabase.rpc(
       "get_next_queue_position"
     );
 
     if (positionError) {
-      console.error("Error getting next position:", positionError);
-      // Fallback: count existing items
-      const { count } = await supabase
+      console.error("[Queue Add] Error getting next position via RPC:", positionError);
+      console.error("[Queue Add] RPC Error details:", JSON.stringify(positionError, null, 2));
+      
+      // Check if table exists first
+      const { error: tableCheckError } = await supabase
         .from("transcription_queue")
-        .select("*", { count: "exact", head: true });
-      const position = (count || 0) + 1;
-
-      // Insert into queue
-      const { data: queueItem, error: insertError } = await supabase
-        .from("transcription_queue")
-        .insert({
-          sermon_id: sermonId,
-          status: "queued",
-          position: position,
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error("Error adding to queue:", insertError);
+        .select("id")
+        .limit(1);
+      
+      if (tableCheckError) {
+        console.error("[Queue Add] Table check error:", tableCheckError);
+        if (tableCheckError.message.includes("relation") || tableCheckError.message.includes("does not exist")) {
+          return NextResponse.json(
+            { 
+              error: "Transcription queue table not found. Please run the migration_add_transcription_queue.sql file in your Supabase SQL Editor first.",
+              details: tableCheckError.message,
+              migrationFile: "supabase/migration_add_transcription_queue.sql"
+            },
+            { status: 500 }
+          );
+        }
         return NextResponse.json(
-          { error: "Failed to add to queue", details: insertError.message },
+          { 
+            error: "Database error checking queue table", 
+            details: tableCheckError.message 
+          },
           { status: 500 }
         );
       }
-
-      // Update sermon status
-      await supabase
-        .from("sermons")
-        .update({
-          status: "generating",
-          progress_json: {
-            step: "queued",
-            message: `Queued for transcription (position ${position} in queue)...`,
-            position: position,
+      
+      // Fallback: count existing items
+      const { count, error: countError } = await supabase
+        .from("transcription_queue")
+        .select("*", { count: "exact", head: true });
+      
+      if (countError) {
+        console.error("[Queue Add] Error counting queue items:", countError);
+        return NextResponse.json(
+          { 
+            error: "Failed to count queue items", 
+            details: countError.message 
           },
-        })
-        .eq("id", sermonId);
-
-      return NextResponse.json({
-        success: true,
-        message: "Added to transcription queue",
-        queueItem: queueItem,
-      });
+          { status: 500 }
+        );
+      }
+      
+      position = (count || 0) + 1;
+      console.log(`[Queue Add] Using fallback position calculation: ${position}`);
+    } else {
+      position = positionData || 1;
+      console.log(`[Queue Add] Using RPC position: ${position}`);
     }
 
-    const position = positionData || 1;
-
     // Insert into queue
+    console.log(`[Queue Add] Inserting sermon ${sermonId} into queue at position ${position}`);
     const { data: queueItem, error: insertError } = await supabase
       .from("transcription_queue")
       .insert({
@@ -150,12 +157,50 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("Error adding to queue:", insertError);
+      console.error("[Queue Add] Error inserting into queue:", insertError);
+      console.error("[Queue Add] Insert error details:", JSON.stringify(insertError, null, 2));
+      
+      // Check for specific error types
+      if (insertError.message.includes("relation") || insertError.message.includes("does not exist")) {
+        return NextResponse.json(
+          { 
+            error: "Transcription queue table not found. Please run the migration_add_transcription_queue.sql file in your Supabase SQL Editor first.",
+            details: insertError.message,
+            migrationFile: "supabase/migration_add_transcription_queue.sql"
+          },
+          { status: 500 }
+        );
+      }
+      
+      if (insertError.message.includes("violates unique constraint") || insertError.message.includes("duplicate")) {
+        // Already in queue, fetch it
+        const { data: existingItem } = await supabase
+          .from("transcription_queue")
+          .select("*")
+          .eq("sermon_id", sermonId)
+          .single();
+        
+        if (existingItem) {
+          return NextResponse.json({
+            success: true,
+            message: "Sermon already in queue",
+            queueItem: existingItem,
+          });
+        }
+      }
+      
       return NextResponse.json(
-        { error: "Failed to add to queue", details: insertError.message },
+        { 
+          error: "Failed to add to queue", 
+          details: insertError.message,
+          code: insertError.code,
+          hint: insertError.hint
+        },
         { status: 500 }
       );
     }
+    
+    console.log(`[Queue Add] Successfully added to queue:`, queueItem);
 
     // Update sermon status
     await supabase
@@ -176,10 +221,12 @@ export async function POST(request: NextRequest) {
       queueItem: queueItem,
     });
   } catch (error) {
-    console.error("Error adding to queue:", error);
+    console.error("[Queue Add] Unexpected error:", error);
+    console.error("[Queue Add] Error stack:", error instanceof Error ? error.stack : "No stack trace");
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
+        details: error instanceof Error ? error.stack : String(error),
       },
       { status: 500 }
     );
