@@ -26,6 +26,29 @@ const execAsync = promisify(exec);
 const app = express();
 app.use(express.json());
 
+// Register health check endpoints FIRST (before other routes)
+// Railway checks /health immediately on startup - must respond quickly
+let serverReady = false;
+
+app.get('/health', (req, res) => {
+  // Simple health check - just verify server is running
+  res.status(200).json({ 
+    status: 'ok', 
+    service: 'audio-chunking-worker',
+    ready: serverReady,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    service: 'audio-chunking-worker',
+    ready: serverReady,
+    endpoints: ['/health', '/chunk', '/transcribe'],
+  });
+});
+
 const PORT = process.env.PORT || 8080;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -808,29 +831,33 @@ app.post('/transcribe', async (req, res) => {
 /**
  * Health check endpoint
  */
-// Health check endpoints for Railway/container orchestration
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    service: 'audio-chunking-worker',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
+// Health check endpoints are registered at the top of the file (before other routes)
 
-// Root endpoint for basic health checks
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    service: 'audio-chunking-worker',
-    endpoints: ['/health', '/chunk', '/transcribe'],
-  });
-});
-
-app.listen(PORT, '0.0.0.0', () => {
+// Start server
+const server = app.listen(PORT, '0.0.0.0', () => {
+  serverReady = true;
   console.log(`[Worker] Audio chunking worker service listening on port ${PORT}`);
   console.log(`[Worker] Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!supabase) {
     console.warn('[Worker] WARNING: Supabase Storage not configured - chunks will be stored locally');
   }
+  console.log(`[Worker] Health check available at http://0.0.0.0:${PORT}/health`);
+  console.log(`[Worker] Server ready and accepting connections`);
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('[Worker] SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('[Worker] Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('[Worker] SIGINT received, shutting down gracefully...');
+  server.close(() => {
+    console.log('[Worker] Server closed');
+    process.exit(0);
+  });
 });
