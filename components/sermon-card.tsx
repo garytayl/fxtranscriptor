@@ -15,7 +15,7 @@ interface SermonCardProps {
 export const SermonCard = memo(function SermonCard({ sermon, onClick, getStatusBadge }: SermonCardProps) {
   return (
     <article
-      className="group border border-border/30 p-6 hover:border-accent/50 transition-all duration-200 cursor-pointer"
+      className="group border border-border/30 p-4 sm:p-6 hover:border-accent/50 active:border-accent transition-all duration-200 cursor-pointer touch-manipulation"
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-4 mb-4">

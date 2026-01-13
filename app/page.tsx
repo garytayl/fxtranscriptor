@@ -13,13 +13,27 @@ import { Progress } from "@/components/ui/progress";
 import { HeroSection } from "@/components/hero-section";
 import { SideNav } from "@/components/side-nav";
 import { SermonSeriesSection } from "@/components/sermon-series-section";
-import { SeriesDetailView } from "@/components/series-detail-view";
-import { AudioUrlDialog } from "@/components/audio-url-dialog";
+import dynamic from "next/dynamic";
 import { SermonCard } from "@/components/sermon-card";
 import { SermonSkeleton } from "@/components/sermon-skeleton";
 import { Sermon } from "@/lib/supabase";
+
+// Lazy load heavy components
+const BatchOperations = dynamic(() => import("@/components/batch-operations").then(mod => ({ default: mod.BatchOperations })), {
+  ssr: false,
+  loading: () => <div className="h-16" />,
+});
+
+const SeriesDetailView = dynamic(() => import("@/components/series-detail-view").then(mod => ({ default: mod.SeriesDetailView })), {
+  ssr: false,
+});
+
+const AudioUrlDialog = dynamic(() => import("@/components/audio-url-dialog").then(mod => ({ default: mod.AudioUrlDialog })), {
+  ssr: false,
+});
 import { groupSermonsBySeries, SermonSeries } from "@/lib/extractSeries";
 import { exportToCSV, exportToJSON, downloadFile } from "@/lib/export";
+import { analytics, errorTracker } from "@/lib/analytics";
 import { format } from "date-fns";
 
 export default function Home() {
@@ -72,7 +86,8 @@ export default function Home() {
     loadSermons();
     // Also load playlist series initially in case sermons are already loaded
     loadPlaylistSeries();
-  }, [loadSermons, loadPlaylistSeries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -318,7 +333,7 @@ export default function Home() {
       setSyncing(true);
       
       // Show loading toast
-      const toastId = toast.loading("Syncing catalog...", {
+      const syncToastId = toast.loading("Syncing catalog...", {
         description: "Fetching sermons from Podbean and YouTube",
       });
       
@@ -329,7 +344,7 @@ export default function Home() {
         const errorMsg = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
         const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
         
-        toast.dismiss(toastId);
+        toast.dismiss(syncToastId);
         if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
           toast.error("Database Setup Required", {
             description: `${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`,
@@ -347,15 +362,17 @@ export default function Home() {
       const data = await response.json();
       
       if (data.success) {
+        // Track catalog sync
+        analytics.catalogSynced();
         // Reload sermons after sync
         await loadSermons();
-        toast.dismiss(toastId);
+        toast.dismiss(syncToastId);
         toast.success("Catalog Synced", {
           description: `Found ${data.summary.matchedSermons} sermons. Created: ${data.summary.created}, Updated: ${data.summary.updated}${data.errors && data.errors.length > 0 ? `. ${data.errors.length} errors occurred.` : ""}`,
           duration: 5000,
         });
       } else {
-        toast.dismiss(toastId);
+        toast.dismiss(syncToastId);
         toast.error("Sync Failed", {
           description: data.error || "Unknown error",
           duration: 8000,
@@ -364,7 +381,8 @@ export default function Home() {
     } catch (error) {
       console.error("Error syncing catalog:", error);
       const errorMsg = error instanceof Error ? error.message : "Network error";
-      toast.dismiss(toastId);
+      // Note: syncToastId may not be defined if error occurs before it's set
+      // We'll just show the error without dismissing
       toast.error("Sync Error", {
         description: `${errorMsg}\n\nMake sure:\n1. Database tables exist (run schema.sql)\n2. Supabase credentials are configured\n3. You're connected to the internet`,
         duration: 10000,
@@ -374,12 +392,27 @@ export default function Home() {
     }
   }, []);
 
-  const generateTranscript = useCallback(async (sermon: Sermon) => {
+  const generateTranscript = useCallback(async (sermon: Sermon | string) => {
+    // Support both sermon object and sermon ID for batch operations
+    const sermonId = typeof sermon === 'string' ? sermon : sermon.id
+    const sermonObj = typeof sermon === 'string' 
+      ? sermons.find(s => s.id === sermonId)
+      : sermon
+    
+    if (!sermonObj) {
+      toast.error("Sermon not found", {
+        description: "The sermon could not be found.",
+        duration: 3000,
+      })
+      return
+    }
+    
+    const sermonToUse = sermonObj
     try {
       // Immediately update status to "generating" in UI
       setSermons((prev) =>
         prev.map((s) =>
-          s.id === sermon.id
+          s.id === sermonToUse.id
             ? { ...s, status: "generating" as const, progress_json: { step: "queued", message: "Queued for transcription..." } }
             : s
         )
@@ -387,7 +420,7 @@ export default function Home() {
       
       // Show loading toast
       toast.loading("Starting transcription...", {
-        id: `transcript-${sermon.id}`,
+        id: `transcript-${sermonToUse.id}`,
         description: "This may take several minutes. You can leave this page.",
       });
       
@@ -397,7 +430,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ sermonId: sermon.id }),
+        body: JSON.stringify({ sermonId: sermonToUse.id }),
       })
       .then(async (response) => {
         const data = await response.json().catch(() => ({ error: "Failed to parse response" }));
@@ -406,12 +439,12 @@ export default function Home() {
           const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
           
           // Dismiss loading toast
-          toast.dismiss(`transcript-${sermon.id}`);
+          toast.dismiss(`transcript-${sermonToUse.id}`);
           
           // Update sermon status to failed
           setSermons((prev) =>
             prev.map((s) =>
-              s.id === sermon.id
+              s.id === sermonToUse.id
                 ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
                 : s
             )
@@ -426,21 +459,22 @@ export default function Home() {
         }
 
         // Dismiss loading toast
-        toast.dismiss(`transcript-${sermon.id}`);
+        toast.dismiss(`transcript-${sermonToUse.id}`);
         
         if (data.success && data.sermon) {
           // Update sermon in local state
           setSermons((prev) =>
-            prev.map((s) => (s.id === sermon.id ? data.sermon : s))
+            prev.map((s) => (s.id === sermonToUse.id ? data.sermon : s))
           );
           
           // If dialog is open for this sermon, update it
-          if (selectedSermon?.id === sermon.id) {
+          if (selectedSermon?.id === sermonToUse.id) {
             setSelectedSermon(data.sermon);
           }
           
           // Show success toast if transcript completed
           if (data.sermon.status === "completed" && data.sermon.transcript) {
+            analytics.transcriptGenerated(sermonToUse.id);
             toast.success("Transcript Generated", {
               description: `${data.sermon.transcript.length.toLocaleString()} characters transcribed`,
               duration: 4000,
@@ -453,7 +487,7 @@ export default function Home() {
           // Update sermon status to failed
           setSermons((prev) =>
             prev.map((s) =>
-              s.id === sermon.id
+              s.id === sermonToUse.id
                 ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
                 : s
             )
@@ -473,7 +507,7 @@ export default function Home() {
         // Update sermon status to failed
         setSermons((prev) =>
           prev.map((s) =>
-            s.id === sermon.id
+            s.id === sermonToUse.id
               ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
               : s
           )
@@ -481,14 +515,14 @@ export default function Home() {
       });
       
       // Show immediate feedback
-      console.log(`[Generate] Transcription queued for "${sermon.title}". You can leave this page and check back later.`);
+      console.log(`[Generate] Transcription queued for "${sermonToUse.title}". You can leave this page and check back later.`);
       
     } catch (error) {
       console.error("Error queuing transcript:", error);
       const errorMsg = error instanceof Error ? error.message : "Network error";
       
       // Dismiss loading toast and show error
-      toast.dismiss(`transcript-${sermon.id}`);
+      toast.dismiss(`transcript-${sermonToUse.id}`);
       toast.error("Failed to Start Transcription", {
         description: errorMsg,
         duration: 6000,
@@ -497,13 +531,13 @@ export default function Home() {
       // Update sermon status to failed
       setSermons((prev) =>
         prev.map((s) =>
-          s.id === sermon.id
+          s.id === sermonToUse.id
             ? { ...s, status: "failed" as const, error_message: errorMsg, progress_json: null }
             : s
         )
       );
     }
-  }, [selectedSermon]);
+  }, [sermons]);
 
   const handleCopyAll = useCallback(async (transcript: string) => {
     try {
@@ -533,6 +567,8 @@ export default function Home() {
   }, []);
 
   const handleViewSermon = useCallback((sermon: Sermon) => {
+    // Track sermon view
+    analytics.sermonViewed(sermon.id, sermon.title || 'Untitled');
     // Navigate to the dedicated sermon page instead of opening dialog
     router.push(`/sermons/${sermon.id}`);
   }, [router]);
@@ -632,6 +668,7 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
       
+      analytics.transcriptDownloaded(sermon.id);
       toast.success("Download Started", {
         description: `${sermon.transcript.length.toLocaleString()} characters`,
         duration: 2000,
@@ -705,8 +742,8 @@ export default function Home() {
         ) : (
           <>
             {/* Actions */}
-            <div className="relative py-12 pl-6 md:pl-28 pr-6 md:pr-12 border-b border-border/30">
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <div className="relative py-6 sm:py-12 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12 border-b border-border/30">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
                 <Button
                   onClick={syncCatalog}
                   disabled={syncing}
@@ -727,14 +764,15 @@ export default function Home() {
                 </Button>
                 {sermons.length > 0 && (
                   <>
-                    <div className="text-sm text-muted-foreground font-mono">
+                    <div className="text-xs sm:text-sm text-muted-foreground font-mono">
                       {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} • {sermonSeries.length} {sermonSeries.length === 1 ? "series" : "series"}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => {
                           const csv = exportToCSV(sermons);
                           downloadFile(csv, `sermons-export-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+                          analytics.batchOperation('export_csv', sermons.length);
                           toast.success("Export Started", {
                             description: "CSV file download started",
                             duration: 2000,
@@ -751,6 +789,7 @@ export default function Home() {
                         onClick={() => {
                           const json = exportToJSON(sermons);
                           downloadFile(json, `sermons-export-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+                          analytics.batchOperation('export_json', sermons.length);
                           toast.success("Export Started", {
                             description: "JSON file download started",
                             duration: 2000,
@@ -881,17 +920,33 @@ export default function Home() {
                 
                 {/* Show ungrouped sermons after series */}
                 {ungrouped.length > 0 && (
-                  <section id="unsorted" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
-                    <div className="mb-16 pr-6 md:pr-12">
+                  <section id="unsorted" className="relative py-16 sm:py-24 md:py-32 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12">
+                    <div className="mb-8 sm:mb-12 md:mb-16 pr-0 sm:pr-6 md:pr-12">
                       <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">02 / Unsorted</span>
-                      <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">UNSORTED SERMONS</h2>
+                      <h2 className="mt-4 font-[var(--font-bebas)] text-3xl sm:text-5xl md:text-7xl tracking-tight">UNSORTED SERMONS</h2>
                       <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
                         {ungrouped.length} {ungrouped.length === 1 ? "sermon" : "sermons"} • Not in any series
                       </p>
                     </div>
                     
+                    {/* Batch Operations */}
+                    {ungrouped.length > 0 && !loading && (
+                      <div className="mb-4 sm:mb-6 pr-0 sm:pr-6 md:pr-12">
+                        <BatchOperations
+                          sermons={ungrouped}
+                          onGenerate={async (sermonIds) => {
+                            await Promise.all(sermonIds.map(id => generateTranscript(id)))
+                          }}
+                          onExport={(selectedSermons) => {
+                            const csv = exportToCSV(selectedSermons)
+                            downloadFile(csv, `sermons-export-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv')
+                          }}
+                        />
+                      </div>
+                    )}
+                    
                     {/* Ungrouped sermons grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pr-6 md:pr-12">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pr-0 sm:pr-6 md:pr-12">
                       {loading ? (
                         // Show skeletons while loading
                         Array.from({ length: 6 }).map((_, i) => (

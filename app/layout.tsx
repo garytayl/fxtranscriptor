@@ -4,6 +4,7 @@ import { IBM_Plex_Sans, IBM_Plex_Mono, Bebas_Neue } from "next/font/google"
 import { SmoothScroll } from "@/components/smooth-scroll"
 import { Toaster } from "@/components/ui/toast"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { AnalyticsProvider } from "@/components/analytics-provider"
 import "./globals.css"
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -55,9 +56,11 @@ export default function RootLayout({
         className={`${ibmPlexSans.variable} ${bebasNeue.variable} ${ibmPlexMono.variable} font-sans antialiased overflow-x-hidden`}
       >
         <ErrorBoundary>
-          <div className="noise-overlay" aria-hidden="true" />
-          <SmoothScroll>{children}</SmoothScroll>
-          <Toaster position="top-right" richColors closeButton />
+          <AnalyticsProvider>
+            <div className="noise-overlay" aria-hidden="true" />
+            <SmoothScroll>{children}</SmoothScroll>
+            <Toaster position="top-right" richColors closeButton />
+          </AnalyticsProvider>
         </ErrorBoundary>
       </body>
     </html>

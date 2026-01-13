@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { Sermon } from "@/lib/supabase";
+import { analytics, errorTracker } from "@/lib/analytics";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
 
 interface TranscriptionProgress {
@@ -97,6 +98,13 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       loadSermon(sermonId);
     }
   }, [sermonId, loadSermon]);
+
+  // Track page view
+  useEffect(() => {
+    if (sermon) {
+      analytics.sermonViewed(sermon.id, sermon.title || 'Untitled');
+    }
+  }, [sermon?.id]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -265,6 +273,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
+      analytics.transcriptDownloaded(sermon.id);
       toast.success("Download Started", {
         description: `${sermon.transcript.length.toLocaleString()} characters`,
         duration: 2000,
@@ -400,22 +409,22 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     <main className="relative min-h-screen">
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
       
-      <div className="relative z-10 py-12 pl-6 md:pl-28 pr-6 md:pr-12">
+      <div className="relative z-10 py-6 sm:py-12 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12">
         {/* Back Button */}
         <Button
           onClick={() => router.push("/")}
           variant="ghost"
           size="sm"
-          className="mb-8 font-mono text-xs uppercase tracking-widest gap-2 hover:text-accent"
+          className="mb-6 sm:mb-8 font-mono text-xs uppercase tracking-widest gap-2 hover:text-accent touch-manipulation"
         >
           <ArrowLeft className="size-4" />
           Back to Catalog
         </Button>
 
         {/* Header */}
-        <div className="mb-12">
+        <div className="mb-8 sm:mb-12">
           <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Sermon Detail</span>
-          <h1 className="mt-4 font-[var(--font-bebas)] text-4xl md:text-6xl tracking-tight mb-6">
+          <h1 className="mt-4 font-[var(--font-bebas)] text-2xl sm:text-4xl md:text-6xl tracking-tight mb-4 sm:mb-6">
             {sermon.title}
           </h1>
           
@@ -734,12 +743,12 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         )}
 
         {/* Actions */}
-        <div className="mb-12 flex flex-wrap gap-4">
+        <div className="mb-8 sm:mb-12 flex flex-wrap gap-3 sm:gap-4">
           {!sermon.audio_url && !sermon.youtube_url && (
             <Button
               variant="outline"
               size="lg"
-              className="font-mono text-xs uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500"
+              className="font-mono text-xs uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500 touch-manipulation"
               onClick={() => setAudioUrlDialogOpen(true)}
             >
               <Link2 className="size-4 mr-2" />
@@ -752,7 +761,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               <Button
                 variant="default"
                 size="lg"
-                className="font-mono text-xs uppercase tracking-widest gap-2"
+                className="font-mono text-xs uppercase tracking-widest gap-2 touch-manipulation"
                 onClick={handleCopyAll}
               >
                 {copied ? (
@@ -770,7 +779,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               <Button
                 variant="outline"
                 size="lg"
-                className="font-mono text-xs uppercase tracking-widest gap-2"
+                className="font-mono text-xs uppercase tracking-widest gap-2 touch-manipulation"
                 onClick={handleDownload}
               >
                 <Download className="size-4" />
@@ -781,7 +790,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             <Button
               variant={sermon.status === "generating" ? "secondary" : "default"}
               size="lg"
-              className="font-mono text-xs uppercase tracking-widest gap-2"
+              className="font-mono text-xs uppercase tracking-widest gap-2 touch-manipulation"
               disabled={generating || sermon.status === "generating" || (!sermon.audio_url && !sermon.youtube_url)}
               onClick={generateTranscript}
             >
