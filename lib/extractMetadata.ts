@@ -26,10 +26,13 @@ export function extractMetadata(text: string | null | undefined): SermonMetadata
   };
 
   // Pattern to match [SERIES], [SPEAKER], [SUMMARY] tags
+  // More flexible: handles multiple spaces, tabs, line breaks between tags
   // Matches: [SERIES] content     [SPEAKER] content     [SUMMARY] content
-  const seriesMatch = text.match(/\[SERIES\]\s*([^\[]+?)(?=\s*\[(?:SPEAKER|SUMMARY)\]|$)/i);
-  const speakerMatch = text.match(/\[SPEAKER\]\s*([^\[]+?)(?=\s*\[(?:SERIES|SUMMARY)\]|$)/i);
-  const summaryMatch = text.match(/\[SUMMARY\]\s*([^\[]+?)(?=\s*\[(?:SERIES|SPEAKER)\]|$)/i);
+  // Also handles: [SERIES] content\n[SPEAKER] content
+  // Uses [\s\S] instead of . to match any character including newlines
+  const seriesMatch = text.match(/\[SERIES\]\s+([\s\S]+?)(?=\s*\[(?:SPEAKER|SUMMARY)\]|$)/i);
+  const speakerMatch = text.match(/\[SPEAKER\]\s+([\s\S]+?)(?=\s*\[(?:SERIES|SUMMARY)\]|$)/i);
+  const summaryMatch = text.match(/\[SUMMARY\]\s+([\s\S]+?)(?=\s*\[(?:SERIES|SPEAKER)\]|$)/i);
 
   if (seriesMatch) {
     metadata.series = seriesMatch[1].trim();

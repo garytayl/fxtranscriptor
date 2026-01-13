@@ -33,12 +33,11 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function extractMetadataFromExisting() {
   console.log('🔍 Fetching sermons with transcripts...\n');
 
-  // Get all sermons that have transcripts but might not have series/speaker extracted
+  // Get all sermons that have transcripts OR descriptions (metadata might be in either)
   const { data: sermons, error } = await supabase
     .from('sermons')
-    .select('id, title, transcript, series, speaker')
-    .not('transcript', 'is', null)
-    .neq('transcript', '');
+    .select('id, title, transcript, description, series, speaker')
+    .or('transcript.not.is.null,description.not.is.null');
 
   if (error) {
     console.error('❌ Error fetching sermons:', error);
@@ -58,8 +57,27 @@ async function extractMetadataFromExisting() {
 
   for (const sermon of sermons) {
     try {
-      // Extract metadata from transcript
-      const metadata = extractMetadata(sermon.transcript);
+      // Extract metadata from both transcript and description (metadata might be in either)
+      const transcriptMetadata = extractMetadata(sermon.transcript);
+      const descriptionMetadata = extractMetadata(sermon.description);
+      
+      // Combine metadata (description takes precedence if both exist)
+      const metadata = {
+        series: descriptionMetadata.series || transcriptMetadata.series || null,
+        speaker: descriptionMetadata.speaker || transcriptMetadata.speaker || null,
+        summary: descriptionMetadata.summary || transcriptMetadata.summary || null,
+      };
+
+      // Debug: Show what we found
+      if (metadata.series || metadata.speaker) {
+        console.log(`\n🔍 Checking "${sermon.title.substring(0, 50)}..."`);
+        if (transcriptMetadata.series || transcriptMetadata.speaker) {
+          console.log(`   Found in transcript: ${transcriptMetadata.series ? `Series: ${transcriptMetadata.series}` : ''} ${transcriptMetadata.speaker ? `Speaker: ${transcriptMetadata.speaker}` : ''}`);
+        }
+        if (descriptionMetadata.series || descriptionMetadata.speaker) {
+          console.log(`   Found in description: ${descriptionMetadata.series ? `Series: ${descriptionMetadata.series}` : ''} ${descriptionMetadata.speaker ? `Speaker: ${descriptionMetadata.speaker}` : ''}`);
+        }
+      }
 
       // Check if we need to update (only if metadata was found and differs from current)
       const needsUpdate = 
@@ -70,7 +88,13 @@ async function extractMetadataFromExisting() {
         if (metadata.series || metadata.speaker) {
           console.log(`⏭️  Skipping "${sermon.title.substring(0, 50)}..." - already has metadata`);
         } else {
-          console.log(`⏭️  Skipping "${sermon.title.substring(0, 50)}..." - no metadata found in transcript`);
+          // Show a sample of the text to help debug
+          const sampleText = (sermon.description || sermon.transcript || '').substring(0, 200);
+          if (sampleText.includes('[SERIES]') || sampleText.includes('[SPEAKER]')) {
+            console.log(`⚠️  "${sermon.title.substring(0, 50)}..." - Found tags but couldn't parse. Sample: ${sampleText}`);
+          } else {
+            console.log(`⏭️  Skipping "${sermon.title.substring(0, 50)}..." - no metadata tags found`);
+          }
         }
         skipped++;
         continue;
