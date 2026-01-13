@@ -406,6 +406,29 @@ app.post('/transcribe', async (req, res) => {
       })
       .eq('id', sermonId);
 
+    // Helper function to check if transcription was cancelled
+    const checkCancelled = async () => {
+      const { data: sermon } = await supabase
+        .from('sermons')
+        .select('status, progress_json')
+        .eq('id', sermonId)
+        .single();
+      
+      // Check if status changed from generating (cancelled)
+      if (sermon && sermon.status !== 'generating') {
+        console.log(`[Worker] Transcription cancelled (status: ${sermon.status})`);
+        return true;
+      }
+      
+      // Check if progress_json indicates cancellation
+      if (sermon?.progress_json?.step === 'cancelled') {
+        console.log(`[Worker] Transcription cancelled (step: cancelled)`);
+        return true;
+      }
+      
+      return false;
+    };
+
     // Download audio first to check size (needed for YouTube URLs)
     let fileSizeMB = 0;
     let tempDir = null;
@@ -415,6 +438,22 @@ app.post('/transcribe', async (req, res) => {
       console.log(`[Worker] YouTube URL detected - downloading audio to check size...`);
       tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'transcribe-'));
       inputFile = await downloadAudio(audioUrl, tempDir);
+      
+      // Check if cancelled during download
+      if (await checkCancelled()) {
+        console.log(`[Worker] Cancelled during YouTube download, cleaning up...`);
+        // Cleanup
+        if (tempDir) {
+          try {
+            const files = await fs.readdir(tempDir);
+            for (const file of files) {
+              await fs.unlink(path.join(tempDir, file)).catch(() => {});
+            }
+            await fs.rmdir(tempDir).catch(() => {});
+          } catch (err) {}
+        }
+        return res.status(200).json({ success: false, cancelled: true, message: 'Transcription cancelled' });
+      }
       
       // Get file size
       const stats = await fs.stat(inputFile);
@@ -495,6 +534,22 @@ app.post('/transcribe', async (req, res) => {
 
       // Transcribe each chunk - skip only if successfully completed
       for (let i = 0; i < chunks.length; i++) {
+        // Check if cancelled before processing each chunk
+        if (await checkCancelled()) {
+          console.log(`[Worker] Cancelled before chunk ${i + 1}, stopping transcription...`);
+          // Cleanup temp files
+          if (tempDir) {
+            try {
+              const files = await fs.readdir(tempDir);
+              for (const file of files) {
+                await fs.unlink(path.join(tempDir, file)).catch(() => {});
+              }
+              await fs.rmdir(tempDir).catch(() => {});
+            } catch (err) {}
+          }
+          return res.status(200).json({ success: false, cancelled: true, message: 'Transcription cancelled', completedChunks: Object.keys(completedChunks).length });
+        }
+        
         // Skip if already successfully completed
         if (completedChunks[i]) {
           console.log(`[Worker] Chunk ${i + 1}/${chunks.length} already completed, skipping...`);
@@ -531,6 +586,36 @@ app.post('/transcribe', async (req, res) => {
         
         try {
           const chunkTranscript = await transcribeAudio(chunks[i]);
+          
+          // Check if cancelled after transcription
+          if (await checkCancelled()) {
+            console.log(`[Worker] Cancelled after chunk ${i + 1}, stopping transcription...`);
+            // Save the chunk we just completed before stopping
+            completedChunks[i] = chunkTranscript;
+            await supabase
+              .from('sermons')
+              .update({ 
+                progress_json: { 
+                  step: 'cancelled',
+                  current: i + 1,
+                  total: chunks.length,
+                  message: `Transcription cancelled. ${Object.keys(completedChunks).length} chunks completed.`,
+                  completedChunks: completedChunks,
+                }
+              })
+              .eq('id', sermonId);
+            // Cleanup temp files
+            if (tempDir) {
+              try {
+                const files = await fs.readdir(tempDir);
+                for (const file of files) {
+                  await fs.unlink(path.join(tempDir, file)).catch(() => {});
+                }
+                await fs.rmdir(tempDir).catch(() => {});
+              } catch (err) {}
+            }
+            return res.status(200).json({ success: false, cancelled: true, message: 'Transcription cancelled', completedChunks: Object.keys(completedChunks).length });
+          }
           
           // Save this chunk immediately so we don't lose progress
           completedChunks[i] = chunkTranscript;
