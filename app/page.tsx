@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
+import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
+import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save, ChevronDown, ChevronUp, Search, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,6 +14,7 @@ import { SideNav } from "@/components/side-nav";
 import { SermonSeriesSection } from "@/components/sermon-series-section";
 import { SeriesDetailView } from "@/components/series-detail-view";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
+import { SermonCard } from "@/components/sermon-card";
 import { Sermon } from "@/lib/supabase";
 import { groupSermonsBySeries, SermonSeries } from "@/lib/extractSeries";
 import { format } from "date-fns";
@@ -31,11 +34,35 @@ export default function Home() {
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
   const [audioUrlDialogSermon, setAudioUrlDialogSermon] = useState<Sermon | null>(null);
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
-  // Group sermons by series (using playlist data if available)
+  // Filter sermons based on search and status
+  const filteredSermons = useMemo(() => {
+    let filtered = sermons;
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(sermon => 
+        sermon.title.toLowerCase().includes(query) ||
+        sermon.description?.toLowerCase().includes(query) ||
+        sermon.transcript?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Status filter
+    if (statusFilter) {
+      filtered = filtered.filter(sermon => sermon.status === statusFilter);
+    }
+    
+    return filtered;
+  }, [sermons, searchQuery, statusFilter]);
+
+  // Group filtered sermons by series (using playlist data if available)
   const { series: sermonSeries, ungrouped } = useMemo(() => {
-    return groupSermonsBySeries(sermons, playlistSeriesMap);
-  }, [sermons, playlistSeriesMap]);
+    return groupSermonsBySeries(filteredSermons, playlistSeriesMap);
+  }, [filteredSermons, playlistSeriesMap]);
 
   // Load sermons on mount (which will also reload playlist series)
   useEffect(() => {
@@ -43,6 +70,53 @@ export default function Home() {
     // Also load playlist series initially in case sermons are already loaded
     loadPlaylistSeries();
   }, []);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: 'k',
+      ctrl: true,
+      handler: () => {
+        // Focus search input
+        const searchInput = document.querySelector('input[type="text"][placeholder*="Search"]') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      },
+      description: 'Focus search (Ctrl+K)',
+    },
+    {
+      key: 'r',
+      ctrl: true,
+      shift: true,
+      handler: () => {
+        if (!syncing) {
+          syncCatalog();
+        }
+      },
+      description: 'Sync catalog (Ctrl+Shift+R)',
+    },
+    {
+      key: 'Escape',
+      handler: () => {
+        // Close dialogs
+        if (selectedSermon) {
+          setSelectedSermon(null);
+        }
+        if (selectedSeries) {
+          setSelectedSeries(null);
+        }
+        if (showAudioOverride) {
+          setShowAudioOverride(false);
+        }
+        // Clear search
+        setSearchQuery("");
+        setStatusFilter(null);
+      },
+      description: 'Close dialogs / Clear filters (Esc)',
+    },
+  ]);
 
   // Refresh selected sermon when sermons state updates to ensure we have latest data
   useEffect(() => {
@@ -244,9 +318,15 @@ export default function Home() {
         const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
         
         if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
-          alert(`❌ Database Setup Required\n\n${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`);
+          toast.error("Database Setup Required", {
+            description: `${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`,
+            duration: 10000,
+          });
         } else {
-          alert(`Sync failed: ${errorMsg}${details}`);
+          toast.error("Sync Failed", {
+            description: `${errorMsg}${details}`,
+            duration: 8000,
+          });
         }
         return;
       }
@@ -256,20 +336,29 @@ export default function Home() {
       if (data.success) {
         // Reload sermons after sync
         await loadSermons();
-        alert(`✅ Catalog synced!\n\nFound ${data.summary.matchedSermons} sermons.\nCreated: ${data.summary.created}\nUpdated: ${data.summary.updated}${data.errors && data.errors.length > 0 ? `\n\nErrors: ${data.errors.length}` : ""}`);
+        toast.success("Catalog Synced", {
+          description: `Found ${data.summary.matchedSermons} sermons. Created: ${data.summary.created}, Updated: ${data.summary.updated}${data.errors && data.errors.length > 0 ? `. ${data.errors.length} errors occurred.` : ""}`,
+          duration: 5000,
+        });
       } else {
-        alert("Sync failed: " + (data.error || "Unknown error"));
+        toast.error("Sync Failed", {
+          description: data.error || "Unknown error",
+          duration: 8000,
+        });
       }
     } catch (error) {
       console.error("Error syncing catalog:", error);
       const errorMsg = error instanceof Error ? error.message : "Network error";
-      alert(`Error syncing catalog: ${errorMsg}\n\nMake sure:\n1. Database tables exist (run schema.sql)\n2. Supabase credentials are configured\n3. You're connected to the internet`);
+      toast.error("Sync Error", {
+        description: `${errorMsg}\n\nMake sure:\n1. Database tables exist (run schema.sql)\n2. Supabase credentials are configured\n3. You're connected to the internet`,
+        duration: 10000,
+      });
     } finally {
       setSyncing(false);
     }
   };
 
-  const generateTranscript = async (sermon: Sermon) => {
+  const generateTranscript = useCallback(async (sermon: Sermon) => {
     try {
       // Immediately update status to "generating" in UI
       setSermons((prev) =>
@@ -279,6 +368,12 @@ export default function Home() {
             : s
         )
       );
+      
+      // Show loading toast
+      toast.loading("Starting transcription...", {
+        id: `transcript-${sermon.id}`,
+        description: "This may take several minutes. You can leave this page.",
+      });
       
       // Fire and forget - don't wait for response
       fetch("/api/catalog/generate", {
@@ -294,6 +389,9 @@ export default function Home() {
         if (!response.ok && response.status !== 200) {
           const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
           
+          // Dismiss loading toast
+          toast.dismiss(`transcript-${sermon.id}`);
+          
           // Update sermon status to failed
           setSermons((prev) =>
             prev.map((s) =>
@@ -302,9 +400,18 @@ export default function Home() {
                 : s
             )
           );
+          
+          // Show error toast
+          toast.error("Transcription Failed", {
+            description: errorMsg,
+            duration: 8000,
+          });
           return;
         }
 
+        // Dismiss loading toast
+        toast.dismiss(`transcript-${sermon.id}`);
+        
         if (data.success && data.sermon) {
           // Update sermon in local state
           setSermons((prev) =>
@@ -314,6 +421,14 @@ export default function Home() {
           // If dialog is open for this sermon, update it
           if (selectedSermon?.id === sermon.id) {
             setSelectedSermon(data.sermon);
+          }
+          
+          // Show success toast if transcript completed
+          if (data.sermon.status === "completed" && data.sermon.transcript) {
+            toast.success("Transcript Generated", {
+              description: `${data.sermon.transcript.length.toLocaleString()} characters transcribed`,
+              duration: 4000,
+            });
           }
         } else {
           // Handle case where transcript generation failed
@@ -327,6 +442,12 @@ export default function Home() {
                 : s
             )
           );
+          
+          // Show error toast
+          toast.error("Transcription Failed", {
+            description: errorMsg,
+            duration: 8000,
+          });
         }
       })
       .catch((error) => {
@@ -350,6 +471,13 @@ export default function Home() {
       console.error("Error queuing transcript:", error);
       const errorMsg = error instanceof Error ? error.message : "Network error";
       
+      // Dismiss loading toast and show error
+      toast.dismiss(`transcript-${sermon.id}`);
+      toast.error("Failed to Start Transcription", {
+        description: errorMsg,
+        duration: 6000,
+      });
+      
       // Update sermon status to failed
       setSermons((prev) =>
         prev.map((s) =>
@@ -359,17 +487,24 @@ export default function Home() {
         )
       );
     }
-  };
+  }, []);
 
-  const handleCopyAll = async (transcript: string) => {
+  const handleCopyAll = useCallback(async (transcript: string) => {
     try {
       await navigator.clipboard.writeText(transcript);
       setCopied(true);
+      toast.success("Copied to clipboard", {
+        description: `${transcript.length.toLocaleString()} characters copied`,
+        duration: 2000,
+      });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      alert("Failed to copy to clipboard. Please select and copy manually.");
+      toast.error("Copy Failed", {
+        description: "Please select and copy manually.",
+        duration: 4000,
+      });
     }
-  };
+  }, []);
 
   const handleSeriesClick = (series: SermonSeries) => {
     setSelectedSeries(series);
@@ -425,7 +560,10 @@ export default function Home() {
 
       if (!response.ok || !data.success) {
         const errorMsg = data.error || `HTTP ${response.status}`;
-        alert(`Failed to update audio URL: ${errorMsg}`);
+        toast.error("Update Failed", {
+          description: `Failed to update audio URL: ${errorMsg}`,
+          duration: 6000,
+        });
         return;
       }
 
@@ -443,10 +581,16 @@ export default function Home() {
       setShowAudioOverride(false);
       setAudioOverrideUrl("");
       
-      alert(`✅ Audio URL updated successfully! You can now generate the transcript.`);
+      toast.success("Audio URL Updated", {
+        description: "You can now generate the transcript.",
+        duration: 3000,
+      });
     } catch (error) {
       console.error("Error updating audio URL:", error);
-      alert(`Error updating audio URL: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error("Update Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
     } finally {
       setUpdatingAudio(false);
     }
@@ -574,6 +718,82 @@ export default function Home() {
               </div>
             ) : (
               <>
+                {/* Search and Filter Bar */}
+                <section className="relative py-12 pl-6 md:pl-28 pr-6 md:pr-12 border-b border-border/30">
+                  <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                    {/* Search Input */}
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search sermons by title, description, or transcript..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 font-mono text-sm"
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant={statusFilter === null ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setStatusFilter(null)}
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        All ({sermons.length})
+                      </Button>
+                      <Button
+                        variant={statusFilter === "pending" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setStatusFilter("pending")}
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        Pending ({sermons.filter(s => s.status === "pending").length})
+                      </Button>
+                      <Button
+                        variant={statusFilter === "generating" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setStatusFilter("generating")}
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        Generating ({sermons.filter(s => s.status === "generating").length})
+                      </Button>
+                      <Button
+                        variant={statusFilter === "completed" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setStatusFilter("completed")}
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        Completed ({sermons.filter(s => s.status === "completed").length})
+                      </Button>
+                      <Button
+                        variant={statusFilter === "failed" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setStatusFilter("failed")}
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        Failed ({sermons.filter(s => s.status === "failed").length})
+                      </Button>
+                    </div>
+                    
+                    {/* Results count */}
+                    {(searchQuery || statusFilter) && (
+                      <div className="text-xs font-mono text-muted-foreground">
+                        Showing {filteredSermons.length} of {sermons.length} sermons
+                      </div>
+                    )}
+                  </div>
+                </section>
+
                 {/* Show John series if it exists */}
                 {sermonSeries.length > 0 && (
                   <SermonSeriesSection series={sermonSeries} onSeriesClick={handleSeriesClick} />
@@ -592,36 +812,22 @@ export default function Home() {
                     
                     {/* Ungrouped sermons grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pr-6 md:pr-12">
-                      {ungrouped.map((sermon) => (
-                        <article
-                          key={sermon.id}
-                          className="group border border-border/30 p-6 hover:border-accent/50 transition-all duration-200 cursor-pointer"
-                          onClick={() => handleViewSermon(sermon)}
-                        >
-                          <div className="flex items-start justify-between gap-4 mb-4">
-                            <h3 className="font-[var(--font-bebas)] text-xl tracking-tight line-clamp-2 flex-1 group-hover:text-accent transition-colors">
-                              {sermon.title}
-                            </h3>
-                            {getStatusBadge(sermon)}
-                          </div>
-                          
-                          {sermon.date && (
-                            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground mb-4">
-                              <Calendar className="size-3" />
-                              {format(new Date(sermon.date), "MMMM d, yyyy")}
-                            </div>
-                          )}
-                          
-                          {sermon.transcript && (
-                            <div className="mt-4">
-                              <span className="inline-flex items-center gap-2 text-xs font-mono text-muted-foreground">
-                                <CheckCircle2 className="size-3" />
-                                Transcript available
-                              </span>
-                            </div>
-                          )}
-                        </article>
-                      ))}
+                      {ungrouped.length === 0 && (searchQuery || statusFilter) ? (
+                        <div className="col-span-full text-center py-16">
+                          <p className="font-mono text-sm text-muted-foreground">
+                            No sermons match your filters. Try adjusting your search or filter criteria.
+                          </p>
+                        </div>
+                      ) : (
+                        ungrouped.map((sermon) => (
+                          <SermonCard
+                            key={sermon.id}
+                            sermon={sermon}
+                            onClick={() => handleViewSermon(sermon)}
+                            getStatusBadge={getStatusBadge}
+                          />
+                        ))
+                      )}
                     </div>
                   </section>
                 )}
@@ -893,7 +1099,10 @@ export default function Home() {
                             className="font-mono text-xs uppercase tracking-widest"
                             onClick={() => {
                               if (!audioOverrideUrl.trim()) {
-                                alert("Please enter an audio URL or Podbean episode URL");
+                                toast.error("Invalid Input", {
+                                  description: "Please enter an audio URL or Podbean episode URL",
+                                  duration: 4000,
+                                });
                                 return;
                               }
                               
@@ -902,9 +1111,25 @@ export default function Home() {
                               const isDirectAudio = /\.(mp3|m4a|wav|ogg)(\?|$)/i.test(audioOverrideUrl);
                               
                               if (!isPodbeanUrl && !isDirectAudio) {
-                                if (!confirm("This doesn't look like a Podbean URL or direct audio URL. Continue anyway?")) {
-                                  return;
-                                }
+                                toast.warning("URL Warning", {
+                                  description: "This doesn't look like a Podbean URL or direct audio URL. Continue anyway?",
+                                  action: {
+                                    label: "Continue",
+                                    onClick: () => {
+                                      updateAudioUrl(
+                                        selectedSermon!,
+                                        isDirectAudio ? audioOverrideUrl : "",
+                                        isPodbeanUrl ? audioOverrideUrl : undefined
+                                      );
+                                    },
+                                  },
+                                  cancel: {
+                                    label: "Cancel",
+                                    onClick: () => {},
+                                  },
+                                  duration: 8000,
+                                });
+                                return;
                               }
                               
                               updateAudioUrl(

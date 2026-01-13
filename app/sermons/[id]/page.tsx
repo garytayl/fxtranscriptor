@@ -195,17 +195,25 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const handleCopyAll = async () => {
+  const handleCopyAll = useCallback(async () => {
     if (!sermon?.transcript) return;
     
     try {
       await navigator.clipboard.writeText(sermon.transcript);
       setCopied(true);
+      toast.success("Copied to clipboard", {
+        description: `${sermon.transcript.length.toLocaleString()} characters copied`,
+        duration: 2000,
+      });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Failed to copy:", error);
+      toast.error("Copy Failed", {
+        description: "Please select and copy manually.",
+        duration: 4000,
+      });
     }
-  };
+  }, [sermon?.transcript]);
 
   const handleDownload = () => {
     if (!sermon?.transcript) return;
@@ -460,27 +468,29 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                           ? "Cancel transcription? Completed chunks will be preserved."
                           : "Cancel transcription? No chunks have been completed yet.";
                         
-                        if (!confirm(confirmMsg)) {
-                          return;
-                        }
-                        try {
-                          const response = await fetch("/api/catalog/manage-transcription", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ sermonId: sermon.id, action: "cancel" }),
-                          });
-                          const data = await response.json();
-                          if (data.success && data.sermon) {
-                            setSermon(data.sermon);
-                            setGenerating(false);
-                            setProgress(null);
-                          } else {
-                            alert(data.error || "Failed to cancel transcription");
+                        toast.promise(
+                          (async () => {
+                            const response = await fetch("/api/catalog/manage-transcription", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ sermonId: sermon.id, action: "cancel" }),
+                            });
+                            const data = await response.json();
+                            if (data.success && data.sermon) {
+                              setSermon(data.sermon);
+                              setGenerating(false);
+                              setProgress(null);
+                              return data;
+                            } else {
+                              throw new Error(data.error || "Failed to cancel transcription");
+                            }
+                          })(),
+                          {
+                            loading: "Cancelling transcription...",
+                            success: hasChunks ? "Transcription cancelled. Completed chunks preserved." : "Transcription cancelled.",
+                            error: (err) => err.message || "Failed to cancel transcription",
                           }
-                        } catch (error) {
-                          console.error("Error cancelling transcription:", error);
-                          alert("Failed to cancel transcription");
-                        }
+                        );
                       }}
                     >
                       <X className="size-3 mr-1" />
@@ -494,27 +504,28 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                       size="sm"
                       className="text-xs font-mono uppercase tracking-widest border-destructive/50 hover:border-destructive hover:text-destructive"
                       onClick={async () => {
-                        if (!confirm("Delete all completed chunks? This cannot be undone.")) {
-                          return;
-                        }
-                        try {
-                          const response = await fetch("/api/catalog/manage-transcription", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ sermonId: sermon.id, action: "delete-chunks" }),
-                          });
-                          const data = await response.json();
-                          if (data.success && data.sermon) {
-                            setSermon(data.sermon);
-                            // Clear expanded chunks if they were deleted
-                            setExpandedChunks(new Set());
-                          } else {
-                            alert(data.error || "Failed to delete chunks");
+                        toast.promise(
+                          (async () => {
+                            const response = await fetch("/api/catalog/manage-transcription", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ sermonId: sermon.id, action: "delete-chunks" }),
+                            });
+                            const data = await response.json();
+                            if (data.success && data.sermon) {
+                              setSermon(data.sermon);
+                              setExpandedChunks(new Set());
+                              return data;
+                            } else {
+                              throw new Error(data.error || "Failed to delete chunks");
+                            }
+                          })(),
+                          {
+                            loading: "Deleting chunks...",
+                            success: "All chunks deleted successfully",
+                            error: (err) => err.message || "Failed to delete chunks",
                           }
-                        } catch (error) {
-                          console.error("Error deleting chunks:", error);
-                          alert("Failed to delete chunks");
-                        }
+                        );
                       }}
                     >
                       <Trash2 className="size-3 mr-1" />
@@ -757,25 +768,27 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   size="sm"
                   className="text-xs font-mono uppercase tracking-widest border-destructive/50 hover:border-destructive hover:text-destructive"
                   onClick={async () => {
-                    if (!confirm("Delete this transcript? You can regenerate it later.")) {
-                      return;
-                    }
-                    try {
-                      const response = await fetch("/api/catalog/manage-transcription", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ sermonId: sermon.id, action: "delete-transcript" }),
-                      });
-                      const data = await response.json();
-                      if (data.success && data.sermon) {
-                        setSermon(data.sermon);
-                      } else {
-                        alert(data.error || "Failed to delete transcript");
+                    toast.promise(
+                      (async () => {
+                        const response = await fetch("/api/catalog/manage-transcription", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ sermonId: sermon.id, action: "delete-transcript" }),
+                        });
+                        const data = await response.json();
+                        if (data.success && data.sermon) {
+                          setSermon(data.sermon);
+                          return data;
+                        } else {
+                          throw new Error(data.error || "Failed to delete transcript");
+                        }
+                      })(),
+                      {
+                        loading: "Deleting transcript...",
+                        success: "Transcript deleted. You can regenerate it later.",
+                        error: (err) => err.message || "Failed to delete transcript",
                       }
-                    } catch (error) {
-                      console.error("Error deleting transcript:", error);
-                      alert("Failed to delete transcript");
-                    }
+                    );
                   }}
                 >
                   <Trash2 className="size-3 mr-1" />
