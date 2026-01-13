@@ -31,7 +31,7 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function extractMetadataFromExisting() {
-  console.log('🔍 Fetching sermons with transcripts...\n');
+  console.log('🔍 Fetching sermons with transcripts or descriptions...\n');
 
   // Get all sermons that have transcripts OR descriptions (metadata might be in either)
   const { data: sermons, error } = await supabase
@@ -45,11 +45,11 @@ async function extractMetadataFromExisting() {
   }
 
   if (!sermons || sermons.length === 0) {
-    console.log('✅ No sermons with transcripts found.');
+    console.log('✅ No sermons with transcripts or descriptions found.');
     return;
   }
 
-  console.log(`📚 Found ${sermons.length} sermons with transcripts\n`);
+  console.log(`📚 Found ${sermons.length} sermons with transcripts or descriptions\n`);
 
   let updated = 0;
   let skipped = 0;
