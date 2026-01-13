@@ -25,6 +25,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [progress, setProgress] = useState<TranscriptionProgress | null>(null);
   const [copied, setCopied] = useState(false);
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
+  const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
 
   // Extract ID from params (Next.js 15+ always uses Promise)
   useEffect(() => {
@@ -431,12 +432,107 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                       {sermon.progress_json.total && 
                        ` / ${sermon.progress_json.total}`}
                     </p>
-                    <p className="text-xs text-muted-foreground/70 italic">
+                    {sermon.progress_json.failedChunks && 
+                     Object.keys(sermon.progress_json.failedChunks).length > 0 && (
+                      <p className="text-xs font-mono text-destructive/70 mb-2">
+                        ❌ Failed chunks: {Object.keys(sermon.progress_json.failedChunks).length}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground/70 italic mb-4">
                       Progress is saved automatically. If transcription fails, you can retry and it will resume from the last completed chunk.
                     </p>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Completed Chunks Display - Show even if not generating if chunks exist */}
+        {sermon.progress_json?.completedChunks && 
+         Object.keys(sermon.progress_json.completedChunks).length > 0 && (
+          <div className="mb-12 border border-border/30 rounded-lg p-6 bg-card/50">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold font-mono uppercase tracking-widest mb-1">
+                Completed Chunks
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {Object.keys(sermon.progress_json.completedChunks).length}
+                {sermon.progress_json.total && ` / ${sermon.progress_json.total}`} chunks completed
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              {Object.entries(sermon.progress_json.completedChunks)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([index, text]) => {
+                  const chunkIndex = Number(index);
+                  const isExpanded = expandedChunks.has(chunkIndex);
+                  const chunkText = text as string;
+                  
+                  return (
+                    <div key={chunkIndex} className="border rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => {
+                          const newExpanded = new Set(expandedChunks);
+                          if (isExpanded) {
+                            newExpanded.delete(chunkIndex);
+                          } else {
+                            newExpanded.add(chunkIndex);
+                          }
+                          setExpandedChunks(newExpanded);
+                        }}
+                        className="w-full flex items-center justify-between p-3 bg-card hover:bg-card/80 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-green-500" />
+                          <span className="text-sm font-mono font-semibold">
+                            Chunk {chunkIndex + 1}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({chunkText.length.toLocaleString()} chars)
+                          </span>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      {isExpanded && (
+                        <div className="p-4 border-t bg-card/30">
+                          <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground max-h-96 overflow-auto mb-3">
+                            {chunkText}
+                          </pre>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => {
+                                navigator.clipboard.writeText(chunkText);
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                              }}
+                            >
+                              {copied ? (
+                                <>
+                                  <CheckCircle2 className="size-3 mr-1" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="size-3 mr-1" />
+                                  Copy Chunk
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}
