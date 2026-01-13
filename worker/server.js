@@ -848,6 +848,22 @@ app.post('/transcribe', async (req, res) => {
       })
       .eq('id', sermonId);
 
+    // Mark queue item as complete
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    try {
+      await fetch(`${appUrl}/api/queue/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sermonId: sermonId,
+          success: true,
+        }),
+      });
+      console.log(`[Worker] ✅ Queue item marked as complete`);
+    } catch (queueError) {
+      console.warn(`[Worker] ⚠️  Failed to mark queue item as complete (non-critical):`, queueError.message);
+    }
+
     console.log(`[Worker] ✅ Transcription complete for sermon ${sermonId} (${transcript.length} chars)`);
 
     res.json({
@@ -869,6 +885,23 @@ app.post('/transcribe', async (req, res) => {
           progress_json: null,
         })
         .eq('id', req.body.sermonId);
+
+      // Mark queue item as failed
+      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      try {
+        await fetch(`${appUrl}/api/queue/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sermonId: req.body.sermonId,
+            success: false,
+            errorMessage: error.message,
+          }),
+        });
+        console.log(`[Worker] ✅ Queue item marked as failed`);
+      } catch (queueError) {
+        console.warn(`[Worker] ⚠️  Failed to mark queue item as failed (non-critical):`, queueError.message);
+      }
     }
 
     res.status(500).json({

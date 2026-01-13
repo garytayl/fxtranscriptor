@@ -13,6 +13,7 @@ import { Sermon } from "@/lib/supabase";
 import { analytics, errorTracker } from "@/lib/analytics";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonMetadata } from "@/components/sermon-metadata";
+import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/lib/extractMetadata";
 
 interface TranscriptionProgress {
   step: string;
@@ -475,12 +476,37 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
-        {/* Description */}
+        {/* Description / Summary */}
         {sermon.description && (
           <div className="mb-12 max-w-3xl">
-            <p className="font-mono text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {sermon.description}
-            </p>
+            {(() => {
+              // Extract summary from description (removes [SERIES] and [SPEAKER] tags, keeps summary content)
+              const summary = extractSummaryFromDescription(sermon.description);
+              
+              if (summary) {
+                return (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-3">Summary</h3>
+                    <p className="font-mono text-sm text-foreground leading-relaxed">
+                      {summary}
+                    </p>
+                  </div>
+                );
+              }
+              
+              // Fallback: show description without metadata tags
+              const cleaned = removeMetadataFromTranscript(sermon.description);
+              
+              if (cleaned) {
+                return (
+                  <p className="font-mono text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {cleaned}
+                  </p>
+                );
+              }
+              
+              return null;
+            })()}
           </div>
         )}
 

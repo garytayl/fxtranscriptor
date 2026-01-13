@@ -136,127 +136,85 @@ export async function POST(request: NextRequest) {
     }
     
     if (workerUrl && audioSource) {
-      console.log(`[Generate] ✅ Delegating transcription to Railway worker for sermon ${sermonId}`);
-      console.log(`[Generate] Worker URL: ${workerUrl}`);
+      console.log(`[Generate] ✅ Adding sermon to transcription queue`);
+      console.log(`[Generate] Sermon ID: ${sermonId}`);
       console.log(`[Generate] Audio source: ${audioSource.substring(0, 100)}...`);
       
-      // Update status to "generating"
-      await supabase
-        .from("sermons")
-        .update({ status: "generating", progress_json: { step: "queued", message: "Queued for transcription..." } })
-        .eq("id", sermonId);
-
-      // Ensure worker URL doesn't have trailing slash
-      const cleanWorkerUrl = workerUrl.replace(/\/$/, '');
-      
-      // Trigger worker - use shorter timeout just to verify connection, then fire-and-forget
-      console.log(`[Generate] Calling worker: ${cleanWorkerUrl}/transcribe`);
-      console.log(`[Generate] Payload: { sermonId: ${sermonId}, audioUrl: ${audioSource.substring(0, 80)}... }`);
-      
-      // Short timeout just to verify worker is reachable (10 seconds)
-      // After that, we fire-and-forget - worker will process asynchronously
-      const connectionTimeout = 10000; // 10 seconds to verify connection
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), connectionTimeout);
-      
+      // Add to queue instead of calling worker directly
       try {
-        const workerResponse = await fetch(`${cleanWorkerUrl}/transcribe`, {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                       process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                       "http://localhost:3000";
+        
+        const queueResponse = await fetch(`${baseUrl}/api/queue/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sermonId: sermonId,
-            audioUrl: audioSource, // Can be Podbean audio URL or YouTube URL
-          }),
-          signal: controller.signal,
+          body: JSON.stringify({ sermonId }),
         });
-        
-        clearTimeout(timeoutId);
-        
-        if (!workerResponse.ok) {
-          const errorText = await workerResponse.text().catch(() => 'Unknown error');
-          console.error(`[Generate] Worker returned error ${workerResponse.status}: ${errorText}`);
-          throw new Error(`Worker error: ${workerResponse.status} ${errorText}`);
+
+        if (!queueResponse.ok) {
+          const errorData = await queueResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to add to queue");
         }
+
+        const queueData = await queueResponse.json();
         
-        console.log(`[Generate] ✅ Worker accepted request (status: ${workerResponse.status}) - processing will continue in background`);
+        if (!queueData.success) {
+          throw new Error(queueData.error || "Failed to add to queue");
+        }
+
+        // Get updated sermon with queue info
+        const { data: updatedSermon } = await supabase
+          .from("sermons")
+          .select("*")
+          .eq("id", sermonId)
+          .single();
+
+        console.log(`[Generate] ✅ Added to queue (position: ${queueData.queueItem?.position || 'unknown'})`);
         
-        // Return immediately - worker will update database asynchronously
-        // Don't wait for transcription to complete - it can take many minutes
+        // Trigger queue processor to start processing if nothing is currently processing
+        // This is fire-and-forget - processor will handle it
+        // Use setTimeout to avoid blocking the response
+        setTimeout(() => {
+          fetch(`${baseUrl}/api/queue/processor`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          }).catch(err => {
+            console.log(`[Generate] Queue processor trigger failed (non-critical):`, err.message);
+          });
+        }, 100);
+
         return NextResponse.json({
           success: true,
-          message: "Transcription started. This may take several minutes. The page will auto-refresh to show progress.",
-          sermon: {
-            ...sermon,
-            status: "generating",
-          },
+          message: queueData.queueItem?.position === 1 
+            ? "Transcription started. This may take several minutes."
+            : `Added to queue (position ${queueData.queueItem?.position || 'unknown'}). The page will auto-refresh to show progress.`,
+          sermon: updatedSermon || sermon,
+          queueItem: queueData.queueItem,
         });
       } catch (error) {
-        clearTimeout(timeoutId);
-        console.error(`[Generate] ❌ Error triggering worker:`, error);
+        console.error(`[Generate] ❌ Error adding to queue:`, error);
         
-        // Only fail if it's a connection error, not a timeout
         const errorMessage = error instanceof Error 
           ? error.message 
           : "Unknown error";
         
-        const isConnectionError = errorMessage.includes("ECONNREFUSED") || 
-                                  errorMessage.includes("ENOTFOUND") ||
-                                  errorMessage.includes("NetworkError");
+        await supabase
+          .from("sermons")
+          .update({ 
+            status: "failed",
+            error_message: `Failed to add to queue: ${errorMessage}`,
+            progress_json: null,
+          })
+          .eq("id", sermonId);
         
-        // If it's just a timeout but worker might be processing, don't mark as failed
-        // The worker might have accepted the request before the timeout
-        if (errorMessage.includes("aborted") && !isConnectionError) {
-          console.log(`[Generate] ⚠️  Connection timeout, but worker may have accepted request - checking status...`);
-          
-          // Check if worker actually started processing by checking sermon status
-          // Give it a moment, then check
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          const { data: updatedSermon } = await supabase
-            .from("sermons")
-            .select("status, progress_json")
-            .eq("id", sermonId)
-            .single();
-          
-          // If status is generating or has progress, worker is working
-          if (updatedSermon && (updatedSermon.status === "generating" || updatedSermon.progress_json)) {
-            console.log(`[Generate] ✅ Worker is processing (status: ${updatedSermon.status}) - timeout was false alarm`);
-            return NextResponse.json({
-              success: true,
-              message: "Transcription started. This may take several minutes. The page will auto-refresh to show progress.",
-              sermon: updatedSermon,
-            });
-          }
-        }
-        
-        // Real connection error - mark as failed
-        const finalErrorMessage = isConnectionError
-          ? `Worker service unreachable. Please check that ${cleanWorkerUrl} is running. Check Railway logs.`
-          : `Failed to trigger worker: ${errorMessage}. Check that ${cleanWorkerUrl} is accessible.`;
-        
-        if (supabase) {
-          try {
-            await supabase
-              .from("sermons")
-              .update({ 
-                status: "failed",
-                error_message: finalErrorMessage,
-                progress_json: null,
-              })
-              .eq("id", sermonId);
-          } catch (err) {
-            console.error(`[Generate] Error updating status:`, err);
-          }
-        }
-        
-        // Return error response
         return NextResponse.json({
           success: false,
-          error: finalErrorMessage,
+          error: errorMessage,
           sermon: {
             ...sermon,
             status: "failed",
-            error_message: finalErrorMessage,
+            error_message: errorMessage,
           },
         }, { status: 200 });
       }

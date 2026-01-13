@@ -67,3 +67,28 @@ export function removeMetadataFromTranscript(text: string | null | undefined): s
     .replace(/\[SUMMARY\]\s*[^\[]+?(?=\s*\[(?:SERIES|SPEAKER)\]|$)/gi, '')
     .trim();
 }
+
+/**
+ * Extract only the summary from description text
+ * Removes [SERIES] and [SPEAKER] tags but keeps [SUMMARY] content
+ */
+export function extractSummaryFromDescription(text: string | null | undefined): string {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+
+  // Extract summary if it exists
+  const summaryMatch = text.match(/\[SUMMARY\]\s+([\s\S]+?)(?=\s*\[(?:SERIES|SPEAKER)\]|$)/i);
+  
+  if (summaryMatch) {
+    // Return just the summary text, cleaned up
+    return summaryMatch[1].trim();
+  }
+
+  // If no summary tag, remove all metadata tags and return what's left
+  return text
+    .replace(/\[SERIES\]\s*[\s\S]+?(?=\s*\[(?:SPEAKER|SUMMARY)\]|$)/gi, '')
+    .replace(/\[SPEAKER\]\s*[\s\S]+?(?=\s*\[(?:SERIES|SUMMARY)\]|$)/gi, '')
+    .replace(/\[SUMMARY\]\s*/gi, '')
+    .trim();
+}
