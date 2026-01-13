@@ -148,36 +148,65 @@ export async function POST(request: NextRequest) {
       // Ensure worker URL doesn't have trailing slash
       const cleanWorkerUrl = workerUrl.replace(/\/$/, '');
       
-      // Trigger worker asynchronously (don't wait for response)
+      // Trigger worker with timeout to catch connection errors
       console.log(`[Generate] Calling worker: ${cleanWorkerUrl}/transcribe`);
       console.log(`[Generate] Payload: { sermonId: ${sermonId}, audioUrl: ${audioSource.substring(0, 80)}... }`);
       
-      fetch(`${cleanWorkerUrl}/transcribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sermonId: sermonId,
-          audioUrl: audioSource, // Can be Podbean audio URL or YouTube URL
-        }),
-      })
-      .then(async (response) => {
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error');
-          console.error(`[Generate] Worker returned error ${response.status}: ${errorText}`);
-          throw new Error(`Worker error: ${response.status} ${errorText}`);
+      const workerTimeout = 30000; // 30 second timeout for initial connection
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), workerTimeout);
+      
+      try {
+        const workerResponse = await fetch(`${cleanWorkerUrl}/transcribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sermonId: sermonId,
+            audioUrl: audioSource, // Can be Podbean audio URL or YouTube URL
+          }),
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!workerResponse.ok) {
+          const errorText = await workerResponse.text().catch(() => 'Unknown error');
+          console.error(`[Generate] Worker returned error ${workerResponse.status}: ${errorText}`);
+          throw new Error(`Worker error: ${workerResponse.status} ${errorText}`);
         }
-        console.log(`[Generate] ✅ Worker request sent successfully`);
-      })
-      .catch(async (error) => {
+        
+        console.log(`[Generate] ✅ Worker request sent successfully (status: ${workerResponse.status})`);
+        
+        // Return immediately - worker will update database asynchronously
+        return NextResponse.json({
+          success: true,
+          message: "Transcription queued. Check back in a few minutes.",
+          sermon: {
+            ...sermon,
+            status: "generating",
+          },
+        });
+      } catch (error) {
+        clearTimeout(timeoutId);
         console.error(`[Generate] ❌ Error triggering worker:`, error);
+        
         // Update status to failed if worker trigger fails
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : "Unknown error";
+        
+        const isTimeout = errorMessage.includes("aborted") || errorMessage.includes("timeout") || errorMessage.includes("ECONNREFUSED");
+        const finalErrorMessage = isTimeout
+          ? `Worker service timeout or unreachable (${workerTimeout/1000}s). The worker may be down. Please check Railway logs at ${cleanWorkerUrl}.`
+          : `Failed to trigger worker: ${errorMessage}. Check that ${cleanWorkerUrl} is accessible.`;
+        
         if (supabase) {
           try {
             await supabase
               .from("sermons")
               .update({ 
                 status: "failed",
-                error_message: `Failed to trigger worker: ${error.message}. Check that ${cleanWorkerUrl} is accessible.`,
+                error_message: finalErrorMessage,
                 progress_json: null,
               })
               .eq("id", sermonId);
@@ -185,17 +214,18 @@ export async function POST(request: NextRequest) {
             console.error(`[Generate] Error updating status:`, err);
           }
         }
-      });
-
-      // Return immediately - worker will update database
-      return NextResponse.json({
-        success: true,
-        message: "Transcription queued. Check back in a few minutes.",
-        sermon: {
-          ...sermon,
-          status: "generating",
-        },
-      });
+        
+        // Return error response
+        return NextResponse.json({
+          success: false,
+          error: finalErrorMessage,
+          sermon: {
+            ...sermon,
+            status: "failed",
+            error_message: finalErrorMessage,
+          },
+        }, { status: 200 });
+      }
     }
 
     // Fallback: Use Vercel transcription (for small files or if worker not configured)
