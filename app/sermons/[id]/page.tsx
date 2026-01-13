@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -441,6 +441,76 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     <p className="text-xs text-muted-foreground/70 italic mb-4">
                       Progress is saved automatically. If transcription fails, you can retry and it will resume from the last completed chunk.
                     </p>
+                    {/* Cancel and Delete buttons */}
+                    <div className="flex gap-2 mt-4">
+                      {sermon.status === "generating" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs font-mono uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500"
+                          onClick={async () => {
+                            if (!confirm("Cancel transcription? Completed chunks will be preserved.")) {
+                              return;
+                            }
+                            try {
+                              const response = await fetch("/api/catalog/manage-transcription", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ sermonId: sermon.id, action: "cancel" }),
+                              });
+                              const data = await response.json();
+                              if (data.success && data.sermon) {
+                                setSermon(data.sermon);
+                                setGenerating(false);
+                                setProgress(null);
+                              } else {
+                                alert(data.error || "Failed to cancel transcription");
+                              }
+                            } catch (error) {
+                              console.error("Error cancelling transcription:", error);
+                              alert("Failed to cancel transcription");
+                            }
+                          }}
+                        >
+                          <X className="size-3 mr-1" />
+                          Cancel Transcription
+                        </Button>
+                      )}
+                      {sermon.progress_json?.completedChunks && 
+                       Object.keys(sermon.progress_json.completedChunks).length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs font-mono uppercase tracking-widest border-destructive/50 hover:border-destructive hover:text-destructive"
+                          onClick={async () => {
+                            if (!confirm("Delete all completed chunks? This cannot be undone.")) {
+                              return;
+                            }
+                            try {
+                              const response = await fetch("/api/catalog/manage-transcription", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ sermonId: sermon.id, action: "delete-chunks" }),
+                              });
+                              const data = await response.json();
+                              if (data.success && data.sermon) {
+                                setSermon(data.sermon);
+                                // Clear expanded chunks if they were deleted
+                                setExpandedChunks(new Set());
+                              } else {
+                                alert(data.error || "Failed to delete chunks");
+                              }
+                            } catch (error) {
+                              console.error("Error deleting chunks:", error);
+                              alert("Failed to delete chunks");
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-3 mr-1" />
+                          Delete Chunks
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -452,14 +522,47 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         {sermon.progress_json?.completedChunks && 
          Object.keys(sermon.progress_json.completedChunks).length > 0 && (
           <div className="mb-12 border border-border/30 rounded-lg p-6 bg-card/50">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold font-mono uppercase tracking-widest mb-1">
-                Completed Chunks
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {Object.keys(sermon.progress_json.completedChunks).length}
-                {sermon.progress_json.total && ` / ${sermon.progress_json.total}`} chunks completed
-              </p>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold font-mono uppercase tracking-widest mb-1">
+                  Completed Chunks
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {Object.keys(sermon.progress_json.completedChunks).length}
+                  {sermon.progress_json.total && ` / ${sermon.progress_json.total}`} chunks completed
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs font-mono uppercase tracking-widest border-destructive/50 hover:border-destructive hover:text-destructive"
+                onClick={async () => {
+                  if (!confirm("Delete all completed chunks? This cannot be undone.")) {
+                    return;
+                  }
+                  try {
+                    const response = await fetch("/api/catalog/manage-transcription", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ sermonId: sermon.id, action: "delete-chunks" }),
+                    });
+                    const data = await response.json();
+                    if (data.success && data.sermon) {
+                      setSermon(data.sermon);
+                      // Clear expanded chunks if they were deleted
+                      setExpandedChunks(new Set());
+                    } else {
+                      alert(data.error || "Failed to delete chunks");
+                    }
+                  } catch (error) {
+                    console.error("Error deleting chunks:", error);
+                    alert("Failed to delete chunks");
+                  }
+                }}
+              >
+                <Trash2 className="size-3 mr-1" />
+                Delete All
+              </Button>
             </div>
             
             <div className="space-y-2">
