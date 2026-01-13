@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!action || typeof action !== "string" || !["cancel", "delete-chunks"].includes(action)) {
+    if (!action || typeof action !== "string" || !["cancel", "delete-chunks", "delete-transcript"].includes(action)) {
       return NextResponse.json(
-        { error: "Missing or invalid action. Must be 'cancel' or 'delete-chunks'" },
+        { error: "Missing or invalid action. Must be 'cancel', 'delete-chunks', or 'delete-transcript'" },
         { status: 400 }
       );
     }
@@ -102,6 +102,17 @@ export async function POST(request: NextRequest) {
         };
       }
       console.log(`[ManageTranscription] Deleting chunks for sermon ${sermonId}`);
+    } else if (action === "delete-transcript") {
+      // Delete transcript: clear transcript, transcript_source, transcript_generated_at, and reset status
+      updateData = {
+        transcript: null,
+        transcript_source: null,
+        transcript_generated_at: null,
+        status: "pending",
+        error_message: null,
+        progress_json: null,
+      };
+      console.log(`[ManageTranscription] Deleting transcript for sermon ${sermonId}`);
     }
 
     // Update sermon

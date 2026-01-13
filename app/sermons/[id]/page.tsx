@@ -746,11 +746,42 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           <div className="border border-border/30 rounded-lg p-6 bg-card/50">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-mono text-sm uppercase tracking-widest">Transcript</h2>
-              {sermon.transcript_generated_at && (
-                <span className="text-xs font-mono text-muted-foreground">
-                  Generated {format(new Date(sermon.transcript_generated_at), "MMM d, yyyy")}
-                </span>
-              )}
+              <div className="flex items-center gap-4">
+                {sermon.transcript_generated_at && (
+                  <span className="text-xs font-mono text-muted-foreground">
+                    Generated {format(new Date(sermon.transcript_generated_at), "MMM d, yyyy")}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs font-mono uppercase tracking-widest border-destructive/50 hover:border-destructive hover:text-destructive"
+                  onClick={async () => {
+                    if (!confirm("Delete this transcript? You can regenerate it later.")) {
+                      return;
+                    }
+                    try {
+                      const response = await fetch("/api/catalog/manage-transcription", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ sermonId: sermon.id, action: "delete-transcript" }),
+                      });
+                      const data = await response.json();
+                      if (data.success && data.sermon) {
+                        setSermon(data.sermon);
+                      } else {
+                        alert(data.error || "Failed to delete transcript");
+                      }
+                    } catch (error) {
+                      console.error("Error deleting transcript:", error);
+                      alert("Failed to delete transcript");
+                    }
+                  }}
+                >
+                  <Trash2 className="size-3 mr-1" />
+                  Delete Transcript
+                </Button>
+              </div>
             </div>
             <div className="prose prose-invert max-w-none">
               <pre className="font-mono text-sm text-foreground whitespace-pre-wrap leading-relaxed">
