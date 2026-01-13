@@ -31,7 +31,7 @@ function extractYouTubeVideoId(url) {
  * Download audio from YouTube using ytdl-core
  */
 async function downloadYouTubeAudioBuffer(youtubeUrl) {
-  const ytdl = require('ytdl-core');
+  const ytdl = require('@distube/ytdl-core');
   const videoId = extractYouTubeVideoId(youtubeUrl);
   if (!videoId) {
     throw new Error(`Invalid YouTube URL: ${youtubeUrl}`);
@@ -49,9 +49,15 @@ async function downloadYouTubeAudioBuffer(youtubeUrl) {
   console.log(`[Transcribe] YouTube video: ${info.videoDetails.title.substring(0, 60)}...`);
 
   // Get audio stream and convert to buffer
+  // Add request options for better reliability
   const stream = ytdl(youtubeUrl, {
     quality: 'highestaudio',
     filter: 'audioonly',
+    requestOptions: {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    },
   });
 
   const chunks = [];
@@ -67,7 +73,14 @@ async function downloadYouTubeAudioBuffer(youtubeUrl) {
     });
     stream.on('error', (error) => {
       console.error(`[Transcribe] YouTube download error:`, error);
-      reject(new Error(`Failed to download YouTube audio: ${error.message}`));
+      let errorMessage = `Failed to download YouTube audio: ${error.message}`;
+      
+      // Provide helpful error message for signature extraction errors
+      if (error.message.includes('Could not extract functions') || error.message.includes('sig.js')) {
+        errorMessage = `YouTube signature extraction failed. This usually means YouTube has updated their API. The ytdl-core library may need an update. Error: ${error.message}`;
+      }
+      
+      reject(new Error(errorMessage));
     });
   });
 }
