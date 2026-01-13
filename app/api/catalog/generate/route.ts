@@ -142,31 +142,19 @@ export async function POST(request: NextRequest) {
       
       // Add to queue instead of calling worker directly
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                       process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                       "http://localhost:3000";
+        // Import and use shared queue function directly (no HTTP call needed)
+        const { addSermonToQueue } = await import("@/lib/queue");
         
-        const queueResponse = await fetch(`${baseUrl}/api/queue/add`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sermonId }),
-        });
+        console.log(`[Generate] Adding sermon to queue directly...`);
+        const queueResult = await addSermonToQueue(sermonId);
 
-        if (!queueResponse.ok) {
-          const errorData = await queueResponse.json().catch(() => ({}));
-          const errorMsg = errorData.error || "Failed to add to queue";
-          const errorDetails = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
-          const migrationHint = errorData.migrationFile ? `\n\nPlease run: ${errorData.migrationFile}` : "";
-          throw new Error(`${errorMsg}${errorDetails}${migrationHint}`);
-        }
-
-        const queueData = await queueResponse.json();
-        
-        if (!queueData.success) {
-          const errorMsg = queueData.error || "Failed to add to queue";
-          const errorDetails = queueData.details ? `\n\nDetails: ${queueData.details}` : "";
-          const migrationHint = queueData.migrationFile ? `\n\nPlease run: ${queueData.migrationFile}` : "";
-          throw new Error(`${errorMsg}${errorDetails}${migrationHint}`);
+        if (!queueResult.success) {
+          const errorMsg = queueResult.error || "Failed to add to queue";
+          const errorDetails = queueResult.details ? `\n\nDetails: ${queueResult.details}` : "";
+          const migrationHint = queueResult.migrationFile ? `\n\nPlease run: ${queueResult.migrationFile}` : "";
+          const fullError = `${errorMsg}${errorDetails}${migrationHint}`;
+          console.error(`[Generate] Queue add failed:`, fullError);
+          throw new Error(fullError);
         }
 
         // Get updated sermon with queue info
@@ -176,11 +164,14 @@ export async function POST(request: NextRequest) {
           .eq("id", sermonId)
           .single();
 
-        console.log(`[Generate] ✅ Added to queue (position: ${queueData.queueItem?.position || 'unknown'})`);
+        console.log(`[Generate] ✅ Added to queue (position: ${queueResult.queueItem?.position || 'unknown'})`);
         
         // Trigger queue processor to start processing if nothing is currently processing
         // This is fire-and-forget - processor will handle it
         // Use setTimeout to avoid blocking the response
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                       process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                       "http://localhost:3000";
         setTimeout(() => {
           fetch(`${baseUrl}/api/queue/processor`, {
             method: "POST",
@@ -200,6 +191,9 @@ export async function POST(request: NextRequest) {
         });
       } catch (error) {
         console.error(`[Generate] ❌ Error adding to queue:`, error);
+        console.error(`[Generate] Error type:`, error instanceof Error ? error.constructor.name : typeof error);
+        console.error(`[Generate] Error message:`, error instanceof Error ? error.message : String(error));
+        console.error(`[Generate] Error stack:`, error instanceof Error ? error.stack : "No stack");
         
         const errorMessage = error instanceof Error 
           ? error.message 

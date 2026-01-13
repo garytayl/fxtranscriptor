@@ -29,7 +29,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Trigger to auto-update updated_at
+-- Trigger to auto-update updated_at (drop if exists first)
+DROP TRIGGER IF EXISTS update_transcription_queue_updated_at ON transcription_queue;
 CREATE TRIGGER update_transcription_queue_updated_at BEFORE UPDATE ON transcription_queue
     FOR EACH ROW EXECUTE FUNCTION update_transcription_queue_updated_at();
 
@@ -37,18 +38,22 @@ CREATE TRIGGER update_transcription_queue_updated_at BEFORE UPDATE ON transcript
 ALTER TABLE transcription_queue ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Everyone can read the queue
+DROP POLICY IF EXISTS "Queue is viewable by everyone" ON transcription_queue;
 CREATE POLICY "Queue is viewable by everyone" ON transcription_queue
     FOR SELECT USING (true);
 
 -- Policy: Anyone can insert (to add to queue)
+DROP POLICY IF EXISTS "Queue can be added to by anyone" ON transcription_queue;
 CREATE POLICY "Queue can be added to by anyone" ON transcription_queue
     FOR INSERT WITH CHECK (true);
 
 -- Policy: Anyone can update (to cancel, etc.)
+DROP POLICY IF EXISTS "Queue can be updated by anyone" ON transcription_queue;
 CREATE POLICY "Queue can be updated by anyone" ON transcription_queue
     FOR UPDATE USING (true);
 
 -- Policy: Anyone can delete (for cleanup)
+DROP POLICY IF EXISTS "Queue can be deleted by anyone" ON transcription_queue;
 CREATE POLICY "Queue can be deleted by anyone" ON transcription_queue
     FOR DELETE USING (true);
 
