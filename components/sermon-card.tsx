@@ -2,9 +2,9 @@
 
 import { memo } from 'react'
 import { Calendar, CheckCircle2 } from 'lucide-react'
-import { format } from 'date-fns'
-import { Sermon } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
+import { Sermon } from '@/lib/supabase'
+import { format } from 'date-fns'
 
 interface SermonCardProps {
   sermon: Sermon
@@ -12,11 +12,7 @@ interface SermonCardProps {
   getStatusBadge: (sermon: Sermon) => React.ReactElement
 }
 
-export const SermonCard = memo(function SermonCard({ 
-  sermon, 
-  onClick, 
-  getStatusBadge 
-}: SermonCardProps) {
+export const SermonCard = memo(function SermonCard({ sermon, onClick, getStatusBadge }: SermonCardProps) {
   return (
     <article
       className="group border border-border/30 p-6 hover:border-accent/50 transition-all duration-200 cursor-pointer"

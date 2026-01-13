@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { Sermon } from "@/lib/supabase";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
@@ -95,9 +96,30 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     if (sermonId) {
       loadSermon(sermonId);
     }
-  }, [sermonId]);
+  }, [sermonId, loadSermon]);
 
-  const loadSermon = async (id: string) => {
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: 'Escape',
+      handler: () => {
+        router.push('/');
+      },
+      description: 'Go back (Esc)',
+    },
+    {
+      key: 'r',
+      ctrl: true,
+      handler: () => {
+        if (sermonId && !loading) {
+          loadSermon(sermonId);
+        }
+      },
+      description: 'Refresh sermon (Ctrl+R)',
+    },
+  ]);
+
+  const loadSermon = useCallback(async (id: string) => {
     try {
       console.log("[SermonDetail] Loading sermon with ID:", id);
       setLoading(true);
@@ -106,7 +128,10 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       }
       
       console.log("[SermonDetail] Fetching from /api/catalog/" + id);
-      const response = await fetch(`/api/catalog/${id}`);
+      const response = await fetch(`/api/catalog/${id}`, {
+        // Add cache control
+        next: { revalidate: 30 }, // Revalidate every 30 seconds
+      });
       
       console.log("[SermonDetail] Response status:", response.status);
       
@@ -136,15 +161,20 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const generateTranscript = async () => {
+  const generateTranscript = useCallback(async () => {
     if (!sermon || generating) return;
 
     // Immediately update status to "generating" in UI
     setSermon((prev) => prev ? { ...prev, status: "generating" as const, progress_json: { step: "queued", message: "Queued for transcription..." } } : null);
     setGenerating(true);
     setProgress({ step: "queued", message: "Queued for transcription..." });
+
+    // Show loading toast
+    const toastId = toast.loading("Starting transcription...", {
+      description: "This may take several minutes. You can leave this page.",
+    });
 
     try {
       // Fire and forget - don't wait for response
@@ -215,22 +245,42 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     }
   }, [sermon?.transcript]);
 
-  const handleDownload = () => {
-    if (!sermon?.transcript) return;
+  const handleDownload = useCallback(() => {
+    if (!sermon?.transcript) {
+      toast.error("No Transcript", {
+        description: "This sermon doesn't have a transcript yet.",
+        duration: 3000,
+      });
+      return;
+    }
     
-    const blob = new Blob([sermon.transcript], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${sermon.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_transcript.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const updateAudioUrl = async (sermon: Sermon, audioUrl: string, podbeanUrl?: string) => {
     try {
+      const blob = new Blob([sermon.transcript], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sermon.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_transcript.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Download Started", {
+        description: `${sermon.transcript.length.toLocaleString()} characters`,
+        duration: 2000,
+      });
+    } catch (error) {
+      toast.error("Download Failed", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 4000,
+      });
+    }
+  }, [sermon?.transcript, sermon?.title]);
+
+  const updateAudioUrl = useCallback(async (sermon: Sermon, audioUrl: string, podbeanUrl?: string) => {
+    try {
+      const toastId = toast.loading("Updating audio URL...");
+      
       const response = await fetch("/api/catalog/update-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -244,19 +294,29 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
       const data = await response.json();
       
+      toast.dismiss(toastId);
+      
       if (data.success && data.sermon) {
         setSermon(data.sermon);
         setAudioUrlDialogOpen(false);
+        toast.success("Audio URL Updated", {
+          description: "You can now generate the transcript.",
+          duration: 3000,
+        });
       } else {
         throw new Error(data.error || "Failed to update audio URL");
       }
     } catch (error) {
       console.error("Error updating audio URL:", error);
+      toast.error("Update Failed", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
       throw error;
     }
-  };
+  }, []);
 
-  const getStatusBadge = (sermon: Sermon) => {
+  const getStatusBadge = useCallback((sermon: Sermon) => {
     switch (sermon.status) {
       case "completed":
         return (
@@ -282,9 +342,9 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       default:
         return <Badge variant="outline">Pending</Badge>;
     }
-  };
+  }, []);
 
-  const getSourceBadge = (source: string | null) => {
+  const getSourceBadge = useCallback((source: string | null) => {
     if (!source) return null;
     const variants: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
       youtube: { label: "YouTube", variant: "default" },
@@ -294,27 +354,25 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     };
     const config = variants[source] || { label: source, variant: "outline" as const };
     return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  }, []);
 
   if (loading) {
     return (
       <main className="relative min-h-screen">
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-        <div className="relative z-10 py-32 pl-6 md:pl-28 pr-6 md:pr-12">
-          <div className="text-center">
-            <Loader2 className="size-8 animate-spin text-accent mx-auto mb-4" />
-            <div className="text-muted-foreground font-mono text-sm mb-4">
-              Loading sermon...
+        <div className="relative z-10 py-12 pl-6 md:pl-28 pr-6 md:pr-12">
+          <div className="mb-8">
+            <div className="h-10 w-32 bg-muted animate-pulse rounded mb-4" />
+            <div className="h-16 w-3/4 bg-muted animate-pulse rounded mb-6" />
+            <div className="flex gap-4">
+              <div className="h-8 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-8 w-24 bg-muted animate-pulse rounded" />
             </div>
-            <Button 
-              onClick={() => router.push("/")} 
-              variant="outline" 
-              size="sm"
-              className="font-mono text-xs uppercase tracking-widest"
-            >
-              <ArrowLeft className="size-4 mr-2" />
-              Back to Catalog
-            </Button>
+          </div>
+          <div className="space-y-4">
+            <div className="h-12 w-full bg-muted animate-pulse rounded" />
+            <div className="h-12 w-full bg-muted animate-pulse rounded" />
+            <div className="h-64 w-full bg-muted animate-pulse rounded" />
           </div>
         </div>
       </main>

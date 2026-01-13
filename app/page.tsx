@@ -9,14 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { HeroSection } from "@/components/hero-section";
 import { SideNav } from "@/components/side-nav";
 import { SermonSeriesSection } from "@/components/sermon-series-section";
 import { SeriesDetailView } from "@/components/series-detail-view";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonCard } from "@/components/sermon-card";
+import { SermonSkeleton } from "@/components/sermon-skeleton";
 import { Sermon } from "@/lib/supabase";
 import { groupSermonsBySeries, SermonSeries } from "@/lib/extractSeries";
+import { exportToCSV, exportToJSON, downloadFile } from "@/lib/export";
 import { format } from "date-fns";
 
 export default function Home() {
@@ -69,7 +72,7 @@ export default function Home() {
     loadSermons();
     // Also load playlist series initially in case sermons are already loaded
     loadPlaylistSeries();
-  }, []);
+  }, [loadSermons, loadPlaylistSeries]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -211,7 +214,7 @@ export default function Home() {
     };
   }, [sermons, selectedSermon]);
 
-  const loadPlaylistSeries = async () => {
+  const loadPlaylistSeries = useCallback(async () => {
     try {
       // Playlists from FX Church's sermon series
       // These playlists organize sermons into series automatically
@@ -257,12 +260,15 @@ export default function Home() {
       console.warn("Error loading playlist series data (non-critical):", error);
       // Don't block the app if playlist fetch fails - fallback to title extraction
     }
-  };
+  }, []);
 
-  const loadSermons = async () => {
+  const loadSermons = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/catalog/list");
+      const response = await fetch("/api/catalog/list", {
+        // Add cache control for better performance
+        next: { revalidate: 60 }, // Revalidate every 60 seconds
+      });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -305,11 +311,17 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const syncCatalog = async () => {
+  const syncCatalog = useCallback(async () => {
     try {
       setSyncing(true);
+      
+      // Show loading toast
+      const toastId = toast.loading("Syncing catalog...", {
+        description: "Fetching sermons from Podbean and YouTube",
+      });
+      
       const response = await fetch("/api/catalog/sync");
       
       if (!response.ok) {
@@ -317,6 +329,7 @@ export default function Home() {
         const errorMsg = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
         const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
         
+        toast.dismiss(toastId);
         if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
           toast.error("Database Setup Required", {
             description: `${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`,
@@ -336,11 +349,13 @@ export default function Home() {
       if (data.success) {
         // Reload sermons after sync
         await loadSermons();
+        toast.dismiss(toastId);
         toast.success("Catalog Synced", {
           description: `Found ${data.summary.matchedSermons} sermons. Created: ${data.summary.created}, Updated: ${data.summary.updated}${data.errors && data.errors.length > 0 ? `. ${data.errors.length} errors occurred.` : ""}`,
           duration: 5000,
         });
       } else {
+        toast.dismiss(toastId);
         toast.error("Sync Failed", {
           description: data.error || "Unknown error",
           duration: 8000,
@@ -349,6 +364,7 @@ export default function Home() {
     } catch (error) {
       console.error("Error syncing catalog:", error);
       const errorMsg = error instanceof Error ? error.message : "Network error";
+      toast.dismiss(toastId);
       toast.error("Sync Error", {
         description: `${errorMsg}\n\nMake sure:\n1. Database tables exist (run schema.sql)\n2. Supabase credentials are configured\n3. You're connected to the internet`,
         duration: 10000,
@@ -356,7 +372,7 @@ export default function Home() {
     } finally {
       setSyncing(false);
     }
-  };
+  }, []);
 
   const generateTranscript = useCallback(async (sermon: Sermon) => {
     try {
@@ -487,7 +503,7 @@ export default function Home() {
         )
       );
     }
-  }, []);
+  }, [selectedSermon]);
 
   const handleCopyAll = useCallback(async (transcript: string) => {
     try {
@@ -506,22 +522,22 @@ export default function Home() {
     }
   }, []);
 
-  const handleSeriesClick = (series: SermonSeries) => {
+  const handleCloseSeriesDetail = useCallback(() => {
+    setSelectedSeries(null);
+  }, []);
+
+  const handleSeriesClick = useCallback((series: SermonSeries) => {
     setSelectedSeries(series);
     // Scroll to top of detail view
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, []);
 
-  const handleCloseSeriesDetail = () => {
-    setSelectedSeries(null);
-  };
-
-  const handleViewSermon = (sermon: Sermon) => {
+  const handleViewSermon = useCallback((sermon: Sermon) => {
     // Navigate to the dedicated sermon page instead of opening dialog
     router.push(`/sermons/${sermon.id}`);
-  };
+  }, [router]);
 
-  const handleViewSermonDialog = (sermon: Sermon, e?: React.MouseEvent) => {
+  const handleViewSermonDialog = useCallback((sermon: Sermon, e?: React.MouseEvent) => {
     // Optional: Open in dialog (for quick previews)
     // Can be triggered by a button or modifier key
     if (e) {
@@ -532,14 +548,14 @@ export default function Home() {
     const latestSermon = sermons.find(s => s.id === sermon.id) || sermon;
     console.log('[View Sermon Dialog] Setting selected sermon:', latestSermon.id, 'youtube_url:', latestSermon.youtube_url ? 'YES' : 'NO', 'audio_url:', latestSermon.audio_url ? 'YES' : 'NO');
     setSelectedSermon(latestSermon);
-  };
+  }, [sermons]);
 
-  const handleSetAudioUrl = (sermon: Sermon) => {
+  const handleSetAudioUrl = useCallback((sermon: Sermon) => {
     setAudioUrlDialogSermon(sermon);
     setAudioUrlDialogOpen(true);
-  };
+  }, []);
 
-  const updateAudioUrl = async (sermon: Sermon, audioUrl: string, podbeanUrl?: string) => {
+  const updateAudioUrl = useCallback(async (sermon: Sermon, audioUrl: string, podbeanUrl?: string) => {
     try {
       setUpdatingAudio(true);
       
@@ -594,42 +610,70 @@ export default function Home() {
     } finally {
       setUpdatingAudio(false);
     }
-  };
+  }, [selectedSermon]);
 
-  const handleDownload = (sermon: Sermon) => {
-    if (!sermon.transcript) return;
+  const handleDownload = useCallback((sermon: Sermon) => {
+    if (!sermon.transcript) {
+      toast.error("No Transcript", {
+        description: "This sermon doesn't have a transcript yet.",
+        duration: 3000,
+      });
+      return;
+    }
 
-    const blob = new Blob([sermon.transcript], { type: "text/plain" });
-    const downloadUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = `${sermon.title || "transcript"}.txt`.replace(/[^a-z0-9]/gi, "_");
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(downloadUrl);
-  };
+    try {
+      const blob = new Blob([sermon.transcript], { type: "text/plain" });
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `${sermon.title || "transcript"}.txt`.replace(/[^a-z0-9]/gi, "_");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      
+      toast.success("Download Started", {
+        description: `${sermon.transcript.length.toLocaleString()} characters`,
+        duration: 2000,
+      });
+    } catch (error) {
+      toast.error("Download Failed", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 4000,
+      });
+    }
+  }, []);
 
-  const getStatusBadge = (sermon: Sermon) => {
+  const getStatusBadge = useCallback((sermon: Sermon) => {
     switch (sermon.status) {
       case "completed":
-        return <Badge variant="default">Completed</Badge>;
+        return (
+          <Badge variant="default" className="gap-1">
+            <CheckCircle2 className="size-3" />
+            Completed
+          </Badge>
+        );
       case "generating":
         const progressMessage = sermon.progress_json?.message || "Generating...";
         return (
           <Badge variant="secondary" className="gap-1" title={progressMessage}>
             <Loader2 className="size-3 animate-spin" />
-            {progressMessage}
+            Generating
           </Badge>
         );
       case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <AlertCircle className="size-3" />
+            Failed
+          </Badge>
+        );
       default:
         return <Badge variant="outline">Pending</Badge>;
     }
-  };
+  }, []);
 
-  const getSourceBadge = (source: string | null) => {
+  const getSourceBadge = useCallback((source: string | null) => {
     if (!source) return null;
     const variants: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
       youtube: { label: "YouTube", variant: "default" },
@@ -639,7 +683,7 @@ export default function Home() {
     };
     const config = variants[source] || { label: source, variant: "outline" as const };
     return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  }, []);
 
   return (
     <main className="relative min-h-screen">
@@ -682,9 +726,45 @@ export default function Home() {
                   Refresh
                 </Button>
                 {sermons.length > 0 && (
-                  <div className="text-sm text-muted-foreground font-mono">
-                    {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} • {sermonSeries.length} {sermonSeries.length === 1 ? "series" : "series"}
-                  </div>
+                  <>
+                    <div className="text-sm text-muted-foreground font-mono">
+                      {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} • {sermonSeries.length} {sermonSeries.length === 1 ? "series" : "series"}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          const csv = exportToCSV(sermons);
+                          downloadFile(csv, `sermons-export-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+                          toast.success("Export Started", {
+                            description: "CSV file download started",
+                            duration: 2000,
+                          });
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        <Download className="size-3 mr-2" />
+                        Export CSV
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const json = exportToJSON(sermons);
+                          downloadFile(json, `sermons-export-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+                          toast.success("Export Started", {
+                            description: "JSON file download started",
+                            duration: 2000,
+                          });
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="font-mono text-xs uppercase tracking-widest"
+                      >
+                        <Download className="size-3 mr-2" />
+                        Export JSON
+                      </Button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -812,10 +892,21 @@ export default function Home() {
                     
                     {/* Ungrouped sermons grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pr-6 md:pr-12">
-                      {ungrouped.length === 0 && (searchQuery || statusFilter) ? (
+                      {loading ? (
+                        // Show skeletons while loading
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <SermonSkeleton key={`skeleton-${i}`} />
+                        ))
+                      ) : ungrouped.length === 0 && (searchQuery || statusFilter) ? (
                         <div className="col-span-full text-center py-16">
                           <p className="font-mono text-sm text-muted-foreground">
                             No sermons match your filters. Try adjusting your search or filter criteria.
+                          </p>
+                        </div>
+                      ) : ungrouped.length === 0 ? (
+                        <div className="col-span-full text-center py-16">
+                          <p className="font-mono text-sm text-muted-foreground">
+                            No unsorted sermons. Sync the catalog to load sermons.
                           </p>
                         </div>
                       ) : (
