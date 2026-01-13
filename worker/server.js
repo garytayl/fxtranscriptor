@@ -29,7 +29,13 @@ const app = express();
 // Railway checks /health immediately on startup - must respond quickly
 app.get('/health', (req, res) => {
   console.log('[Worker] ✅ Health check hit - responding with 200 OK');
-  res.status(200).send('ok');
+  // Railway expects 200 status with a simple response
+  // Some platforms prefer JSON, some prefer plain text - provide both options
+  res.status(200).json({ 
+    status: 'healthy',
+    service: 'audio-chunking-worker',
+    timestamp: Date.now()
+  });
 });
 
 app.get('/', (req, res) => {
@@ -828,9 +834,10 @@ app.post('/transcribe', async (req, res) => {
 // Health check endpoints are registered at the top of the file (before other routes)
 
 // Start server immediately - health check is already registered
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Worker] ✅ Server listening on 0.0.0.0:${PORT}`);
-  console.log(`[Worker] ✅ Health check: http://0.0.0.0:${PORT}/health`);
+// Railway v2 may require IPv6 binding (::) instead of 0.0.0.0
+const server = app.listen(PORT, '::', () => {
+  console.log(`[Worker] ✅ Server listening on [::]:${PORT} (IPv6 - Railway v2 compatible)`);
+  console.log(`[Worker] ✅ Health check: http://[::]:${PORT}/health`);
   console.log(`[Worker] Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!supabase) {
     console.warn('[Worker] ⚠️  WARNING: Supabase Storage not configured - chunks will be stored locally');
