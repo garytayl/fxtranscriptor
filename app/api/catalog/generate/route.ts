@@ -148,13 +148,15 @@ export async function POST(request: NextRequest) {
       // Ensure worker URL doesn't have trailing slash
       const cleanWorkerUrl = workerUrl.replace(/\/$/, '');
       
-      // Trigger worker with timeout to catch connection errors
+      // Trigger worker - use shorter timeout just to verify connection, then fire-and-forget
       console.log(`[Generate] Calling worker: ${cleanWorkerUrl}/transcribe`);
       console.log(`[Generate] Payload: { sermonId: ${sermonId}, audioUrl: ${audioSource.substring(0, 80)}... }`);
       
-      const workerTimeout = 30000; // 30 second timeout for initial connection
+      // Short timeout just to verify worker is reachable (10 seconds)
+      // After that, we fire-and-forget - worker will process asynchronously
+      const connectionTimeout = 10000; // 10 seconds to verify connection
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), workerTimeout);
+      const timeoutId = setTimeout(() => controller.abort(), connectionTimeout);
       
       try {
         const workerResponse = await fetch(`${cleanWorkerUrl}/transcribe`, {
@@ -175,12 +177,13 @@ export async function POST(request: NextRequest) {
           throw new Error(`Worker error: ${workerResponse.status} ${errorText}`);
         }
         
-        console.log(`[Generate] ✅ Worker request sent successfully (status: ${workerResponse.status})`);
+        console.log(`[Generate] ✅ Worker accepted request (status: ${workerResponse.status}) - processing will continue in background`);
         
         // Return immediately - worker will update database asynchronously
+        // Don't wait for transcription to complete - it can take many minutes
         return NextResponse.json({
           success: true,
-          message: "Transcription queued. Check back in a few minutes.",
+          message: "Transcription started. This may take several minutes. The page will auto-refresh to show progress.",
           sermon: {
             ...sermon,
             status: "generating",
@@ -190,14 +193,44 @@ export async function POST(request: NextRequest) {
         clearTimeout(timeoutId);
         console.error(`[Generate] ❌ Error triggering worker:`, error);
         
-        // Update status to failed if worker trigger fails
+        // Only fail if it's a connection error, not a timeout
         const errorMessage = error instanceof Error 
           ? error.message 
           : "Unknown error";
         
-        const isTimeout = errorMessage.includes("aborted") || errorMessage.includes("timeout") || errorMessage.includes("ECONNREFUSED");
-        const finalErrorMessage = isTimeout
-          ? `Worker service timeout or unreachable (${workerTimeout/1000}s). The worker may be down. Please check Railway logs at ${cleanWorkerUrl}.`
+        const isConnectionError = errorMessage.includes("ECONNREFUSED") || 
+                                  errorMessage.includes("ENOTFOUND") ||
+                                  errorMessage.includes("NetworkError");
+        
+        // If it's just a timeout but worker might be processing, don't mark as failed
+        // The worker might have accepted the request before the timeout
+        if (errorMessage.includes("aborted") && !isConnectionError) {
+          console.log(`[Generate] ⚠️  Connection timeout, but worker may have accepted request - checking status...`);
+          
+          // Check if worker actually started processing by checking sermon status
+          // Give it a moment, then check
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const { data: updatedSermon } = await supabase
+            .from("sermons")
+            .select("status, progress_json")
+            .eq("id", sermonId)
+            .single();
+          
+          // If status is generating or has progress, worker is working
+          if (updatedSermon && (updatedSermon.status === "generating" || updatedSermon.progress_json)) {
+            console.log(`[Generate] ✅ Worker is processing (status: ${updatedSermon.status}) - timeout was false alarm`);
+            return NextResponse.json({
+              success: true,
+              message: "Transcription started. This may take several minutes. The page will auto-refresh to show progress.",
+              sermon: updatedSermon,
+            });
+          }
+        }
+        
+        // Real connection error - mark as failed
+        const finalErrorMessage = isConnectionError
+          ? `Worker service unreachable. Please check that ${cleanWorkerUrl} is running. Check Railway logs.`
           : `Failed to trigger worker: ${errorMessage}. Check that ${cleanWorkerUrl} is accessible.`;
         
         if (supabase) {
