@@ -326,7 +326,11 @@ export default function Home() {
   };
 
   const handleViewSermon = (sermon: Sermon) => {
-    router.push(`/sermons/${sermon.id}`);
+    // Set the selected sermon to open the dialog
+    console.log('[View Sermon] Setting selected sermon:', sermon.id, 'youtube_url:', sermon.youtube_url ? 'YES' : 'NO');
+    setSelectedSermon(sermon);
+    // Update URL for sharing/bookmarking (optional - doesn't affect dialog)
+    window.history.pushState({}, '', `/sermons/${sermon.id}`);
   };
 
   const handleSetAudioUrl = (sermon: Sermon) => {
@@ -571,6 +575,14 @@ export default function Home() {
           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-2xl">{selectedSermon?.title}</DialogTitle>
+              {/* Debug info - remove after fixing */}
+              {process.env.NODE_ENV === 'development' && selectedSermon && (
+                <div className="text-xs font-mono text-muted-foreground mt-2 p-2 bg-muted rounded">
+                  Debug: audio_url={selectedSermon.audio_url ? 'YES' : 'NO'}, 
+                  youtube_url={selectedSermon.youtube_url ? 'YES' : 'NO'}
+                  {selectedSermon.youtube_url && <span className="text-green-500"> ({selectedSermon.youtube_url.substring(0, 50)}...)</span>}
+                </div>
+              )}
               <DialogDescription className="flex items-center gap-4 flex-wrap">
                 {selectedSermon?.date && (
                   <span className="flex items-center gap-1.5 text-xs font-mono">
