@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
 import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +99,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     if (sermonId) {
       loadSermon(sermonId);
     }
-  }, [sermonId, loadSermon]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sermonId]);
 
   // Track page view
   useEffect(() => {
@@ -231,7 +234,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       setGenerating(false);
       setProgress(null);
     }
-  };
+  }, [sermon, generating]);
 
   const handleCopyAll = useCallback(async () => {
     if (!sermon?.transcript) return;
