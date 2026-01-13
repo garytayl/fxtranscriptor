@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "populate-john-series": "npx tsx scripts/populate-john-series.ts",
-    "merge-sources": "npx tsx scripts/merge-podbean-youtube.ts"
+    "merge-sources": "npx tsx scripts/merge-podbean-youtube.ts",
+    "extract-metadata": "npx tsx scripts/extract-metadata-from-existing.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
