@@ -437,16 +437,34 @@ app.post('/transcribe', async (req, res) => {
         .eq('id', sermonId)
         .single();
       
-      // Check if status changed from generating (cancelled)
-      if (sermon && sermon.status !== 'generating') {
-        console.log(`[Worker] Transcription cancelled (status: ${sermon.status})`);
+      if (!sermon) {
+        return false;
+      }
+      
+      // Only cancel if explicitly cancelled (status set to "pending" by cancel action)
+      // OR if progress_json.step is "cancelled"
+      // Do NOT cancel if status is "failed" - that's a different state (previous error, not cancellation)
+      if (sermon.status === 'pending' && sermon.progress_json?.step === 'cancelled') {
+        console.log(`[Worker] Transcription cancelled by user (status: pending, step: cancelled)`);
         return true;
       }
       
-      // Check if progress_json indicates cancellation
-      if (sermon?.progress_json?.step === 'cancelled') {
+      // Check if progress_json indicates explicit cancellation
+      if (sermon.progress_json?.step === 'cancelled') {
         console.log(`[Worker] Transcription cancelled (step: cancelled)`);
         return true;
+      }
+      
+      // If status is "failed", that's from a previous error, not a cancellation
+      // Continue with transcription (user might be retrying)
+      if (sermon.status === 'failed') {
+        console.log(`[Worker] Status is "failed" from previous attempt - continuing with new transcription`);
+        // Update status back to generating since we're retrying
+        await supabase
+          .from('sermons')
+          .update({ status: 'generating' })
+          .eq('id', sermonId);
+        return false;
       }
       
       return false;
