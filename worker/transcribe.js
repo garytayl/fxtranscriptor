@@ -117,7 +117,7 @@ async function downloadYouTubeAudioBuffer(youtubeUrl) {
  * Matches Vercel implementation exactly (uses fetch, not axios)
  * Now supports both direct audio URLs (Podbean) and YouTube URLs
  */
-async function transcribeAudio(audioUrl, retries = 3) {
+async function transcribeAudio(audioUrl, retries = 5) {
   if (!HUGGINGFACE_API_KEY) {
     throw new Error('HUGGINGFACE_API_KEY not configured');
   }
@@ -186,10 +186,10 @@ async function transcribeAudio(audioUrl, retries = 3) {
         // Read response text (can only read once)
         const responseText = await response.text();
 
-        // Handle 503 (model loading) - retry
+        // Handle 503 (model loading) - retry with longer delay
         if (response.status === 503) {
-          console.log(`[Transcribe] Model is loading (503), will retry...`);
-          await new Promise(resolve => setTimeout(resolve, 5000 * attempt)); // Wait longer for model loading
+          console.log(`[Transcribe] Model is loading (503), will retry in ${10 * attempt} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 10000 * attempt)); // Wait longer for model loading
           continue;
         }
 
@@ -237,10 +237,11 @@ async function transcribeAudio(audioUrl, retries = 3) {
           continue;
         }
 
-        // Handle 502/504 (server error) - retry
+        // Handle 502/504 (server error) - retry with exponential backoff
         if (response.status === 502 || response.status === 504) {
-          console.log(`[Transcribe] ${response.status} Server Error, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+          const delaySeconds = Math.min(30, 5 * Math.pow(2, attempt - 1)); // Exponential backoff: 5s, 10s, 20s (max 30s)
+          console.log(`[Transcribe] ${response.status} Server Error (timeout/overload), retrying in ${delaySeconds} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
           continue;
         }
 

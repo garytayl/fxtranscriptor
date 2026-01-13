@@ -467,7 +467,7 @@ app.post('/transcribe', async (req, res) => {
 
       console.log(`[Worker] ✅ Chunked into ${chunks.length} chunks, starting transcription...`);
 
-      // Transcribe each chunk
+      // Transcribe each chunk with delays to avoid overwhelming Hugging Face
       const transcripts = [];
       for (let i = 0; i < chunks.length; i++) {
         await supabase
@@ -483,6 +483,15 @@ app.post('/transcribe', async (req, res) => {
           .eq('id', sermonId);
 
         console.log(`[Worker] Transcribing chunk ${i + 1}/${chunks.length}...`);
+        
+        // Add delay between chunks to avoid rate limiting (except for first chunk)
+        // Hugging Face free tier can be slow, so we add delays to avoid overwhelming it
+        if (i > 0) {
+          const delaySeconds = 5; // 5 second delay between chunks
+          console.log(`[Worker] Waiting ${delaySeconds} seconds before next chunk to avoid rate limits...`);
+          await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+        }
+        
         const chunkTranscript = await transcribeAudio(chunks[i]);
         transcripts.push(chunkTranscript);
       }
