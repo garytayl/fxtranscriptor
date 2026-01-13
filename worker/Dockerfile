@@ -16,6 +16,7 @@ RUN npm install --production
 # Copy source files
 COPY . .
 
-EXPOSE 3000
+# Railway will set PORT env var, default to 8080
+EXPOSE 8080
 
 CMD ["npm", "start"]

@@ -26,7 +26,7 @@ const execAsync = promisify(exec);
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'sermon-chunks';
@@ -808,11 +808,26 @@ app.post('/transcribe', async (req, res) => {
 /**
  * Health check endpoint
  */
+// Health check endpoints for Railway/container orchestration
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'audio-chunking-worker' });
+  res.json({ 
+    status: 'ok', 
+    service: 'audio-chunking-worker',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 });
 
-app.listen(PORT, () => {
+// Root endpoint for basic health checks
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    service: 'audio-chunking-worker',
+    endpoints: ['/health', '/chunk', '/transcribe'],
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`[Worker] Audio chunking worker service listening on port ${PORT}`);
   console.log(`[Worker] Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!supabase) {
