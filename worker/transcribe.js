@@ -5,6 +5,12 @@
  */
 
 const axios = require('axios'); // Still used for downloading audio
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
+const fs = require('fs').promises;
+const path = require('path');
+const os = require('os');
 
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
@@ -28,61 +34,82 @@ function extractYouTubeVideoId(url) {
 }
 
 /**
- * Download audio from YouTube using ytdl-core
+ * Extract video ID from YouTube URL
+ */
+function extractYouTubeVideoId(url) {
+  if (!url) return null;
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch) return watchMatch[1];
+  return null;
+}
+
+/**
+ * Download audio from YouTube using yt-dlp (more reliable, handles bot detection better)
  */
 async function downloadYouTubeAudioBuffer(youtubeUrl) {
-  const ytdl = require('@distube/ytdl-core');
   const videoId = extractYouTubeVideoId(youtubeUrl);
   if (!videoId) {
     throw new Error(`Invalid YouTube URL: ${youtubeUrl}`);
   }
 
-  console.log(`[Transcribe] Extracting audio from YouTube video: ${videoId}`);
-  
-  const isValid = await ytdl.validateURL(youtubeUrl);
-  if (!isValid) {
-    throw new Error(`Invalid YouTube URL or video not available: ${youtubeUrl}`);
+  console.log(`[Transcribe] Extracting audio from YouTube video: ${videoId} using yt-dlp`);
+
+  // Create temp directory for download
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ytdlp-'));
+  const tempFile = path.join(tempDir, `audio_${videoId}.m4a`);
+
+  try {
+    // Use yt-dlp to download audio (handles bot detection much better)
+    // -x: extract audio only
+    // --audio-format m4a: output as m4a
+    // --audio-quality 0: best quality
+    // -o: output file
+    const command = `yt-dlp -x --audio-format m4a --audio-quality 0 -o "${tempFile}" "${youtubeUrl}"`;
+    
+    console.log(`[Transcribe] Running: yt-dlp for video ${videoId}`);
+    const { stdout, stderr } = await execAsync(command, {
+      timeout: 600000, // 10 minutes timeout
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    });
+
+    if (stderr && !stderr.includes('[download]')) {
+      console.warn(`[Transcribe] yt-dlp warnings: ${stderr}`);
+    }
+
+    // Read the downloaded file into a buffer
+    const audioBuffer = await fs.readFile(tempFile);
+    const audioSizeMB = audioBuffer.length / 1024 / 1024;
+    console.log(`[Transcribe] ✅ YouTube audio extracted: ${audioSizeMB.toFixed(2)} MB`);
+
+    // Cleanup temp file
+    try {
+      await fs.unlink(tempFile);
+      await fs.rmdir(tempDir);
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+
+    return audioBuffer;
+  } catch (error) {
+    // Cleanup on error
+    try {
+      await fs.unlink(tempFile).catch(() => {});
+      await fs.rmdir(tempDir).catch(() => {});
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+
+    console.error(`[Transcribe] yt-dlp error:`, error);
+    let errorMessage = `Failed to download YouTube audio: ${error.message}`;
+    
+    if (error.message.includes('Sign in to confirm') || error.message.includes('bot')) {
+      errorMessage = `YouTube bot detection: ${error.message}. yt-dlp should handle this better, but YouTube may be blocking automated access.`;
+    }
+    
+    throw new Error(errorMessage);
   }
-
-  // Get video info
-  const info = await ytdl.getInfo(youtubeUrl);
-  console.log(`[Transcribe] YouTube video: ${info.videoDetails.title.substring(0, 60)}...`);
-
-  // Get audio stream and convert to buffer
-  // Add request options for better reliability
-  const stream = ytdl(youtubeUrl, {
-    quality: 'highestaudio',
-    filter: 'audioonly',
-    requestOptions: {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    },
-  });
-
-  const chunks = [];
-  return new Promise((resolve, reject) => {
-    stream.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-    stream.on('end', () => {
-      const audioBuffer = Buffer.concat(chunks);
-      const audioSizeMB = audioBuffer.length / 1024 / 1024;
-      console.log(`[Transcribe] YouTube audio extracted: ${audioSizeMB.toFixed(2)} MB`);
-      resolve(audioBuffer);
-    });
-    stream.on('error', (error) => {
-      console.error(`[Transcribe] YouTube download error:`, error);
-      let errorMessage = `Failed to download YouTube audio: ${error.message}`;
-      
-      // Provide helpful error message for signature extraction errors
-      if (error.message.includes('Could not extract functions') || error.message.includes('sig.js')) {
-        errorMessage = `YouTube signature extraction failed. This usually means YouTube has updated their API. The ytdl-core library may need an update. Error: ${error.message}`;
-      }
-      
-      reject(new Error(errorMessage));
-    });
-  });
 }
 
 /**

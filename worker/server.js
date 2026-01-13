@@ -19,7 +19,9 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
-const ytdl = require('@distube/ytdl-core');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 const app = express();
 app.use(express.json());
@@ -71,7 +73,7 @@ function extractYouTubeVideoId(url) {
 }
 
 /**
- * Download audio from YouTube using ytdl-core
+ * Download audio from YouTube using yt-dlp (more reliable, handles bot detection better)
  */
 async function downloadYouTubeAudio(youtubeUrl, tempDir) {
   const videoId = extractYouTubeVideoId(youtubeUrl);
@@ -79,59 +81,46 @@ async function downloadYouTubeAudio(youtubeUrl, tempDir) {
     throw new Error(`Invalid YouTube URL: ${youtubeUrl}`);
   }
 
-  console.log(`[Worker] Extracting audio from YouTube video: ${videoId}`);
+  console.log(`[Worker] Extracting audio from YouTube video: ${videoId} using yt-dlp`);
   
-  // Validate URL first
-  const isValid = await ytdl.validateURL(youtubeUrl);
-  if (!isValid) {
-    throw new Error(`Invalid YouTube URL or video not available: ${youtubeUrl}`);
-  }
-
   const tempFile = path.join(tempDir, `youtube_${videoId}_${uuidv4()}.m4a`);
-  const writer = require('fs').createWriteStream(tempFile);
 
-  return new Promise((resolve, reject) => {
-    // Get audio stream (best quality audio only)
-    // Add request options for better reliability
-    const stream = ytdl(youtubeUrl, {
-      quality: 'highestaudio',
-      filter: 'audioonly',
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-      },
+  try {
+    // Use yt-dlp to download audio (handles bot detection much better)
+    // -x: extract audio only
+    // --audio-format m4a: output as m4a
+    // --audio-quality 0: best quality
+    // -o: output file
+    const command = `yt-dlp -x --audio-format m4a --audio-quality 0 -o "${tempFile}" "${youtubeUrl}"`;
+    
+    console.log(`[Worker] Running: yt-dlp for video ${videoId}`);
+    const { stdout, stderr } = await execAsync(command, {
+      timeout: 600000, // 10 minutes timeout
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
     });
 
-    stream.on('info', (info) => {
-      console.log(`[Worker] YouTube video info: ${info.videoDetails.title.substring(0, 60)}...`);
-      console.log(`[Worker] Duration: ${info.videoDetails.lengthSeconds}s`);
-    });
+    if (stderr && !stderr.includes('[download]')) {
+      console.warn(`[Worker] yt-dlp warnings: ${stderr}`);
+    }
 
-    stream.on('error', (error) => {
-      console.error(`[Worker] YouTube download error:`, error);
-      let errorMessage = `Failed to download YouTube audio: ${error.message}`;
-      
-      // Provide helpful error message for signature extraction errors
-      if (error.message.includes('Could not extract functions') || error.message.includes('sig.js')) {
-        errorMessage = `YouTube signature extraction failed. This usually means YouTube has updated their API. The ytdl-core library may need an update. Error: ${error.message}`;
-      }
-      
-      reject(new Error(errorMessage));
-    });
-
-    stream.pipe(writer);
-
-    writer.on('finish', () => {
-      console.log(`[Worker] YouTube audio extracted: ${tempFile}`);
-      resolve(tempFile);
-    });
-
-    writer.on('error', (error) => {
-      console.error(`[Worker] File write error:`, error);
-      reject(new Error(`Failed to save YouTube audio: ${error.message}`));
-    });
-  });
+    // Check if file was created
+    try {
+      await fs.access(tempFile);
+      console.log(`[Worker] ✅ YouTube audio extracted: ${tempFile}`);
+      return tempFile;
+    } catch (error) {
+      throw new Error(`Audio file was not created: ${tempFile}`);
+    }
+  } catch (error) {
+    console.error(`[Worker] yt-dlp error:`, error);
+    let errorMessage = `Failed to download YouTube audio: ${error.message}`;
+    
+    if (error.message.includes('Sign in to confirm') || error.message.includes('bot')) {
+      errorMessage = `YouTube bot detection: ${error.message}. yt-dlp should handle this better, but YouTube may be blocking automated access.`;
+    }
+    
+    throw new Error(errorMessage);
+  }
 }
 
 /**

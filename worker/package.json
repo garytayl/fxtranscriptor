@@ -13,8 +13,7 @@
     "@supabase/supabase-js": "^2.38.4",
     "axios": "^1.6.2",
     "uuid": "^9.0.1",
-    "form-data": "^4.0.0",
-    "@distube/ytdl-core": "^4.14.4"
+    "form-data": "^4.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
