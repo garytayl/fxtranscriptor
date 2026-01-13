@@ -183,11 +183,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          message: queueData.queueItem?.position === 1 
+          message: queueResult.queueItem?.position === 1 
             ? "Transcription started. This may take several minutes."
-            : `Added to queue (position ${queueData.queueItem?.position || 'unknown'}). The page will auto-refresh to show progress.`,
+            : `Added to queue (position ${queueResult.queueItem?.position || 'unknown'}). The page will auto-refresh to show progress.`,
           sermon: updatedSermon || sermon,
-          queueItem: queueData.queueItem,
+          queueItem: queueResult.queueItem,
         });
       } catch (error) {
         console.error(`[Generate] ❌ Error adding to queue:`, error);
