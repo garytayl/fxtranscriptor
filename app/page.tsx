@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import { SermonCard } from "@/components/sermon-card";
 import { SermonSkeleton } from "@/components/sermon-skeleton";
 import { Sermon } from "@/lib/supabase";
+import { SermonMetadata } from "@/components/sermon-metadata";
 
 // Lazy load heavy components
 const BatchOperations = dynamic(() => import("@/components/batch-operations").then(mod => ({ default: mod.BatchOperations })), {
@@ -1001,14 +1002,21 @@ export default function Home() {
                   {selectedSermon.youtube_url && <span className="text-green-500"> ({selectedSermon.youtube_url.substring(0, 50)}...)</span>}
                 </div>
               )}
-              <DialogDescription className="flex items-center gap-4 flex-wrap">
-                {selectedSermon?.date && (
-                  <span className="flex items-center gap-1.5 text-xs font-mono">
-                    <Calendar className="size-3" />
-                    {format(new Date(selectedSermon.date), "MMMM d, yyyy")}
-                  </span>
+              <DialogDescription className="flex flex-col gap-3">
+                <div className="flex items-center gap-4 flex-wrap">
+                  {selectedSermon?.date && (
+                    <span className="flex items-center gap-1.5 text-xs font-mono">
+                      <Calendar className="size-3" />
+                      {format(new Date(selectedSermon.date), "MMMM d, yyyy")}
+                    </span>
+                  )}
+                  {selectedSermon?.transcript_source && getSourceBadge(selectedSermon.transcript_source)}
+                </div>
+                {/* Series and Speaker Metadata */}
+                {selectedSermon && (
+                  <SermonMetadata series={selectedSermon.series} speaker={selectedSermon.speaker} />
                 )}
-                {selectedSermon?.transcript_source && getSourceBadge(selectedSermon.transcript_source)}
+              </DialogDescription>
                 {selectedSermon?.podbean_url && selectedSermon.podbean_url.trim() && (
                   <a
                     href={selectedSermon.podbean_url}

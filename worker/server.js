@@ -798,6 +798,36 @@ app.post('/transcribe', async (req, res) => {
       }
     }
 
+    // Extract metadata from transcript (series, speaker, summary)
+    function extractMetadata(text) {
+      if (!text || typeof text !== 'string') {
+        return { series: null, speaker: null, summary: null };
+      }
+
+      const metadata = { series: null, speaker: null, summary: null };
+
+      // Pattern to match [SERIES], [SPEAKER], [SUMMARY] tags
+      const seriesMatch = text.match(/\[SERIES\]\s*([^\[]+?)(?=\s*\[(?:SPEAKER|SUMMARY)\]|$)/i);
+      const speakerMatch = text.match(/\[SPEAKER\]\s*([^\[]+?)(?=\s*\[(?:SERIES|SUMMARY)\]|$)/i);
+      const summaryMatch = text.match(/\[SUMMARY\]\s*([^\[]+?)(?=\s*\[(?:SERIES|SPEAKER)\]|$)/i);
+
+      if (seriesMatch) {
+        metadata.series = seriesMatch[1].trim();
+      }
+
+      if (speakerMatch) {
+        metadata.speaker = speakerMatch[1].trim();
+      }
+
+      if (summaryMatch) {
+        metadata.summary = summaryMatch[1].trim();
+      }
+
+      return metadata;
+    }
+
+    const metadata = extractMetadata(transcript);
+
     // Final step before saving
     await supabase
       .from('sermons')
@@ -806,11 +836,13 @@ app.post('/transcribe', async (req, res) => {
       })
       .eq('id', sermonId);
 
-    // Update database with transcript
+    // Update database with transcript and metadata
     await supabase
       .from('sermons')
       .update({
         transcript: transcript,
+        series: metadata.series,
+        speaker: metadata.speaker,
         status: 'completed',
         progress_json: null,
       })

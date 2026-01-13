@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { transcribeWithWhisper } from "@/lib/transcribeWithWhisper";
 import { transcribeChunks } from "@/lib/transcribeChunks";
+import { extractMetadata } from "@/lib/extractMetadata";
 
 export const runtime = "nodejs";
 
@@ -556,12 +557,17 @@ export async function POST(request: NextRequest) {
 
     // Update sermon with transcript or error
     if (transcriptResult?.success && transcriptResult.transcript.trim().length > 100) {
+      // Extract metadata from transcript (series, speaker, summary)
+      const metadata = extractMetadata(transcriptResult.transcript);
+      
       const { data: updatedSermon, error: updateError } = await supabase
         .from("sermons")
         .update({
           transcript: transcriptResult.transcript.trim(),
           transcript_source: transcriptSource as any,
           transcript_generated_at: new Date().toISOString(),
+          series: metadata.series,
+          speaker: metadata.speaker,
           status: "completed",
           error_message: null,
           progress_json: null, // Clear progress on completion

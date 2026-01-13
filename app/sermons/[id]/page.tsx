@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { Sermon } from "@/lib/supabase";
 import { analytics, errorTracker } from "@/lib/analytics";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
+import { SermonMetadata } from "@/components/sermon-metadata";
 
 interface TranscriptionProgress {
   step: string;
@@ -440,6 +441,11 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 {format(new Date(sermon.date), "MMMM d, yyyy")}
               </span>
             )}
+          </div>
+
+          {/* Series and Speaker Metadata */}
+          <div className="mb-6">
+            <SermonMetadata series={sermon.series} speaker={sermon.speaker} />
           </div>
 
           {/* Links */}

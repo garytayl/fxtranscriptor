@@ -37,6 +37,8 @@ export interface Sermon {
   transcript: string | null;
   transcript_source: 'youtube' | 'podbean' | 'apple' | 'generated' | null;
   transcript_generated_at: string | null;
+  series: string | null;
+  speaker: string | null;
   status: 'pending' | 'generating' | 'completed' | 'failed';
   error_message: string | null;
   progress_json: { 

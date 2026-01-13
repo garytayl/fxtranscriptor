@@ -128,8 +128,14 @@ export function groupSermonsBySeries(
   }
 
   for (const sermon of sermons) {
-    // ONLY use playlist-based series name - no title extraction
-    const seriesName = playlistSeriesMap?.get(sermon.id);
+    // Priority order for series name:
+    // 1. Playlist-based series name (highest priority)
+    // 2. Extracted series metadata from transcript (second priority)
+    // 3. Ungrouped if neither exists
+    const playlistSeriesName = playlistSeriesMap?.get(sermon.id);
+    const extractedSeriesName = sermon.series; // From transcript metadata
+    
+    const seriesName = playlistSeriesName || extractedSeriesName;
 
     if (seriesName) {
       const seriesId = generateSeriesId(seriesName);
@@ -163,7 +169,7 @@ export function groupSermonsBySeries(
         }
       }
     } else {
-      // All non-playlist sermons go to ungrouped
+      // All non-playlist and non-extracted sermons go to ungrouped
       ungrouped.push(sermon);
     }
   }
