@@ -27,10 +27,10 @@ const app = express();
 
 // Register health check endpoints FIRST (before ANY middleware)
 // Railway checks /health immediately on startup - must respond quickly
+// Always return 200 OK - Railway will stop container if it gets non-200
 app.get('/health', (req, res) => {
-  console.log('[Worker] ✅ Health check hit - responding with 200 OK');
-  // Railway expects 200 status with a simple response
-  // Some platforms prefer JSON, some prefer plain text - provide both options
+  console.log(`[Worker] ✅ Health check hit - responding immediately with 200 OK`);
+  // Always return 200 - Railway stops container on non-200 responses
   res.status(200).json({ 
     status: 'healthy',
     service: 'audio-chunking-worker',
@@ -834,19 +834,23 @@ app.post('/transcribe', async (req, res) => {
 // Health check endpoints are registered at the top of the file (before other routes)
 
 // Start server immediately - health check is already registered
-// Railway v2 may require IPv6 binding (::) instead of 0.0.0.0
-const server = app.listen(PORT, '::', () => {
-  console.log(`[Worker] ✅ Server listening on [::]:${PORT} (IPv6 - Railway v2 compatible)`);
-  console.log(`[Worker] ✅ Health check: http://[::]:${PORT}/health`);
+// Try both IPv6 (::) and IPv4 (0.0.0.0) to ensure Railway can reach it
+const server = app.listen(PORT, () => {
+  // Don't specify host - let Node.js bind to all interfaces (both IPv4 and IPv6)
+  console.log(`[Worker] ✅ Server listening on port ${PORT} (all interfaces)`);
+  console.log(`[Worker] ✅ Health check: http://localhost:${PORT}/health`);
   console.log(`[Worker] Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!supabase) {
     console.warn('[Worker] ⚠️  WARNING: Supabase Storage not configured - chunks will be stored locally');
   } else {
     console.log(`[Worker] ✅ Supabase Storage: ${STORAGE_BUCKET}`);
   }
+  console.log(`[Worker] ✅ Server ready - health checks will return 200 OK`);
+  console.log(`[Worker] ✅ This is a long-running service - Railway should keep it running`);
 });
 
-// Graceful shutdown handling
+// Keep process alive - prevent Railway from thinking the service "completed"
+// This is a long-running service, not a one-off job
 process.on('SIGTERM', () => {
   console.log('[Worker] SIGTERM received, shutting down gracefully...');
   server.close(() => {
@@ -862,3 +866,19 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
+
+// Prevent process from exiting unexpectedly
+process.on('uncaughtException', (error) => {
+  console.error('[Worker] Uncaught exception:', error);
+  // Don't exit - keep the server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Worker] Unhandled rejection at:', promise, 'reason:', reason);
+  // Don't exit - keep the server running
+});
+
+// Keep-alive: Log every 30 seconds to show the service is running
+setInterval(() => {
+  console.log(`[Worker] 💓 Keep-alive: Service running (uptime: ${Math.floor(process.uptime())}s)`);
+}, 30000);
