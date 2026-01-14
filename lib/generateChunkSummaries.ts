@@ -15,27 +15,61 @@ export interface ChunkSummaryResult {
   verses: VerseReference[];
 }
 
+export interface SermonMetadata {
+  speaker?: string | null;
+  title?: string | null;
+  series?: string | null;
+}
+
 /**
  * Generate summary and extract verses from a chunk using OpenAI
  */
 export async function generateChunkSummary(
   chunkText: string,
   apiKey?: string,
-  previousSummaries?: string[] // Array of previous chunk summaries for context
+  previousSummaries?: string[], // Array of previous chunk summaries for context
+  sermonMetadata?: SermonMetadata // Speaker, title, series information
 ): Promise<ChunkSummaryResult> {
   if (!apiKey || apiKey.trim().length === 0) {
     throw new Error("OpenAI API key not configured. Add OPENAI_API_KEY to Vercel environment variables.");
   }
 
-  const contextSection = previousSummaries && previousSummaries.length > 0
-    ? `\n\nPrevious chunks context (for reference):\n${previousSummaries.slice(-2).join("\n\n")}\n`
+  // Build sermon context (speaker, title, series)
+  const sermonContextParts: string[] = [];
+  if (sermonMetadata?.speaker) {
+    sermonContextParts.push(`Speaker: ${sermonMetadata.speaker}`);
+  }
+  if (sermonMetadata?.title) {
+    sermonContextParts.push(`Title: ${sermonMetadata.title}`);
+  }
+  if (sermonMetadata?.series) {
+    sermonContextParts.push(`Series: ${sermonMetadata.series}`);
+  }
+  const sermonContext = sermonContextParts.length > 0
+    ? `\n\nSermon Context:\n${sermonContextParts.join("\n")}\n`
     : "";
 
-  const prompt = `You are analyzing a sermon transcript chunk. Please:
+  // Include more previous summaries for better continuity (last 4 instead of 2)
+  const previousContext = previousSummaries && previousSummaries.length > 0
+    ? `\n\nPrevious Chunks (for narrative continuity - build on these naturally):\n${previousSummaries.slice(-4).map((s, i) => `Chunk ${previousSummaries.length - 4 + i + 1}: ${s}`).join("\n\n")}\n`
+    : "";
 
-1. Generate a concise 2-3 sentence summary of the main points discussed in this chunk, building on the context from previous chunks if provided.
-2. Extract all Bible verse references mentioned (e.g., "John 3:16", "Romans 8:28-30", "Psalm 23:1-3").
-3. Return your response as a JSON object with this exact structure:
+  // Build speaker usage examples for the prompt
+  const speakerExample = sermonMetadata?.speaker 
+    ? `Use the speaker's name directly (e.g., "${sermonMetadata.speaker} explains..." or "${sermonMetadata.speaker} continues..." or "${sermonMetadata.speaker.split(' ')[0]} emphasizes...")`
+    : "Refer to the speaker naturally (e.g., 'he explains...' or 'the speaker continues...')";
+
+  const prompt = `You are creating a summary for one chunk of a sermon transcript. Your goal is to create summaries that flow together as a unified narrative - like a painting, not a collage.
+
+Key Requirements:
+1. Write naturally flowing 2-3 sentences that connect to previous chunks when available
+2. ${speakerExample} instead of generic phrases like "the sermon discusses" or "the speaker emphasizes"
+3. Avoid repetitive introductory phrases like "In this sermon" or "The sermon discusses" - vary your language naturally
+4. Build on previous chunks: use transitions, continue thoughts, reference earlier points when relevant
+5. Each chunk should feel like the next paragraph in a story, not an isolated summary
+6. Extract all Bible verse references mentioned (e.g., "John 3:16", "Romans 8:28-30", "Psalm 23:1-3")
+
+Return your response as a JSON object with this exact structure:
 {
   "summary": "Your summary text here",
   "verses": [
@@ -56,14 +90,14 @@ export async function generateChunkSummary(
   ]
 }
 
-Important:
+Technical Requirements:
 - For single verses, set "verse_end" to null
 - For verse ranges, set both "verse_start" and "verse_end"
 - Use the full book name (e.g., "John", not "Jn")
 - If no verses are mentioned, return an empty array for "verses"
 - Only return valid JSON, no other text
-${contextSection}
-Transcript chunk:
+${sermonContext}${previousContext}
+Current Chunk Transcript:
 ${chunkText.substring(0, 4000)}${chunkText.length > 4000 ? "..." : ""}`;
 
   try {
@@ -78,7 +112,7 @@ ${chunkText.substring(0, 4000)}${chunkText.length > 4000 ? "..." : ""}`;
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that analyzes sermon transcripts and extracts Bible verse references. Always return valid JSON.",
+            content: "You are a skilled writer creating coherent, flowing summaries of sermon chunks that build on each other naturally. You write summaries that read like a unified narrative, using the speaker's name directly and avoiding repetitive phrases. Always return valid JSON.",
           },
           {
             role: "user",

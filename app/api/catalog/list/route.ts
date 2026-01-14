@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("sermons")
-      .select("*")
+      .select("id, title, date, description, podbean_url, youtube_url, youtube_video_id, audio_url, transcript_source, transcript_generated_at, series, speaker, status, error_message, progress_json, created_at, updated_at")
       .order("date", { ascending: false, nullsFirst: false });
     
     // Only apply range if limit is explicitly provided

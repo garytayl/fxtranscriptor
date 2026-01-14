@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { generateChunkSummary } from "@/lib/generateChunkSummaries";
+import type { SermonMetadata } from "@/lib/generateChunkSummaries";
 
 export const runtime = "nodejs";
 
@@ -116,6 +117,13 @@ export async function POST(
     const errors: string[] = [];
     const previousSummaries: string[] = []; // Track previous summaries for context
 
+    // Prepare sermon metadata for context
+    const sermonMetadata: SermonMetadata = {
+      speaker: sermon.speaker || null,
+      title: sermon.title || null,
+      series: sermon.series || null,
+    };
+
     // Generate summaries for each chunk
     for (const [chunkIndexStr, chunkText] of chunkEntries) {
       const chunkIndex = Number(chunkIndexStr);
@@ -126,8 +134,8 @@ export async function POST(
           continue;
         }
 
-        // Generate summary and extract verses (include previous summaries for context)
-        const summaryResult = await generateChunkSummary(chunkText, apiKey, previousSummaries);
+        // Generate summary and extract verses (include previous summaries and sermon metadata for context)
+        const summaryResult = await generateChunkSummary(chunkText, apiKey, previousSummaries, sermonMetadata);
         
         // Add this summary to context for next chunks
         previousSummaries.push(summaryResult.summary);

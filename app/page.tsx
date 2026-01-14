@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
-import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save, ChevronDown, ChevronUp, Search, Filter, X } from "lucide-react";
+import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save, ChevronDown, ChevronUp, Search, Filter, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,8 @@ export default function Home() {
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [loadedTranscript, setLoadedTranscript] = useState<string | null>(null);
+  const [loadingTranscript, setLoadingTranscript] = useState(false);
 
   // Filter sermons based on search and status
   const filteredSermons = useMemo(() => {
@@ -64,8 +66,7 @@ export default function Home() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(sermon => 
         sermon.title.toLowerCase().includes(query) ||
-        sermon.description?.toLowerCase().includes(query) ||
-        sermon.transcript?.toLowerCase().includes(query)
+        sermon.description?.toLowerCase().includes(query)
       );
     }
     
@@ -137,6 +138,12 @@ export default function Home() {
     },
   ]);
 
+  // Reset loaded transcript when selected sermon changes
+  useEffect(() => {
+    setLoadedTranscript(null);
+    setLoadingTranscript(false);
+  }, [selectedSermon?.id]);
+
   // Refresh selected sermon when sermons state updates to ensure we have latest data
   useEffect(() => {
     if (selectedSermon) {
@@ -148,7 +155,6 @@ export default function Home() {
           latestSermon.youtube_url !== selectedSermon.youtube_url ||
           latestSermon.audio_url !== selectedSermon.audio_url ||
           latestSermon.status !== selectedSermon.status ||
-          latestSermon.transcript !== selectedSermon.transcript ||
           JSON.stringify(latestSermon.progress_json) !== JSON.stringify(selectedSermon.progress_json);
         
         if (hasNewData) {
@@ -649,8 +655,32 @@ export default function Home() {
     }
   }, [selectedSermon]);
 
-  const handleDownload = useCallback((sermon: Sermon) => {
-    if (!sermon.transcript) {
+  const handleLoadTranscript = useCallback(async (sermonId: string) => {
+    if (loadingTranscript) return;
+    
+    setLoadingTranscript(true);
+    try {
+      const response = await fetch(`/api/sermons/${sermonId}/transcript`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      setLoadedTranscript(data.transcript || null);
+    } catch (error) {
+      console.error("Error loading transcript:", error);
+      toast.error("Failed to Load Transcript", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 4000,
+      });
+      setLoadedTranscript(null);
+    } finally {
+      setLoadingTranscript(false);
+    }
+  }, [loadingTranscript]);
+
+  const handleDownload = useCallback((transcript: string, sermonTitle: string) => {
+    if (!transcript) {
       toast.error("No Transcript", {
         description: "This sermon doesn't have a transcript yet.",
         duration: 3000,
@@ -659,19 +689,21 @@ export default function Home() {
     }
 
     try {
-      const blob = new Blob([sermon.transcript], { type: "text/plain" });
+      const blob = new Blob([transcript], { type: "text/plain" });
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = `${sermon.title || "transcript"}.txt`.replace(/[^a-z0-9]/gi, "_");
+      a.download = `${sermonTitle || "transcript"}.txt`.replace(/[^a-z0-9]/gi, "_");
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
       
-      analytics.transcriptDownloaded(sermon.id);
+      if (selectedSermon) {
+        analytics.transcriptDownloaded(selectedSermon.id);
+      }
       toast.success("Download Started", {
-        description: `${sermon.transcript.length.toLocaleString()} characters`,
+        description: `${transcript.length.toLocaleString()} characters`,
         duration: 2000,
       });
     } catch (error) {
@@ -680,7 +712,7 @@ export default function Home() {
         duration: 4000,
       });
     }
-  }, []);
+  }, [selectedSermon]);
 
   const getStatusBadge = useCallback((sermon: Sermon) => {
     switch (sermon.status) {
@@ -989,6 +1021,8 @@ export default function Home() {
             setSelectedSermon(null);
             setShowAudioOverride(false);
             setAudioOverrideUrl("");
+            setLoadedTranscript(null);
+            setLoadingTranscript(false);
           }
         }}>
           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
@@ -1058,23 +1092,23 @@ export default function Home() {
               </DialogDescription>
             </DialogHeader>
 
-            {selectedSermon?.transcript ? (
+            {loadedTranscript ? (
               <>
                 <div className="flex-1 overflow-auto border rounded-lg p-4 bg-card">
                   <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground">
-                    {selectedSermon.transcript}
+                    {loadedTranscript}
                   </pre>
                 </div>
 
                 <DialogFooter className="flex-row justify-between items-center">
                   <div className="text-xs text-muted-foreground font-mono">
-                    {selectedSermon.transcript.length.toLocaleString()} characters
+                    {loadedTranscript.length.toLocaleString()} characters
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => selectedSermon.transcript && handleCopyAll(selectedSermon.transcript)}
+                      onClick={() => loadedTranscript && handleCopyAll(loadedTranscript)}
                     >
                       {copied ? (
                         <>
@@ -1091,13 +1125,37 @@ export default function Home() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => selectedSermon && handleDownload(selectedSermon)}
+                      onClick={() => selectedSermon && loadedTranscript && handleDownload(loadedTranscript, selectedSermon.title)}
                     >
                       <Download className="size-4" />
                       Download .txt
                     </Button>
                   </div>
                 </DialogFooter>
+              </>
+            ) : selectedSermon?.transcript_source || selectedSermon?.status === "completed" ? (
+              <>
+                {/* Show "Show Full Transcript" button if transcript exists but hasn't been loaded */}
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                  {loadingTranscript ? (
+                    <>
+                      <Loader2 className="size-8 animate-spin text-accent" />
+                      <p className="text-sm font-mono text-muted-foreground">Loading transcript...</p>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="size-12 text-muted-foreground/50" />
+                      <p className="text-sm font-mono text-muted-foreground">Transcript available</p>
+                      <Button
+                        className="font-mono text-xs uppercase tracking-widest"
+                        onClick={() => selectedSermon && handleLoadTranscript(selectedSermon.id)}
+                      >
+                        <FileText className="size-4 mr-2" />
+                        Show Full Transcript
+                      </Button>
+                    </>
+                  )}
+                </div>
               </>
             ) : selectedSermon?.progress_json?.completedChunks && Object.keys(selectedSermon.progress_json.completedChunks).length > 0 ? (
               <>
