@@ -15,6 +15,8 @@ import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonMetadata } from "@/components/sermon-metadata";
 import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/lib/extractMetadata";
 import { SermonSummaryCard } from "@/components/sermon-summary-card";
+import { UnifiedSermonSummary } from "@/components/unified-sermon-summary";
+import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
 interface TranscriptionProgress {
   step: string;
@@ -37,6 +39,9 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [expandedSummaryChunks, setExpandedSummaryChunks] = useState<Set<number>>(new Set());
   const [generatingSummaries, setGeneratingSummaries] = useState(false);
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
+  const [summaryView, setSummaryView] = useState<"chunks" | "unified">("chunks");
+  const [unifiedSummary, setUnifiedSummary] = useState<UnifiedSummarySection[] | null>(null);
+  const [generatingUnified, setGeneratingUnified] = useState(false);
 
   // Extract ID from params (Next.js 15+ always uses Promise)
   useEffect(() => {
@@ -222,6 +227,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         });
         setSummaries([]);
         setExpandedSummaryChunks(new Set());
+        setUnifiedSummary(null); // Clear unified summary too
       } else {
         toast.error("Clear Failed", {
           description: data.error || "Failed to clear summaries",
@@ -234,6 +240,44 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         description: error instanceof Error ? error.message : "Unknown error",
         duration: 6000,
       });
+    }
+  }, []);
+
+  const generateUnifiedSummary = useCallback(async (id: string) => {
+    setGeneratingUnified(true);
+    try {
+      const toastId = toast.loading("Generating unified summary...", {
+        description: "This may take a few moments.",
+      });
+      
+      const response = await fetch(`/api/sermons/${id}/summaries/unified`, {
+        method: "POST",
+      });
+      
+      const data = await response.json();
+      toast.dismiss(toastId);
+      
+      if (response.ok && data.success) {
+        toast.success("Unified Summary Generated", {
+          description: `Created ${data.sections.length} sections.`,
+          duration: 3000,
+        });
+        setUnifiedSummary(data.sections);
+        setSummaryView("unified");
+      } else {
+        toast.error("Generation Failed", {
+          description: data.error || "Failed to generate unified summary",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      console.error("Error generating unified summary:", error);
+      toast.error("Generation Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
+    } finally {
+      setGeneratingUnified(false);
     }
   }, []);
 
@@ -1104,6 +1148,40 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               <h2 className="font-mono text-sm uppercase tracking-widest">AI Summaries</h2>
               <div className="flex items-center gap-2">
                 {summaries.length > 0 && (
+                  <div className="flex items-center gap-2 border border-border/30 rounded-md p-1">
+                    <Button
+                      variant={summaryView === "chunks" ? "default" : "ghost"}
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest"
+                      onClick={() => setSummaryView("chunks")}
+                    >
+                      Chunk View
+                    </Button>
+                    <Button
+                      variant={summaryView === "unified" ? "default" : "ghost"}
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest"
+                      onClick={() => {
+                        if (!unifiedSummary && sermon.id) {
+                          generateUnifiedSummary(sermon.id);
+                        } else {
+                          setSummaryView("unified");
+                        }
+                      }}
+                      disabled={generatingUnified}
+                    >
+                      {generatingUnified ? (
+                        <>
+                          <Loader2 className="size-3 mr-1 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        "Unified Summary"
+                      )}
+                    </Button>
+                  </div>
+                )}
+                {summaries.length > 0 && (
                   <div className="relative" ref={optionsMenuRef}>
                     <Button
                       variant="ghost"
@@ -1171,6 +1249,11 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   Generate Summaries
                 </Button>
               </div>
+            ) : summaryView === "unified" ? (
+              <UnifiedSermonSummary
+                sections={unifiedSummary || []}
+                loading={generatingUnified}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {summaries.map((summary, index) => {
