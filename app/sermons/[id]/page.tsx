@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
@@ -478,6 +478,78 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return <Badge variant={config.variant}>{config.label}</Badge>;
   }, []);
 
+  // Aggregate and organize all verses from all chunks
+  const organizedVerses = useMemo(() => {
+    if (!summaries || summaries.length === 0) return { mainChapter: null, supportingVerses: [] };
+
+    // Collect all verses
+    const allVerses: SermonChunkVerse[] = [];
+    summaries.forEach((summary) => {
+      if (summary.verses && summary.verses.length > 0) {
+        allVerses.push(...summary.verses);
+      }
+    });
+
+    if (allVerses.length === 0) return { mainChapter: null, supportingVerses: [] };
+
+    // Group by book and chapter
+    const chapterMap = new Map<string, SermonChunkVerse[]>();
+    allVerses.forEach((verse) => {
+      const key = `${verse.book} ${verse.chapter}`;
+      if (!chapterMap.has(key)) {
+        chapterMap.set(key, []);
+      }
+      chapterMap.get(key)!.push(verse);
+    });
+
+    // Find main chapter (the one with the most verses)
+    let mainChapterKey: string | null = null;
+    let maxVerses = 0;
+    chapterMap.forEach((verses, key) => {
+      if (verses.length > maxVerses) {
+        maxVerses = verses.length;
+        mainChapterKey = key;
+      }
+    });
+
+    // Get main chapter verses
+    const mainChapter = mainChapterKey ? chapterMap.get(mainChapterKey) || [] : [];
+    
+    // Get supporting verses (all others)
+    const supportingVerses: SermonChunkVerse[] = [];
+    chapterMap.forEach((verses, key) => {
+      if (key !== mainChapterKey) {
+        supportingVerses.push(...verses);
+      }
+    });
+
+    // Sort verses within each group by verse_start
+    mainChapter.sort((a, b) => a.verse_start - b.verse_start);
+    supportingVerses.sort((a, b) => {
+      if (a.book !== b.book) return a.book.localeCompare(b.book);
+      if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+      return a.verse_start - b.verse_start;
+    });
+
+    // Remove duplicates (by full_reference)
+    const seen = new Set<string>();
+    const uniqueMainChapter = mainChapter.filter((v) => {
+      if (seen.has(v.full_reference)) return false;
+      seen.add(v.full_reference);
+      return true;
+    });
+    const uniqueSupporting = supportingVerses.filter((v) => {
+      if (seen.has(v.full_reference)) return false;
+      seen.add(v.full_reference);
+      return true;
+    });
+
+    return {
+      mainChapter: mainChapterKey ? { key: mainChapterKey, verses: uniqueMainChapter } : null,
+      supportingVerses: uniqueSupporting,
+    };
+  }, [summaries]);
+
   if (loading) {
     return (
       <main className="relative min-h-screen">
@@ -943,6 +1015,55 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             </Button>
           )}
         </div>
+
+        {/* All Scripture References Section */}
+        {summaries.length > 0 && (organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0) && (
+          <div className="mb-12 border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
+            <h2 className="font-mono text-sm uppercase tracking-widest mb-6">All Scripture References</h2>
+            
+            <div className="space-y-6">
+              {/* Main Chapter */}
+              {organizedVerses.mainChapter && (
+                <div>
+                  <h3 className="font-mono text-xs uppercase tracking-widest text-accent mb-3">
+                    Main Chapter: {organizedVerses.mainChapter.key}
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {organizedVerses.mainChapter.verses.map((verse) => (
+                      <Badge
+                        key={verse.id}
+                        variant="default"
+                        className="font-mono text-xs border-accent/50 bg-accent/10 hover:bg-accent/20 hover:border-accent/70 hover:shadow-[0_0_15px_rgba(255,165,0,0.3)] transition-all"
+                      >
+                        {verse.full_reference}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Supporting Verses */}
+              {organizedVerses.supportingVerses.length > 0 && (
+                <div>
+                  <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-3">
+                    Supporting Verses
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {organizedVerses.supportingVerses.map((verse) => (
+                      <Badge
+                        key={verse.id}
+                        variant="secondary"
+                        className="font-mono text-xs border-accent/30 hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
+                      >
+                        {verse.full_reference}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Chunk Summaries Display */}
         {(sermon.transcript || sermon.progress_json?.completedChunks) && (
