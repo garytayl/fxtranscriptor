@@ -16,6 +16,7 @@ import { SermonMetadata } from "@/components/sermon-metadata";
 import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/lib/extractMetadata";
 import { SermonSummaryCard } from "@/components/sermon-summary-card";
 import { UnifiedSermonSummary } from "@/components/unified-sermon-summary";
+import { SermonNarrativeView } from "@/components/sermon-narrative-view";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
 interface TranscriptionProgress {
@@ -1250,7 +1251,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 </Button>
               </div>
             ) : summaryView === "unified" ? (
-              <UnifiedSermonSummary
+              <SermonNarrativeView
                 sections={unifiedSummary || []}
                 loading={generatingUnified}
               />
