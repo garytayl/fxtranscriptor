@@ -150,6 +150,91 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     },
   ]);
 
+  const fetchSummaries = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/sermons/${id}/summaries`);
+      if (response.ok) {
+        const data = await response.json();
+        setSummaries(data.summaries || []);
+        if (data.summaries && data.summaries.length > 0) {
+          setCurrentChunkIndex(0);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching summaries:", error);
+    }
+  }, []);
+
+  const generateSummaries = useCallback(async (id: string) => {
+    setGeneratingSummaries(true);
+    try {
+      const toastId = toast.loading("Generating AI summaries...", {
+        description: "This may take a few moments.",
+      });
+      
+      const response = await fetch(`/api/sermons/${id}/summaries/generate`, {
+        method: "POST",
+      });
+      
+      const data = await response.json();
+      toast.dismiss(toastId);
+      
+      if (response.ok && data.success) {
+        toast.success("Summaries Generated", {
+          description: `Generated ${data.generated} summaries.`,
+          duration: 3000,
+        });
+        await fetchSummaries(id);
+      } else {
+        toast.error("Generation Failed", {
+          description: data.error || "Failed to generate summaries",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      console.error("Error generating summaries:", error);
+      toast.error("Generation Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
+    } finally {
+      setGeneratingSummaries(false);
+    }
+  }, [fetchSummaries]);
+
+  const clearSummaries = useCallback(async (id: string) => {
+    try {
+      const toastId = toast.loading("Clearing summaries...");
+      
+      const response = await fetch(`/api/sermons/${id}/summaries/clear`, {
+        method: "POST",
+      });
+      
+      const data = await response.json();
+      toast.dismiss(toastId);
+      
+      if (response.ok && data.success) {
+        toast.success("Summaries Cleared", {
+          description: `Deleted ${data.deleted} summaries.`,
+          duration: 3000,
+        });
+        setSummaries([]);
+        setCurrentChunkIndex(0);
+      } else {
+        toast.error("Clear Failed", {
+          description: data.error || "Failed to clear summaries",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      console.error("Error clearing summaries:", error);
+      toast.error("Clear Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
+    }
+  }, []);
+
   const loadSermon = useCallback(async (id: string) => {
     try {
       console.log("[SermonDetail] Loading sermon with ID:", id);
@@ -349,91 +434,6 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         duration: 6000,
       });
       throw error;
-    }
-  }, []);
-
-  const fetchSummaries = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/sermons/${id}/summaries`);
-      if (response.ok) {
-        const data = await response.json();
-        setSummaries(data.summaries || []);
-        if (data.summaries && data.summaries.length > 0) {
-          setCurrentChunkIndex(0);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching summaries:", error);
-    }
-  }, []);
-
-  const generateSummaries = useCallback(async (id: string) => {
-    setGeneratingSummaries(true);
-    try {
-      const toastId = toast.loading("Generating AI summaries...", {
-        description: "This may take a few moments.",
-      });
-      
-      const response = await fetch(`/api/sermons/${id}/summaries/generate`, {
-        method: "POST",
-      });
-      
-      const data = await response.json();
-      toast.dismiss(toastId);
-      
-      if (response.ok && data.success) {
-        toast.success("Summaries Generated", {
-          description: `Generated ${data.generated} summaries.`,
-          duration: 3000,
-        });
-        await fetchSummaries(id);
-      } else {
-        toast.error("Generation Failed", {
-          description: data.error || "Failed to generate summaries",
-          duration: 6000,
-        });
-      }
-    } catch (error) {
-      console.error("Error generating summaries:", error);
-      toast.error("Generation Error", {
-        description: error instanceof Error ? error.message : "Unknown error",
-        duration: 6000,
-      });
-    } finally {
-      setGeneratingSummaries(false);
-    }
-  }, [fetchSummaries]);
-
-  const clearSummaries = useCallback(async (id: string) => {
-    try {
-      const toastId = toast.loading("Clearing summaries...");
-      
-      const response = await fetch(`/api/sermons/${id}/summaries/clear`, {
-        method: "POST",
-      });
-      
-      const data = await response.json();
-      toast.dismiss(toastId);
-      
-      if (response.ok && data.success) {
-        toast.success("Summaries Cleared", {
-          description: `Deleted ${data.deleted} summaries.`,
-          duration: 3000,
-        });
-        setSummaries([]);
-        setCurrentChunkIndex(0);
-      } else {
-        toast.error("Clear Failed", {
-          description: data.error || "Failed to clear summaries",
-          duration: 6000,
-        });
-      }
-    } catch (error) {
-      console.error("Error clearing summaries:", error);
-      toast.error("Clear Error", {
-        description: error instanceof Error ? error.message : "Unknown error",
-        duration: 6000,
-      });
     }
   }, []);
 
