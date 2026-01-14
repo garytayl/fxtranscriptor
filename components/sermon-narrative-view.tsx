@@ -124,7 +124,7 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
       </div>
 
       {/* Verse Side Panel - Sticky on right */}
-      <div className="hidden lg:block relative flex-shrink-0 w-64">
+      <div className="hidden lg:block flex-shrink-0 w-64 self-start">
         <VerseSidePanel
           sections={sections}
           activeVerseIds={activeVerseIds}

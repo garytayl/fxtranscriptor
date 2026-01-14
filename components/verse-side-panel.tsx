@@ -93,6 +93,7 @@ export function VerseSidePanel({
       ref={panelRef}
       data-verse-sidebar
       className="sticky top-6 w-full max-h-[calc(100vh-3rem)] overflow-y-auto z-20 scrollbar-thin scrollbar-thumb-accent/20 scrollbar-track-transparent"
+      style={{ alignSelf: 'flex-start' }}
     >
       <div className="bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg p-4 space-y-4 shadow-lg">
         <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border/30">
