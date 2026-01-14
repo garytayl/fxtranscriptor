@@ -95,7 +95,7 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
   }
 
   return (
-    <div ref={containerRef} className="relative flex gap-6">
+    <div ref={containerRef} className="relative">
       {/* Verse Connections Overlay */}
       <VerseConnections
         sections={sections}
@@ -103,33 +103,36 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
         containerRef={containerRef}
       />
 
-      {/* Main Content */}
-      <div className="relative z-0 flex-1 min-w-0">
-        {sections.map((section, index) => (
-          <SectionReveal
-            key={index}
-            section={section}
-            index={index}
-            isActive={activeSection === index}
-          >
-            <VerseRichText
-              content={section.content}
-              verses={section.verses}
-              activeVerseIds={activeVerseIds}
-              onVerseEnter={handleVerseEnter}
-              onVerseLeave={handleVerseLeave}
-            />
-          </SectionReveal>
-        ))}
-      </div>
+      {/* Flex Container for Content and Sidebar */}
+      <div className="flex gap-6 items-start">
+        {/* Main Content */}
+        <div className="relative z-0 flex-1 min-w-0">
+          {sections.map((section, index) => (
+            <SectionReveal
+              key={index}
+              section={section}
+              index={index}
+              isActive={activeSection === index}
+            >
+              <VerseRichText
+                content={section.content}
+                verses={section.verses}
+                activeVerseIds={activeVerseIds}
+                onVerseEnter={handleVerseEnter}
+                onVerseLeave={handleVerseLeave}
+              />
+            </SectionReveal>
+          ))}
+        </div>
 
-      {/* Verse Side Panel - Sticky on right */}
-      <div className="hidden lg:block flex-shrink-0 w-64 self-start">
-        <VerseSidePanel
-          sections={sections}
-          activeVerseIds={activeVerseIds}
-          onVerseClick={handleVerseClick}
-        />
+        {/* Verse Side Panel - Sticky on right */}
+        <div className="hidden lg:block flex-shrink-0 w-64">
+          <VerseSidePanel
+            sections={sections}
+            activeVerseIds={activeVerseIds}
+            onVerseClick={handleVerseClick}
+          />
+        </div>
       </div>
     </div>
   );
