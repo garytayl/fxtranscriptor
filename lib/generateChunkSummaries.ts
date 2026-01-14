@@ -20,15 +20,20 @@ export interface ChunkSummaryResult {
  */
 export async function generateChunkSummary(
   chunkText: string,
-  apiKey?: string
+  apiKey?: string,
+  previousSummaries?: string[] // Array of previous chunk summaries for context
 ): Promise<ChunkSummaryResult> {
   if (!apiKey || apiKey.trim().length === 0) {
     throw new Error("OpenAI API key not configured. Add OPENAI_API_KEY to Vercel environment variables.");
   }
 
+  const contextSection = previousSummaries && previousSummaries.length > 0
+    ? `\n\nPrevious chunks context (for reference):\n${previousSummaries.slice(-2).join("\n\n")}\n`
+    : "";
+
   const prompt = `You are analyzing a sermon transcript chunk. Please:
 
-1. Generate a concise 2-3 sentence summary of the main points discussed in this chunk.
+1. Generate a concise 2-3 sentence summary of the main points discussed in this chunk, building on the context from previous chunks if provided.
 2. Extract all Bible verse references mentioned (e.g., "John 3:16", "Romans 8:28-30", "Psalm 23:1-3").
 3. Return your response as a JSON object with this exact structure:
 {
@@ -57,7 +62,7 @@ Important:
 - Use the full book name (e.g., "John", not "Jn")
 - If no verses are mentioned, return an empty array for "verses"
 - Only return valid JSON, no other text
-
+${contextSection}
 Transcript chunk:
 ${chunkText.substring(0, 4000)}${chunkText.length > 4000 ? "..." : ""}`;
 

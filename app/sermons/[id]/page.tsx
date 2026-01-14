@@ -33,7 +33,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
   const [summaries, setSummaries] = useState<(SermonChunkSummary & { verses: SermonChunkVerse[] })[]>([]);
-  const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+  const [expandedSummaryChunks, setExpandedSummaryChunks] = useState<Set<number>>(new Set());
   const [generatingSummaries, setGeneratingSummaries] = useState(false);
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
 
@@ -156,8 +156,9 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       if (response.ok) {
         const data = await response.json();
         setSummaries(data.summaries || []);
+        // Expand first chunk by default
         if (data.summaries && data.summaries.length > 0) {
-          setCurrentChunkIndex(0);
+          setExpandedSummaryChunks(new Set([0]));
         }
       }
     } catch (error) {
@@ -219,7 +220,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           duration: 3000,
         });
         setSummaries([]);
-        setCurrentChunkIndex(0);
+        setExpandedSummaryChunks(new Set());
       } else {
         toast.error("Clear Failed", {
           description: data.error || "Failed to clear summaries",
@@ -945,7 +946,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
         {/* Chunk Summaries Display */}
         {(sermon.transcript || sermon.progress_json?.completedChunks) && (
-          <div className="border border-border/30 rounded-lg p-6 bg-card/50">
+          <div className="border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-mono text-sm uppercase tracking-widest">AI Summaries</h2>
               <div className="flex items-center gap-2">
@@ -1018,68 +1019,76 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 </Button>
               </div>
             ) : (
-              <>
-                {/* Navigation */}
-                <div className="flex items-center justify-between mb-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="font-mono text-xs uppercase tracking-widest"
-                    onClick={() => setCurrentChunkIndex(Math.max(0, currentChunkIndex - 1))}
-                    disabled={currentChunkIndex === 0}
-                  >
-                    <ChevronLeft className="size-4" />
-                    Previous
-                  </Button>
-                  <span className="font-mono text-sm text-muted-foreground">
-                    Chunk {currentChunkIndex + 1} of {summaries.length}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="font-mono text-xs uppercase tracking-widest"
-                    onClick={() => setCurrentChunkIndex(Math.min(summaries.length - 1, currentChunkIndex + 1))}
-                    disabled={currentChunkIndex === summaries.length - 1}
-                  >
-                    Next
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-
-                {/* Current Summary */}
-                {summaries[currentChunkIndex] && (
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                        Summary
-                      </h3>
-                      <p className="font-mono text-sm text-foreground leading-relaxed">
-                        {summaries[currentChunkIndex].summary}
-                      </p>
-                    </div>
-
-                    {/* Verses */}
-                    {summaries[currentChunkIndex].verses && summaries[currentChunkIndex].verses.length > 0 && (
-                      <div>
-                        <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                          Bible Verses Referenced
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {summaries[currentChunkIndex].verses.map((verse) => (
-                            <Badge
-                              key={verse.id}
-                              variant="secondary"
-                              className="font-mono text-xs"
-                            >
-                              {verse.full_reference}
-                            </Badge>
-                          ))}
+              <div className="space-y-3">
+                {summaries.map((summary, index) => {
+                  const isExpanded = expandedSummaryChunks.has(index);
+                  return (
+                    <div
+                      key={summary.id}
+                      className="border border-accent/20 rounded-lg overflow-hidden transition-all hover:border-accent/40 hover:shadow-[0_0_20px_rgba(255,165,0,0.1)]"
+                    >
+                      <button
+                        onClick={() => {
+                          const newExpanded = new Set(expandedSummaryChunks);
+                          if (isExpanded) {
+                            newExpanded.delete(index);
+                          } else {
+                            newExpanded.add(index);
+                          }
+                          setExpandedSummaryChunks(newExpanded);
+                        }}
+                        className="w-full flex items-center justify-between p-4 bg-card/30 hover:bg-card/50 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs font-semibold text-accent">
+                            Chunk {index + 1}
+                          </span>
+                          <span className="font-mono text-sm text-muted-foreground line-clamp-1">
+                            {summary.summary.substring(0, 60)}...
+                          </span>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
+                        {isExpanded ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      {isExpanded && (
+                        <div className="p-4 border-t border-accent/10 bg-card/20 space-y-4">
+                          <div>
+                            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                              Summary
+                            </h3>
+                            <p className="font-mono text-sm text-foreground leading-relaxed">
+                              {summary.summary}
+                            </p>
+                          </div>
+
+                          {/* Verses */}
+                          {summary.verses && summary.verses.length > 0 && (
+                            <div>
+                              <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                                Bible Verses Referenced
+                              </h3>
+                              <div className="flex flex-wrap gap-2">
+                                {summary.verses.map((verse) => (
+                                  <Badge
+                                    key={verse.id}
+                                    variant="secondary"
+                                    className="font-mono text-xs border-accent/30 hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
+                                  >
+                                    {verse.full_reference}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

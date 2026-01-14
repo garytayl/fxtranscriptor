@@ -163,3 +163,23 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Glow effects for outlined components */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(255, 165, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.glow-accent:hover {
+  box-shadow: 0 0 30px rgba(255, 165, 0, 0.2);
+}
+
+.glow-border {
+  border-color: oklch(0.7 0.2 45 / 0.3);
+  box-shadow: 0 0 15px oklch(0.7 0.2 45 / 0.1);
+}
+
+.glow-border:hover {
+  border-color: oklch(0.7 0.2 45 / 0.5);
+  box-shadow: 0 0 25px oklch(0.7 0.2 45 / 0.2);
+}

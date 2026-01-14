@@ -114,6 +114,7 @@ export async function POST(
 
     const results = [];
     const errors: string[] = [];
+    const previousSummaries: string[] = []; // Track previous summaries for context
 
     // Generate summaries for each chunk
     for (const [chunkIndexStr, chunkText] of chunkEntries) {
@@ -125,8 +126,11 @@ export async function POST(
           continue;
         }
 
-        // Generate summary and extract verses
-        const summaryResult = await generateChunkSummary(chunkText, apiKey);
+        // Generate summary and extract verses (include previous summaries for context)
+        const summaryResult = await generateChunkSummary(chunkText, apiKey, previousSummaries);
+        
+        // Add this summary to context for next chunks
+        previousSummaries.push(summaryResult.summary);
 
         // Insert summary
         const { data: summary, error: summaryError } = await supabase
