@@ -76,6 +76,21 @@ export async function POST(
       );
     }
 
+    // Clear unified summary cache on sermon (since source summaries are gone)
+    const { error: clearUnifiedError } = await supabase
+      .from("sermons")
+      .update({
+        unified_summary_json: null,
+        unified_summary_generated_at: null,
+        unified_summary_model: null,
+      })
+      .eq("id", sermonId);
+
+    if (clearUnifiedError) {
+      console.error("Error clearing unified summary:", clearUnifiedError);
+      // Do not fail the request; the main operation (deleting chunk summaries) succeeded.
+    }
+
     return NextResponse.json({
       success: true,
       deleted: existingSummaries?.length || 0,

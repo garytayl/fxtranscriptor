@@ -317,14 +317,21 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       if (data.sermon.progress_json) {
         setProgress(data.sermon.progress_json);
       }
+
+      // Load saved unified summary from DB (if present)
+      if (Array.isArray(data.sermon.unified_summary_json) && data.sermon.unified_summary_json.length > 0) {
+        setUnifiedSummary(data.sermon.unified_summary_json as UnifiedSummarySection[]);
+      } else {
+        setUnifiedSummary(null);
+      }
+
       // Fetch summaries if transcript exists
       if (data.sermon.transcript || data.sermon.progress_json?.completedChunks) {
         fetchSummaries(id);
-        // Auto-generate unified summary if chunks exist
-        if (data.sermon.progress_json?.completedChunks && Object.keys(data.sermon.progress_json.completedChunks).length > 0) {
-          setTimeout(() => {
-            generateUnifiedSummary(id);
-          }, 1000);
+        // Only auto-generate unified summary if we don't already have one saved
+        const hasSavedUnified = Array.isArray(data.sermon.unified_summary_json) && data.sermon.unified_summary_json.length > 0;
+        if (!hasSavedUnified && data.sermon.progress_json?.completedChunks && Object.keys(data.sermon.progress_json.completedChunks).length > 0) {
+          setTimeout(() => generateUnifiedSummary(id), 500);
         }
       }
     } catch (error) {
@@ -333,7 +340,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setLoading(false);
     }
-  }, [fetchSummaries]);
+  }, [fetchSummaries, generateUnifiedSummary]);
 
   const generateTranscript = useCallback(async () => {
     if (!sermon || generating) return;

@@ -26,6 +26,61 @@ export interface UnifiedSummaryResponse {
   sections: UnifiedSummarySection[];
 }
 
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: "Supabase not configured" },
+        { status: 500 }
+      );
+    }
+
+    const params = await context.params;
+    const sermonId = params?.id;
+
+    if (!sermonId || typeof sermonId !== "string") {
+      return NextResponse.json(
+        { error: "Missing or invalid sermon ID" },
+        { status: 400 }
+      );
+    }
+
+    const { data: sermon, error } = await supabase
+      .from("sermons")
+      .select("id, unified_summary_json, unified_summary_generated_at, unified_summary_model")
+      .eq("id", sermonId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching unified summary:", error);
+      return NextResponse.json(
+        { error: "Failed to fetch unified summary", details: error.message },
+        { status: 500 }
+      );
+    }
+
+    const sections = Array.isArray((sermon as any)?.unified_summary_json)
+      ? ((sermon as any).unified_summary_json as UnifiedSummarySection[])
+      : null;
+
+    return NextResponse.json({
+      success: true,
+      sections: sections || [],
+      generated_at: (sermon as any)?.unified_summary_generated_at || null,
+      model: (sermon as any)?.unified_summary_model || null,
+    });
+  } catch (error) {
+    console.error("Error fetching unified summary:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -47,6 +102,9 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    const url = new URL(request.url);
+    const force = url.searchParams.get("force") === "1";
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey || apiKey.trim().length === 0) {
@@ -76,6 +134,17 @@ export async function POST(
         { error: `Sermon with ID "${sermonId}" not found.` },
         { status: 404 }
       );
+    }
+
+    // If we already have a stored unified summary and not forcing regeneration, return it.
+    if (!force && Array.isArray((sermon as any).unified_summary_json) && (sermon as any).unified_summary_json.length > 0) {
+      return NextResponse.json({
+        success: true,
+        sections: (sermon as any).unified_summary_json,
+        cached: true,
+        generated_at: (sermon as any).unified_summary_generated_at || null,
+        model: (sermon as any).unified_summary_model || null,
+      });
     }
 
     // Fetch all chunk summaries with verses
@@ -273,9 +342,25 @@ Important:
         throw new Error("No valid sections generated");
       }
 
+      // Persist the unified summary on the sermon row
+      const { error: persistError } = await supabase
+        .from("sermons")
+        .update({
+          unified_summary_json: validatedSections as any,
+          unified_summary_generated_at: new Date().toISOString(),
+          unified_summary_model: "gpt-4o-mini",
+        })
+        .eq("id", sermonId);
+
+      if (persistError) {
+        console.error("Error persisting unified summary:", persistError);
+        // Don't fail the request if persistence fails; still return the generated summary.
+      }
+
       return NextResponse.json({
         success: true,
         sections: validatedSections,
+        cached: false,
       });
     } catch (error) {
       console.error("[UnifiedSummary] Error:", error);

@@ -50,6 +50,9 @@ export interface Sermon {
     completedChunks?: Record<number, string>; // Chunk index -> transcript text
     failedChunks?: Record<number, string>; // Chunk index -> error message
   } | null;
+  unified_summary_json?: unknown[] | null;
+  unified_summary_generated_at?: string | null;
+  unified_summary_model?: string | null;
   created_at: string;
   updated_at: string;
 }

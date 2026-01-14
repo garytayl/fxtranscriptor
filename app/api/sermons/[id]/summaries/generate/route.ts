@@ -32,6 +32,21 @@ export async function POST(
       );
     }
 
+    // Since we're regenerating chunk summaries, invalidate any stored unified summary
+    const { error: invalidateUnifiedError } = await supabase
+      .from("sermons")
+      .update({
+        unified_summary_json: null,
+        unified_summary_generated_at: null,
+        unified_summary_model: null,
+      })
+      .eq("id", sermonId);
+
+    if (invalidateUnifiedError) {
+      console.error("Error invalidating unified summary cache:", invalidateUnifiedError);
+      // Don't fail; we can still proceed with chunk summary generation.
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey || apiKey.trim().length === 0) {
       return NextResponse.json(
