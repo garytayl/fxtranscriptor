@@ -95,7 +95,7 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative flex gap-6">
       {/* Verse Connections Overlay */}
       <VerseConnections
         sections={sections}
@@ -104,7 +104,7 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
       />
 
       {/* Main Content */}
-      <div className="relative z-0">
+      <div className="relative z-0 flex-1 min-w-0">
         {sections.map((section, index) => (
           <SectionReveal
             key={index}
@@ -123,12 +123,14 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
         ))}
       </div>
 
-      {/* Verse Side Panel */}
-      <VerseSidePanel
-        sections={sections}
-        activeVerseIds={activeVerseIds}
-        onVerseClick={handleVerseClick}
-      />
+      {/* Verse Side Panel - Sticky on right */}
+      <div className="hidden lg:block relative flex-shrink-0 w-64">
+        <VerseSidePanel
+          sections={sections}
+          activeVerseIds={activeVerseIds}
+          onVerseClick={handleVerseClick}
+        />
+      </div>
     </div>
   );
 }

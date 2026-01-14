@@ -39,9 +39,13 @@ export function VerseConnections({
 
       const newConnections: Connection[] = [];
       
-      // Calculate sidebar position (fixed on right side)
-      const sidebarX = window.innerWidth - 280; // 256px width + 24px margin
-      const sidebarCenterY = window.scrollY + window.innerHeight / 2;
+      // Calculate sidebar position (sticky on right side within container)
+      const sidebarElement = container.querySelector('[data-verse-sidebar]');
+      if (!sidebarElement) return;
+      
+      const sidebarRect = sidebarElement.getBoundingClientRect();
+      const sidebarX = sidebarRect.left + sidebarRect.width / 2;
+      const sidebarCenterY = sidebarRect.top + sidebarRect.height / 2;
 
       // Find all verse badges in the container
       const verseBadges = container.querySelectorAll('[data-verse-reference]');
