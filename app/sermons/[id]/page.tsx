@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
-import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, Play, Download, Copy, CheckCircle2, AlertCircle, Loader2, Link2, ChevronDown, ChevronUp, X, Trash2, ChevronLeft, ChevronRight, MoreVertical, RefreshCw, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
-import { Sermon } from "@/lib/supabase";
+import { Sermon, SermonChunkSummary, SermonChunkVerse } from "@/lib/supabase";
 import { analytics, errorTracker } from "@/lib/analytics";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonMetadata } from "@/components/sermon-metadata";
@@ -32,6 +32,10 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [copied, setCopied] = useState(false);
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
+  const [summaries, setSummaries] = useState<(SermonChunkSummary & { verses: SermonChunkVerse[] })[]>([]);
+  const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+  const [generatingSummaries, setGeneratingSummaries] = useState(false);
+  const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
 
   // Extract ID from params (Next.js 15+ always uses Promise)
   useEffect(() => {
@@ -111,6 +115,20 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     }
   }, [sermon?.id]);
 
+  // Close options menu when clicking outside
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(event.target as Node)) {
+        setOptionsMenuOpen(false);
+      }
+    };
+    if (optionsMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [optionsMenuOpen]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts([
     {
@@ -168,13 +186,17 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       if (data.sermon.progress_json) {
         setProgress(data.sermon.progress_json);
       }
+      // Fetch summaries if transcript exists
+      if (data.sermon.transcript || data.sermon.progress_json?.completedChunks) {
+        fetchSummaries(id);
+      }
     } catch (error) {
       console.error("[SermonDetail] Error loading sermon:", error);
       setSermon(null); // Set to null so error state shows
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchSummaries]);
 
   const generateTranscript = useCallback(async () => {
     if (!sermon || generating) return;
@@ -327,6 +349,91 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         duration: 6000,
       });
       throw error;
+    }
+  }, []);
+
+  const fetchSummaries = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/sermons/${id}/summaries`);
+      if (response.ok) {
+        const data = await response.json();
+        setSummaries(data.summaries || []);
+        if (data.summaries && data.summaries.length > 0) {
+          setCurrentChunkIndex(0);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching summaries:", error);
+    }
+  }, []);
+
+  const generateSummaries = useCallback(async (id: string) => {
+    setGeneratingSummaries(true);
+    try {
+      const toastId = toast.loading("Generating AI summaries...", {
+        description: "This may take a few moments.",
+      });
+      
+      const response = await fetch(`/api/sermons/${id}/summaries/generate`, {
+        method: "POST",
+      });
+      
+      const data = await response.json();
+      toast.dismiss(toastId);
+      
+      if (response.ok && data.success) {
+        toast.success("Summaries Generated", {
+          description: `Generated ${data.generated} summaries.`,
+          duration: 3000,
+        });
+        await fetchSummaries(id);
+      } else {
+        toast.error("Generation Failed", {
+          description: data.error || "Failed to generate summaries",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      console.error("Error generating summaries:", error);
+      toast.error("Generation Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
+    } finally {
+      setGeneratingSummaries(false);
+    }
+  }, [fetchSummaries]);
+
+  const clearSummaries = useCallback(async (id: string) => {
+    try {
+      const toastId = toast.loading("Clearing summaries...");
+      
+      const response = await fetch(`/api/sermons/${id}/summaries/clear`, {
+        method: "POST",
+      });
+      
+      const data = await response.json();
+      toast.dismiss(toastId);
+      
+      if (response.ok && data.success) {
+        toast.success("Summaries Cleared", {
+          description: `Deleted ${data.deleted} summaries.`,
+          duration: 3000,
+        });
+        setSummaries([]);
+        setCurrentChunkIndex(0);
+      } else {
+        toast.error("Clear Failed", {
+          description: data.error || "Failed to clear summaries",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      console.error("Error clearing summaries:", error);
+      toast.error("Clear Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
     }
   }, []);
 
@@ -791,37 +898,19 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             </Button>
           )}
           
-          {sermon.transcript ? (
-            <>
-              <Button
-                variant="default"
-                size="lg"
-                className="font-mono text-xs uppercase tracking-widest gap-2 touch-manipulation"
-                onClick={handleCopyAll}
-              >
-                {copied ? (
-                  <>
-                    <CheckCircle2 className="size-4" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="size-4" />
-                    Copy All
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="font-mono text-xs uppercase tracking-widest gap-2 touch-manipulation"
-                onClick={handleDownload}
-              >
-                <Download className="size-4" />
-                Download .txt
-              </Button>
-            </>
-          ) : (
+          {sermon.transcript && (
+            <Button
+              variant="outline"
+              size="lg"
+              className="font-mono text-xs uppercase tracking-widest gap-2 touch-manipulation"
+              onClick={() => router.push(`/sermons/${sermon.id}/raw`)}
+            >
+              <FileText className="size-4" />
+              Show Full Transcript
+            </Button>
+          )}
+          
+          {!sermon.transcript && (
             <Button
               variant={sermon.status === "generating" ? "secondary" : "default"}
               size="lg"
@@ -854,55 +943,144 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           )}
         </div>
 
-        {/* Transcript Display */}
-        {sermon.transcript && (
+        {/* Chunk Summaries Display */}
+        {(sermon.transcript || sermon.progress_json?.completedChunks) && (
           <div className="border border-border/30 rounded-lg p-6 bg-card/50">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-mono text-sm uppercase tracking-widest">Transcript</h2>
-              <div className="flex items-center gap-4">
-                {sermon.transcript_generated_at && (
-                  <span className="text-xs font-mono text-muted-foreground">
-                    Generated {format(new Date(sermon.transcript_generated_at), "MMM d, yyyy")}
-                  </span>
+              <h2 className="font-mono text-sm uppercase tracking-widest">AI Summaries</h2>
+              <div className="flex items-center gap-2">
+                {summaries.length > 0 && (
+                  <div className="relative" ref={optionsMenuRef}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest"
+                      onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}
+                    >
+                      <MoreVertical className="size-4" />
+                    </Button>
+                    {optionsMenuOpen && (
+                      <div className="absolute right-0 top-full mt-2 z-10 bg-card border border-border/30 rounded-lg shadow-lg p-2 min-w-[200px]">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-xs font-mono uppercase tracking-widest"
+                          onClick={async () => {
+                            setOptionsMenuOpen(false);
+                            if (sermon.id) {
+                              await clearSummaries(sermon.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-3 mr-2" />
+                          Clear Summaries
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-xs font-mono uppercase tracking-widest"
+                          onClick={async () => {
+                            setOptionsMenuOpen(false);
+                            if (sermon.id) {
+                              await generateSummaries(sermon.id);
+                            }
+                          }}
+                          disabled={generatingSummaries}
+                        >
+                          <RefreshCw className={`size-3 mr-2 ${generatingSummaries ? "animate-spin" : ""}`} />
+                          Regenerate Summaries
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
+              </div>
+            </div>
+
+            {generatingSummaries ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="size-6 animate-spin text-accent" />
+                <span className="ml-3 font-mono text-sm text-muted-foreground">Generating summaries...</span>
+              </div>
+            ) : summaries.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="font-mono text-sm text-muted-foreground mb-4">
+                  No summaries generated yet.
+                </p>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs font-mono uppercase tracking-widest border-destructive/50 hover:border-destructive hover:text-destructive"
-                  onClick={async () => {
-                    toast.promise(
-                      (async () => {
-                        const response = await fetch("/api/catalog/manage-transcription", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ sermonId: sermon.id, action: "delete-transcript" }),
-                        });
-                        const data = await response.json();
-                        if (data.success && data.sermon) {
-                          setSermon(data.sermon);
-                          return data;
-                        } else {
-                          throw new Error(data.error || "Failed to delete transcript");
-                        }
-                      })(),
-                      {
-                        loading: "Deleting transcript...",
-                        success: "Transcript deleted. You can regenerate it later.",
-                        error: (err) => err.message || "Failed to delete transcript",
-                      }
-                    );
-                  }}
+                  className="font-mono text-xs uppercase tracking-widest"
+                  onClick={() => sermon.id && generateSummaries(sermon.id)}
                 >
-                  <Trash2 className="size-3 mr-1" />
-                  Delete Transcript
+                  <RefreshCw className="size-3 mr-2" />
+                  Generate Summaries
                 </Button>
               </div>
-            </div>
-            <div className="prose prose-invert max-w-none">
-              <pre className="font-mono text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {sermon.transcript}
-              </pre>
-            </div>
+            ) : (
+              <>
+                {/* Navigation */}
+                <div className="flex items-center justify-between mb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs uppercase tracking-widest"
+                    onClick={() => setCurrentChunkIndex(Math.max(0, currentChunkIndex - 1))}
+                    disabled={currentChunkIndex === 0}
+                  >
+                    <ChevronLeft className="size-4" />
+                    Previous
+                  </Button>
+                  <span className="font-mono text-sm text-muted-foreground">
+                    Chunk {currentChunkIndex + 1} of {summaries.length}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs uppercase tracking-widest"
+                    onClick={() => setCurrentChunkIndex(Math.min(summaries.length - 1, currentChunkIndex + 1))}
+                    disabled={currentChunkIndex === summaries.length - 1}
+                  >
+                    Next
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+
+                {/* Current Summary */}
+                {summaries[currentChunkIndex] && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                        Summary
+                      </h3>
+                      <p className="font-mono text-sm text-foreground leading-relaxed">
+                        {summaries[currentChunkIndex].summary}
+                      </p>
+                    </div>
+
+                    {/* Verses */}
+                    {summaries[currentChunkIndex].verses && summaries[currentChunkIndex].verses.length > 0 && (
+                      <div>
+                        <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                          Bible Verses Referenced
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {summaries[currentChunkIndex].verses.map((verse) => (
+                            <Badge
+                              key={verse.id}
+                              variant="secondary"
+                              className="font-mono text-xs"
+                            >
+                              {verse.full_reference}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

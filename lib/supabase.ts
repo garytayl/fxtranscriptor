@@ -62,3 +62,23 @@ export interface SermonSource {
   source_id: string;
   created_at: string;
 }
+
+export interface SermonChunkSummary {
+  id: string;
+  sermon_id: string;
+  chunk_index: number;
+  summary: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SermonChunkVerse {
+  id: string;
+  summary_id: string;
+  book: string;
+  chapter: number;
+  verse_start: number;
+  verse_end: number | null;
+  full_reference: string;
+  created_at: string;
+}
