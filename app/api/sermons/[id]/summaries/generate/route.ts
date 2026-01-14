@@ -61,11 +61,26 @@ export async function POST(
       );
     }
 
-    // Get chunks from progress_json.completedChunks
-    const chunks = sermon.progress_json?.completedChunks;
-    if (!chunks || Object.keys(chunks).length === 0) {
+    // Get chunks from progress_json.completedChunks, or split transcript if chunks don't exist
+    let chunks: Record<number, string> = {};
+    
+    if (sermon.progress_json?.completedChunks && Object.keys(sermon.progress_json.completedChunks).length > 0) {
+      // Use existing chunks
+      chunks = sermon.progress_json.completedChunks;
+    } else if (sermon.transcript && sermon.transcript.trim().length > 0) {
+      // Split transcript into chunks (5000 characters per chunk)
+      const CHUNK_SIZE = 5000;
+      const transcriptText = sermon.transcript.trim();
+      const chunkCount = Math.ceil(transcriptText.length / CHUNK_SIZE);
+      
+      for (let i = 0; i < chunkCount; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, transcriptText.length);
+        chunks[i] = transcriptText.substring(start, end);
+      }
+    } else {
       return NextResponse.json(
-        { error: "No chunks found for this sermon. Transcript must be generated first." },
+        { error: "No transcript or chunks found for this sermon. Transcript must be generated first." },
         { status: 400 }
       );
     }
