@@ -14,6 +14,7 @@ import { analytics, errorTracker } from "@/lib/analytics";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonMetadata } from "@/components/sermon-metadata";
 import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/lib/extractMetadata";
+import { SermonSummaryCard } from "@/components/sermon-summary-card";
 
 interface TranscriptionProgress {
   step: string;
@@ -1140,73 +1141,26 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {summaries.map((summary, index) => {
                   const isExpanded = expandedSummaryChunks.has(index);
                   return (
-                    <div
+                    <SermonSummaryCard
                       key={summary.id}
-                      className="border border-accent/20 rounded-lg overflow-hidden transition-all hover:border-accent/40 hover:shadow-[0_0_20px_rgba(255,165,0,0.1)]"
-                    >
-                      <button
-                        onClick={() => {
-                          const newExpanded = new Set(expandedSummaryChunks);
-                          if (isExpanded) {
-                            newExpanded.delete(index);
-                          } else {
-                            newExpanded.add(index);
-                          }
-                          setExpandedSummaryChunks(newExpanded);
-                        }}
-                        className="w-full flex items-center justify-between p-4 bg-card/30 hover:bg-card/50 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-xs font-semibold text-accent">
-                            Chunk {index + 1}
-                          </span>
-                          <span className="font-mono text-sm text-muted-foreground line-clamp-1">
-                            {summary.summary.substring(0, 60)}...
-                          </span>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronUp className="size-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="size-4 text-muted-foreground" />
-                        )}
-                      </button>
-                      {isExpanded && (
-                        <div className="p-4 border-t border-accent/10 bg-card/20 space-y-4">
-                          <div>
-                            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                              Summary
-                            </h3>
-                            <p className="font-mono text-sm text-foreground leading-relaxed">
-                              {summary.summary}
-                            </p>
-                          </div>
-
-                          {/* Verses */}
-                          {summary.verses && summary.verses.length > 0 && (
-                            <div>
-                              <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                                Bible Verses Referenced
-                              </h3>
-                              <div className="flex flex-wrap gap-2">
-                                {summary.verses.map((verse) => (
-                                  <Badge
-                                    key={verse.id}
-                                    variant="secondary"
-                                    className="font-mono text-xs border-accent/30 hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
-                                  >
-                                    {verse.full_reference}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                      summary={summary}
+                      index={index}
+                      mainChapterKey={organizedVerses.mainChapter?.key || null}
+                      isExpanded={isExpanded}
+                      onToggle={() => {
+                        const newExpanded = new Set(expandedSummaryChunks);
+                        if (isExpanded) {
+                          newExpanded.delete(index);
+                        } else {
+                          newExpanded.add(index);
+                        }
+                        setExpandedSummaryChunks(newExpanded);
+                      }}
+                    />
                   );
                 })}
               </div>
