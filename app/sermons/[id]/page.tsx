@@ -503,15 +503,46 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       chapterMap.get(key)!.push(verse);
     });
 
-    // Find main chapter (the one with the most verses)
+    // First, find the main book (the book with the most verses total)
+    const bookMap = new Map<string, SermonChunkVerse[]>();
+    allVerses.forEach((verse) => {
+      if (!bookMap.has(verse.book)) {
+        bookMap.set(verse.book, []);
+      }
+      bookMap.get(verse.book)!.push(verse);
+    });
+
+    let mainBook: string | null = null;
+    let maxBookVerses = 0;
+    bookMap.forEach((verses, book) => {
+      if (verses.length > maxBookVerses) {
+        maxBookVerses = verses.length;
+        mainBook = book;
+      }
+    });
+
+    // Then, within the main book, find the chapter with the most verses
     let mainChapterKey: string | null = null;
     let maxVerses = 0;
     chapterMap.forEach((verses, key) => {
-      if (verses.length > maxVerses) {
-        maxVerses = verses.length;
-        mainChapterKey = key;
+      // Only consider chapters from the main book
+      if (mainBook && key.startsWith(mainBook + " ")) {
+        if (verses.length > maxVerses) {
+          maxVerses = verses.length;
+          mainChapterKey = key;
+        }
       }
     });
+
+    // Fallback: if no main book was found or no chapter in main book, use original logic
+    if (!mainChapterKey) {
+      chapterMap.forEach((verses, key) => {
+        if (verses.length > maxVerses) {
+          maxVerses = verses.length;
+          mainChapterKey = key;
+        }
+      });
+    }
 
     // Get main chapter verses
     const mainChapter = mainChapterKey ? chapterMap.get(mainChapterKey) || [] : [];
