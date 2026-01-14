@@ -6,7 +6,7 @@ import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/uni
 interface VerseConnectionsProps {
   sections: UnifiedSummarySection[];
   activeVerseIds: Set<string>;
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 interface Connection {
