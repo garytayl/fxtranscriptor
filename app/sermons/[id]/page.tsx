@@ -14,8 +14,6 @@ import { analytics, errorTracker } from "@/lib/analytics";
 import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonMetadata } from "@/components/sermon-metadata";
 import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/lib/extractMetadata";
-import { SermonSummaryCard } from "@/components/sermon-summary-card";
-import { UnifiedSermonSummary } from "@/components/unified-sermon-summary";
 import { SermonNarrativeView } from "@/components/sermon-narrative-view";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
@@ -37,10 +35,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
   const [summaries, setSummaries] = useState<(SermonChunkSummary & { verses: SermonChunkVerse[] })[]>([]);
-  const [expandedSummaryChunks, setExpandedSummaryChunks] = useState<Set<number>>(new Set());
   const [generatingSummaries, setGeneratingSummaries] = useState(false);
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
-  const [summaryView, setSummaryView] = useState<"chunks" | "unified">("chunks");
   const [unifiedSummary, setUnifiedSummary] = useState<UnifiedSummarySection[] | null>(null);
   const [generatingUnified, setGeneratingUnified] = useState(false);
 
@@ -163,15 +159,15 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       if (response.ok) {
         const data = await response.json();
         setSummaries(data.summaries || []);
-        // Expand first chunk by default
-        if (data.summaries && data.summaries.length > 0) {
-          setExpandedSummaryChunks(new Set([0]));
+        // Auto-generate unified summary if chunks exist but unified doesn't
+        if (data.summaries && data.summaries.length > 0 && !unifiedSummary) {
+          generateUnifiedSummary(id);
         }
       }
     } catch (error) {
       console.error("Error fetching summaries:", error);
     }
-  }, []);
+  }, [unifiedSummary]);
 
   const generateSummaries = useCallback(async (id: string) => {
     setGeneratingSummaries(true);
@@ -193,6 +189,10 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           duration: 3000,
         });
         await fetchSummaries(id);
+        // Auto-generate unified summary after chunk summaries are created
+        if (sermon.id) {
+          generateUnifiedSummary(sermon.id);
+        }
       } else {
         toast.error("Generation Failed", {
           description: data.error || "Failed to generate summaries",
@@ -208,7 +208,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setGeneratingSummaries(false);
     }
-  }, [fetchSummaries]);
+  }, [fetchSummaries, generateUnifiedSummary]);
 
   const clearSummaries = useCallback(async (id: string) => {
     try {
@@ -227,7 +227,6 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           duration: 3000,
         });
         setSummaries([]);
-        setExpandedSummaryChunks(new Set());
         setUnifiedSummary(null); // Clear unified summary too
       } else {
         toast.error("Clear Failed", {
@@ -1142,46 +1141,12 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
         )}
 
-        {/* Chunk Summaries Display */}
+        {/* Unified Summary Display */}
         {(sermon.transcript || sermon.progress_json?.completedChunks) && (
           <div className="border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-mono text-sm uppercase tracking-widest">AI Summaries</h2>
+              <h2 className="font-mono text-sm uppercase tracking-widest">Sermon Summary</h2>
               <div className="flex items-center gap-2">
-                {summaries.length > 0 && (
-                  <div className="flex items-center gap-2 border border-border/30 rounded-md p-1">
-                    <Button
-                      variant={summaryView === "chunks" ? "default" : "ghost"}
-                      size="sm"
-                      className="text-xs font-mono uppercase tracking-widest"
-                      onClick={() => setSummaryView("chunks")}
-                    >
-                      Chunk View
-                    </Button>
-                    <Button
-                      variant={summaryView === "unified" ? "default" : "ghost"}
-                      size="sm"
-                      className="text-xs font-mono uppercase tracking-widest"
-                      onClick={() => {
-                        if (!unifiedSummary && sermon.id) {
-                          generateUnifiedSummary(sermon.id);
-                        } else {
-                          setSummaryView("unified");
-                        }
-                      }}
-                      disabled={generatingUnified}
-                    >
-                      {generatingUnified ? (
-                        <>
-                          <Loader2 className="size-3 mr-1 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        "Unified Summary"
-                      )}
-                    </Button>
-                  </div>
-                )}
                 {summaries.length > 0 && (
                   <div className="relative" ref={optionsMenuRef}>
                     <Button
@@ -1250,34 +1215,35 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   Generate Summaries
                 </Button>
               </div>
-            ) : summaryView === "unified" ? (
+            ) : unifiedSummary && unifiedSummary.length > 0 ? (
               <SermonNarrativeView
-                sections={unifiedSummary || []}
+                sections={unifiedSummary}
                 loading={generatingUnified}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {summaries.map((summary, index) => {
-                  const isExpanded = expandedSummaryChunks.has(index);
-                  return (
-                    <SermonSummaryCard
-                      key={summary.id}
-                      summary={summary}
-                      index={index}
-                      mainChapterKey={organizedVerses.mainChapter?.key || null}
-                      isExpanded={isExpanded}
-                      onToggle={() => {
-                        const newExpanded = new Set(expandedSummaryChunks);
-                        if (isExpanded) {
-                          newExpanded.delete(index);
-                        } else {
-                          newExpanded.add(index);
-                        }
-                        setExpandedSummaryChunks(newExpanded);
-                      }}
-                    />
-                  );
-                })}
+              <div className="text-center py-12">
+                <p className="font-mono text-sm text-muted-foreground mb-4">
+                  Summaries generated. Generating unified view...
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-mono text-xs uppercase tracking-widest"
+                  onClick={() => sermon.id && generateUnifiedSummary(sermon.id)}
+                  disabled={generatingUnified}
+                >
+                  {generatingUnified ? (
+                    <>
+                      <Loader2 className="size-3 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="size-3 mr-2" />
+                      Generate Unified Summary
+                    </>
+                  )}
+                </Button>
               </div>
             )}
           </div>
