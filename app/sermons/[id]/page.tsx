@@ -1032,8 +1032,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     {organizedVerses.mainChapter.verses.map((verse) => (
                       <Badge
                         key={verse.id}
-                        variant="default"
-                        className="font-mono text-xs border-accent/50 bg-accent/10 hover:bg-accent/20 hover:border-accent/70 hover:shadow-[0_0_15px_rgba(255,165,0,0.3)] transition-all"
+                        variant="outline"
+                        className="font-mono text-xs border-accent/50 text-accent bg-accent/10 hover:bg-accent/20 hover:border-accent/70 hover:shadow-[0_0_15px_rgba(255,165,0,0.3)] transition-all"
                       >
                         {verse.full_reference}
                       </Badge>
@@ -1045,7 +1045,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               {/* Supporting Verses */}
               {organizedVerses.supportingVerses.length > 0 && (
                 <div>
-                  <h3 className="font-mono text-xs uppercase tracking-widest text-accent mb-3">
+                  <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-3">
                     Supporting Verses
                   </h3>
                   <div className="flex flex-wrap gap-2">
@@ -1053,7 +1053,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                       <Badge
                         key={verse.id}
                         variant="outline"
-                        className="font-mono text-xs border-accent/30 text-accent hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
+                        className="font-mono text-xs border-accent/30 text-foreground hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
                       >
                         {verse.full_reference}
                       </Badge>
