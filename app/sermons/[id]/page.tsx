@@ -1045,15 +1045,15 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               {/* Supporting Verses */}
               {organizedVerses.supportingVerses.length > 0 && (
                 <div>
-                  <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground mb-3">
+                  <h3 className="font-mono text-xs uppercase tracking-widest text-accent mb-3">
                     Supporting Verses
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {organizedVerses.supportingVerses.map((verse) => (
                       <Badge
                         key={verse.id}
-                        variant="secondary"
-                        className="font-mono text-xs border-accent/30 hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
+                        variant="outline"
+                        className="font-mono text-xs border-accent/30 text-accent hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
                       >
                         {verse.full_reference}
                       </Badge>
