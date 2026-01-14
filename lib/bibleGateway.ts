@@ -44,17 +44,19 @@ export function getBibleGatewayUrl(
   translation: string = "HCSB"
 ): string {
   const book = normalizeBookName(verse.book);
-  const bookEncoded = encodeURIComponent(book);
   
-  // Build the passage reference
-  let passage = `${book}+${verse.chapter}:${verse.verse_start}`;
+  // Build the passage reference with spaces (e.g., "Exodus 23:24")
+  let passage = `${book} ${verse.chapter}:${verse.verse_start}`;
   if (verse.verse_end && verse.verse_end !== verse.verse_start) {
     passage += `-${verse.verse_end}`;
   }
   
-  const passageEncoded = encodeURIComponent(passage);
+  // Use URLSearchParams to properly encode the URL
+  const params = new URLSearchParams();
+  params.set('search', passage);
+  params.set('version', translation);
   
-  return `https://www.biblegateway.com/passage/?search=${passageEncoded}&version=${translation}`;
+  return `https://www.biblegateway.com/passage/?${params.toString()}`;
 }
 
 /**
