@@ -186,9 +186,9 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         });
         await fetchSummaries(id);
         // Auto-generate unified summary after chunk summaries are created
-        if (id) {
+        setTimeout(() => {
           generateUnifiedSummary(id);
-        }
+        }, 500); // Small delay to ensure summaries are saved
       } else {
         toast.error("Generation Failed", {
           description: data.error || "Failed to generate summaries",
@@ -240,6 +240,11 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   }, []);
 
   const generateUnifiedSummary = useCallback(async (id: string) => {
+    // Don't regenerate if we already have one
+    if (unifiedSummary && unifiedSummary.length > 0) {
+      return;
+    }
+
     setGeneratingUnified(true);
     try {
       const toastId = toast.loading("Generating unified summary...", {
@@ -274,7 +279,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setGeneratingUnified(false);
     }
-  }, []);
+  }, [unifiedSummary]);
 
   const loadSermon = useCallback(async (id: string) => {
     try {
@@ -315,6 +320,12 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       // Fetch summaries if transcript exists
       if (data.sermon.transcript || data.sermon.progress_json?.completedChunks) {
         fetchSummaries(id);
+        // Auto-generate unified summary if chunks exist
+        if (data.sermon.progress_json?.completedChunks && Object.keys(data.sermon.progress_json.completedChunks).length > 0) {
+          setTimeout(() => {
+            generateUnifiedSummary(id);
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error("[SermonDetail] Error loading sermon:", error);
