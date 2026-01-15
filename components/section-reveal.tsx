@@ -110,7 +110,7 @@ export function SectionReveal({
   return (
     <section
       ref={sectionRef}
-      className="min-h-screen flex flex-col justify-center px-6 md:px-28 py-32 relative"
+      className="py-24 md:py-28 flex flex-col justify-start px-6 md:px-16 relative"
       data-section-index={index}
     >
       <div className="max-w-4xl lg:max-w-3xl">
