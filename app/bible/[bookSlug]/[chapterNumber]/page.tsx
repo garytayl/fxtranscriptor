@@ -8,22 +8,23 @@ import { isVerseInRange, parseVerseRange } from "@/lib/bible/reference"
 export const revalidate = 3600
 
 type PageProps = {
-  params: {
+  params: Promise<{
     bookSlug: string
     chapterNumber: string
-  }
+  }>
   searchParams: {
     v?: string | string[]
   }
 }
 
 export default async function BibleChapterPage({ params, searchParams }: PageProps) {
-  const chapterNumber = Number(params.chapterNumber)
+  const resolvedParams = await params
+  const chapterNumber = Number(resolvedParams.chapterNumber)
   if (!Number.isFinite(chapterNumber)) {
     notFound()
   }
 
-  const book = await getBookBySlug(params.bookSlug)
+  const book = await getBookBySlug(resolvedParams.bookSlug)
   if (!book) {
     notFound()
   }

@@ -5,8 +5,9 @@ import { getBookBySlug, listChapters } from "@/lib/bible/api"
 
 export const revalidate = 3600
 
-export default async function BibleBookPage({ params }: { params: { bookSlug: string } }) {
-  const book = await getBookBySlug(params.bookSlug)
+export default async function BibleBookPage({ params }: { params: Promise<{ bookSlug: string }> }) {
+  const resolvedParams = await params
+  const book = await getBookBySlug(resolvedParams.bookSlug)
   if (!book) {
     notFound()
   }
