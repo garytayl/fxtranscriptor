@@ -64,7 +64,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
                 href={`/bible/${book.slug}`}
                 className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
               >
-                ← {book.name} chapters
+                &lt;- {book.name} chapters
               </Link>
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 {book.name} {chapterNumber}
@@ -126,7 +126,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
               href={`/bible/${book.slug}/${previousChapter.number}`}
               className="rounded-md border border-border bg-card/70 px-4 py-2 text-sm text-foreground transition hover:border-accent/60 hover:bg-card"
             >
-              ← {book.name} {previousChapter.number}
+              &lt;- {book.name} {previousChapter.number}
             </Link>
           ) : (
             <div />
@@ -136,7 +136,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
               href={`/bible/${book.slug}/${nextChapter.number}`}
               className="rounded-md border border-border bg-card/70 px-4 py-2 text-sm text-foreground transition hover:border-accent/60 hover:bg-card"
             >
-              {book.name} {nextChapter.number} →
+              {book.name} {nextChapter.number} -&gt;
             </Link>
           ) : null}
         </div>

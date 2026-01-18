@@ -4,9 +4,9 @@
 
 Set these in `.env.local` (local) or Vercel project settings:
 
-- `API_BIBLE_KEY` — API.Bible key (server-side only).
-- `API_BIBLE_BIBLE_ID` — Bible/translation ID to use.
-- `API_BIBLE_BASE_URL` — Base API URL. Default: `https://api.scripture.api.bible/v1`.
+- `API_BIBLE_KEY` - API.Bible key (server-side only).
+- `API_BIBLE_BIBLE_ID` - Bible/translation ID to use.
+- `API_BIBLE_BASE_URL` - Base API URL. Default: `https://api.scripture.api.bible/v1`.
 
 ## Choosing a Bible ID
 
@@ -31,7 +31,7 @@ All API.Bible requests are cached for 1 hour via Next.js fetch revalidation.
 
 ## Reader routes
 
-- `/bible` — list books
-- `/bible/[bookSlug]` — list chapters
-- `/bible/[bookSlug]/[chapterNumber]` — read chapter
+- `/bible` - list books
+- `/bible/[bookSlug]` - list chapters
+- `/bible/[bookSlug]/[chapterNumber]` - read chapter
   - Optional verse highlight: `?v=16-18`

@@ -19,7 +19,7 @@ export default async function BibleBookPage({ params }: { params: { bookSlug: st
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-10">
         <header className="space-y-3">
           <Link href="/bible" className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent">
-            ← All books
+            &lt;- All books
           </Link>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{book.name}</h1>
           {book.nameLong && book.nameLong !== book.name && (

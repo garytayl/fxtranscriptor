@@ -26,7 +26,7 @@ function BookGrid({ title, books }: { title: string; books: { name: string; slug
               )}
             </div>
             <span className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground group-hover:text-accent">
-              View chapters →
+              View chapters -&gt;
             </span>
           </Link>
         ))}
