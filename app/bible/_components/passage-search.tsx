@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import type { BibleBook } from "@/lib/bible/types"
@@ -28,6 +28,8 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   const searchParams = useSearchParams()
   const [rawInput, setRawInput] = useState(initialRefs)
   const [rows, setRows] = useState<PassageRow[]>([emptyRow])
+  const formRef = useRef<HTMLFormElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const bookOptions = useMemo(
     () => books.map((book) => ({ label: book.name, value: book.slug })),
@@ -47,9 +49,6 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   }
 
   const buildFromRows = () => {
-    if (bookOptions.length === 0) {
-      return ""
-    }
     const refs = rows
       .map((row) => {
         if (!row.bookSlug || !row.chapterNumber) {
@@ -66,10 +65,15 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   const handleSearch = () => {
     const builtRefs = buildFromRows()
     const finalRefs = builtRefs || rawInput.trim()
-    const params = new URLSearchParams()
-    if (finalRefs) {
-      params.set("refs", finalRefs)
+    if (builtRefs && textareaRef.current) {
+      textareaRef.current.value = builtRefs
+      setRawInput(builtRefs)
     }
+    if (!finalRefs) {
+      return
+    }
+    const params = new URLSearchParams()
+    params.set("refs", finalRefs)
     if (translationKey) {
       params.set("t", translationKey)
     }
@@ -92,12 +96,21 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   }
 
   return (
-    <div className="space-y-6 rounded-lg border border-border bg-card/60 p-6">
+    <form
+      ref={formRef}
+      className="space-y-6 rounded-lg border border-border bg-card/60 p-6"
+      onSubmit={(event) => {
+        event.preventDefault()
+        handleSearch()
+      }}
+    >
       <div className="space-y-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Search by reference
         </h2>
         <textarea
+          ref={textareaRef}
+          name="refs"
           value={rawInput}
           onChange={(event) => setRawInput(event.target.value)}
           placeholder="Example: John 3:16-18; Romans 8:1"
@@ -154,12 +167,11 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
       )}
 
       <button
-        type="button"
-        onClick={handleSearch}
+        type="submit"
         className="w-full rounded-md border border-accent/40 bg-accent/10 px-4 py-2 text-xs uppercase tracking-[0.2em] text-accent transition hover:border-accent/60 hover:bg-accent/20"
       >
         Search scripture
       </button>
-    </div>
+    </form>
   )
 }
