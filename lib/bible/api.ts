@@ -96,19 +96,18 @@ export async function listChapters(bookId: string): Promise<BibleChapter[]> {
     `/bibles/${bibleId}/books/${bookId}/chapters`
   )
 
-  return (response.data ?? [])
-    .map((chapter) => {
-      const numberValue = Number(chapter.number)
-      if (!Number.isFinite(numberValue)) {
-        return null
-      }
-      return {
-        id: chapter.id,
-        number: numberValue,
-        reference: chapter.reference,
-      }
+  return (response.data ?? []).reduce<BibleChapter[]>((acc, chapter) => {
+    const numberValue = Number(chapter.number)
+    if (!Number.isFinite(numberValue)) {
+      return acc
+    }
+    acc.push({
+      id: chapter.id,
+      number: numberValue,
+      reference: chapter.reference,
     })
-    .filter((chapter): chapter is BibleChapter => chapter !== null)
+    return acc
+  }, [])
 }
 
 export async function getChapterText(
