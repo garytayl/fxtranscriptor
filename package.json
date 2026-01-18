@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "vitest run",
     "populate-john-series": "npx tsx scripts/populate-john-series.ts",
     "merge-sources": "npx tsx scripts/merge-podbean-youtube.ts",
     "extract-metadata": "npx tsx scripts/extract-metadata-from-existing.ts"
@@ -41,11 +42,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^16.4.5",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.3.3",
     "typescript": "^5",
-    "dotenv": "^16.4.5"
+    "vitest": "^4.0.17"
   }
 }

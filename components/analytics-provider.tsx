@@ -8,8 +8,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   useEffect(() => {
-    // Track page views
-    if (pathname) {
+    // Track page views (skip scripture reader for privacy-first browsing)
+    if (pathname && !pathname.startsWith("/bible")) {
       analytics.pageView(pathname)
     }
   }, [pathname])
