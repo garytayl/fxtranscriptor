@@ -16,6 +16,7 @@ type PageProps = {
   }>
   searchParams: {
     v?: string | string[]
+    t?: string | string[]
   }
 }
 
