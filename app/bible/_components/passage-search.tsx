@@ -73,17 +73,22 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
     if (translationKey) {
       params.set("t", translationKey)
     }
-    const currentRefs = searchParams.get("refs") ?? ""
-    const currentTranslation = searchParams.get("t") ?? ""
-    const nextRefs = params.get("refs") ?? ""
-    const nextTranslation = params.get("t") ?? ""
+    const targetUrl = `/bible/search?${params.toString()}`
 
-    if (currentRefs === nextRefs && currentTranslation === nextTranslation) {
-      router.refresh()
+    if (typeof window !== "undefined") {
+      const currentRefs = searchParams.get("refs") ?? ""
+      const currentTranslation = searchParams.get("t") ?? ""
+      const nextRefs = params.get("refs") ?? ""
+      const nextTranslation = params.get("t") ?? ""
+      if (currentRefs === nextRefs && currentTranslation === nextTranslation) {
+        window.location.assign(targetUrl)
+        return
+      }
+      window.location.assign(targetUrl)
       return
     }
 
-    router.push(`/bible/search?${params.toString()}`)
+    router.push(targetUrl)
   }
 
   return (
