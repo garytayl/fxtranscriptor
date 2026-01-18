@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import type { BibleBook } from "@/lib/bible/types"
 
@@ -25,6 +25,7 @@ const emptyRow: PassageRow = {
 
 export function PassageSearch({ initialRefs, translationKey, books = [] }: PassageSearchProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [rawInput, setRawInput] = useState(initialRefs)
   const [rows, setRows] = useState<PassageRow[]>([emptyRow])
 
@@ -72,6 +73,16 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
     if (translationKey) {
       params.set("t", translationKey)
     }
+    const currentRefs = searchParams.get("refs") ?? ""
+    const currentTranslation = searchParams.get("t") ?? ""
+    const nextRefs = params.get("refs") ?? ""
+    const nextTranslation = params.get("t") ?? ""
+
+    if (currentRefs === nextRefs && currentTranslation === nextTranslation) {
+      router.refresh()
+      return
+    }
+
     router.push(`/bible/search?${params.toString()}`)
   }
 
