@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Suspense } from "react"
 import { notFound } from "next/navigation"
 
 import { ChapterJump } from "@/app/bible/_components/chapter-jump"
@@ -85,7 +86,13 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
               {chapterReference && <p className="text-sm text-muted-foreground">{chapterReference}</p>}
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <TranslationSelect translations={translations} currentKey={activeKey} />
+              <Suspense
+                fallback={
+                  <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>
+                }
+              >
+                <TranslationSelect translations={translations} currentKey={activeKey} />
+              </Suspense>
               <ChapterJump
                 bookSlug={book.slug}
                 chapters={chapters}

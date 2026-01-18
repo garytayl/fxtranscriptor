@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Suspense } from "react"
 import { notFound } from "next/navigation"
 
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
@@ -40,7 +41,11 @@ export default async function BibleBookPage({
           {book.nameLong && book.nameLong !== book.name && (
             <p className="text-sm text-muted-foreground">{book.nameLong}</p>
           )}
-          <TranslationSelect translations={translations} currentKey={activeKey} />
+          <Suspense
+            fallback={<div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>}
+          >
+            <TranslationSelect translations={translations} currentKey={activeKey} />
+          </Suspense>
         </header>
 
         {chapters.length === 0 ? (

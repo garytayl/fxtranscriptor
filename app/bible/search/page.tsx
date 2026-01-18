@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { PassageSearch } from "@/app/bible/_components/passage-search"
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
@@ -77,7 +78,11 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
           <p className="max-w-2xl text-sm text-muted-foreground">
             Search by reference or build a list of passages to display together.
           </p>
-          <TranslationSelect translations={translations} currentKey={activeKey} />
+          <Suspense
+            fallback={<div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>}
+          >
+            <TranslationSelect translations={translations} currentKey={activeKey} />
+          </Suspense>
         </header>
 
         <PassageSearch

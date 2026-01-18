@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
 import { getBooksByTestamentWithId } from "@/lib/bible/api"
@@ -84,7 +85,11 @@ export default async function BibleIndexPage({
           <p className="max-w-2xl text-sm text-muted-foreground">
             Ad-free, privacy-first Bible reading. Choose a book to begin.
           </p>
-          <TranslationSelect translations={translations} currentKey={activeKey} />
+          <Suspense
+            fallback={<div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>}
+          >
+            <TranslationSelect translations={translations} currentKey={activeKey} />
+          </Suspense>
           <Link
             href={`/bible/search${activeKey ? `?t=${activeKey}` : ""}`}
             className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
