@@ -7,7 +7,7 @@ import { ChapterJump } from "@/app/bible/_components/chapter-jump"
 import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { isVerseInRange, parseVerseRange } from "@/lib/bible/reference"
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
-import { getAvailableTranslations, getTranslationByKey } from "@/lib/bible/translations"
+import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
 
@@ -31,8 +31,8 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
 
   const verseQuery = Array.isArray(searchParams.v) ? searchParams.v[0] : searchParams.v
   const translationParam = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
-  const translations = getAvailableTranslations()
-  const translation = getTranslationByKey(translationParam)
+  const translations = await getResolvedTranslations()
+  const translation = await getResolvedTranslationByKey(translationParam)
   const activeKey = translation?.key ?? translationParam ?? null
 
   const book = await getBookBySlug(resolvedParams.bookSlug, translation?.bibleId)

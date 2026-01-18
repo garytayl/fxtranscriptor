@@ -1,5 +1,7 @@
 import "server-only"
 
+import { getBibleInfo } from "@/lib/bible/api"
+
 export type BibleTranslation = {
   key: string
   label: string
@@ -7,6 +9,7 @@ export type BibleTranslation = {
 }
 
 let cachedTranslations: BibleTranslation[] | null = null
+let cachedResolvedTranslations: BibleTranslation[] | null = null
 
 function parseCommaSeparatedTranslations(raw: string): BibleTranslation[] {
   return raw
@@ -62,6 +65,46 @@ export function getAvailableTranslations(): BibleTranslation[] {
 
   cachedTranslations = []
   return cachedTranslations
+}
+
+export async function getResolvedTranslations(): Promise<BibleTranslation[]> {
+  if (cachedResolvedTranslations) {
+    return cachedResolvedTranslations
+  }
+
+  const available = getAvailableTranslations()
+  if (available.length === 0) {
+    cachedResolvedTranslations = []
+    return cachedResolvedTranslations
+  }
+
+  const resolved = await Promise.all(
+    available.map(async (translation) => {
+      try {
+        const info = await getBibleInfo(translation.bibleId)
+        return {
+          ...translation,
+          label: info?.name || translation.label,
+        }
+      } catch {
+        return translation
+      }
+    })
+  )
+
+  cachedResolvedTranslations = resolved
+  return resolved
+}
+
+export async function getResolvedTranslationByKey(
+  key: string | null | undefined
+): Promise<BibleTranslation | null> {
+  const resolved = await getResolvedTranslations()
+  const fallback = getDefaultTranslation()
+  if (!key) {
+    return fallback
+  }
+  return resolved.find((translation) => translation.key === key) ?? fallback
 }
 
 export function getDefaultTranslationKey(): string | null {

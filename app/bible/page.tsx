@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react"
 
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
 import { getBooksByTestamentWithId } from "@/lib/bible/api"
-import { getAvailableTranslations, getTranslationByKey } from "@/lib/bible/translations"
+import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
 
@@ -55,8 +55,8 @@ export default async function BibleIndexPage({
   searchParams: { t?: string | string[] }
 }) {
   const translationKey = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
-  const translations = getAvailableTranslations()
-  const translation = getTranslationByKey(translationKey)
+  const translations = await getResolvedTranslations()
+  const translation = await getResolvedTranslationByKey(translationKey)
   const activeKey = translation?.key ?? translationKey ?? null
   let errorMessage: string | null = null
   let oldTestament: { name: string; slug: string; nameLong?: string }[] = []

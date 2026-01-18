@@ -6,7 +6,7 @@ import { PassageSearch } from "@/app/bible/_components/passage-search"
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
 import { getBookBySlug, getBooksWithSlugs, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { parsePassageList, isVerseInRange } from "@/lib/bible/reference"
-import { getAvailableTranslations, getTranslationByKey } from "@/lib/bible/translations"
+import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
 
@@ -20,8 +20,8 @@ type SearchPageProps = {
 export default async function BibleSearchPage({ searchParams }: SearchPageProps) {
   const refsParam = Array.isArray(searchParams.refs) ? searchParams.refs[0] : searchParams.refs
   const translationParam = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
-  const translations = getAvailableTranslations()
-  const translation = getTranslationByKey(translationParam)
+  const translations = await getResolvedTranslations()
+  const translation = await getResolvedTranslationByKey(translationParam)
   const activeKey = translation?.key ?? translationParam ?? null
 
   const passages = refsParam ? parsePassageList(refsParam) : []

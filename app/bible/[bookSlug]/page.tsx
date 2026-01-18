@@ -5,7 +5,7 @@ import { notFound } from "next/navigation"
 
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
 import { getBookBySlug, listChapters } from "@/lib/bible/api"
-import { getAvailableTranslations, getTranslationByKey } from "@/lib/bible/translations"
+import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
 
@@ -18,8 +18,8 @@ export default async function BibleBookPage({
 }) {
   const resolvedParams = await params
   const translationKey = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
-  const translations = getAvailableTranslations()
-  const translation = getTranslationByKey(translationKey)
+  const translations = await getResolvedTranslations()
+  const translation = await getResolvedTranslationByKey(translationKey)
   const activeKey = translation?.key ?? translationKey ?? null
 
   const book = await getBookBySlug(resolvedParams.bookSlug, translation?.bibleId)

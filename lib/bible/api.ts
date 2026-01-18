@@ -20,6 +20,13 @@ type ApiBibleBook = {
   abbreviation?: string
 }
 
+type ApiBibleInfo = {
+  id: string
+  name: string
+  description?: string
+  abbreviation?: string
+}
+
 type ApiBibleChapter = {
   id: string
   number: string | number
@@ -35,6 +42,7 @@ type ApiBibleChapterContent = {
 }
 
 const cachedBooks = new Map<string, { books: BibleBook[]; cachedAt: number }>()
+const cachedBibleInfo = new Map<string, { info: ApiBibleInfo; cachedAt: number }>()
 
 function getBibleEnv(): { apiKey: string; bibleId: string; baseUrl: string } {
   const apiKey = process.env.API_BIBLE_KEY
@@ -96,6 +104,22 @@ export async function listBooks(bibleId?: string): Promise<ApiBibleBook[]> {
   const resolvedBibleId = resolveBibleId(bibleId)
   const response = await bibleFetch<ApiBibleResponse<ApiBibleBook[]>>(`/bibles/${resolvedBibleId}/books`)
   return response.data ?? []
+}
+
+export async function getBibleInfo(bibleId?: string): Promise<ApiBibleInfo | null> {
+  const resolvedBibleId = resolveBibleId(bibleId)
+  const now = Date.now()
+  const cached = cachedBibleInfo.get(resolvedBibleId)
+  if (cached && now - cached.cachedAt < BIBLE_CACHE_SECONDS * 1000) {
+    return cached.info
+  }
+
+  const response = await bibleFetch<ApiBibleResponse<ApiBibleInfo>>(`/bibles/${resolvedBibleId}`)
+  if (!response.data) {
+    return null
+  }
+  cachedBibleInfo.set(resolvedBibleId, { info: response.data, cachedAt: now })
+  return response.data
 }
 
 export async function listChapters(bookId: string, bibleId?: string): Promise<BibleChapter[]> {

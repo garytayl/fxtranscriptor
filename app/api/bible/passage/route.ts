@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { parsePassageReference } from "@/lib/bible/reference"
-import { getTranslationByKey } from "@/lib/bible/translations"
+import { getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const runtime = "nodejs"
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const translation = getTranslationByKey(translationKey)
+    const translation = await getResolvedTranslationByKey(translationKey)
     const book = await getBookBySlug(parsed.bookSlug, translation?.bibleId)
     if (!book) {
       return NextResponse.json({ error: `Book "${parsed.book}" not found.` }, { status: 404 })
