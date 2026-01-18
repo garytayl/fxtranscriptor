@@ -105,10 +105,39 @@ export function parsePassageReference(raw: string): PassageReference | null {
 }
 
 export function parsePassageList(raw: string): PassageReference[] {
-  return raw
+  const segments = raw
     .split(/[\n;]/)
     .map((entry) => entry.trim())
     .filter(Boolean)
+
+  const expanded: string[] = []
+
+  for (const segment of segments) {
+    const parts = segment.split(",").map((entry) => entry.trim()).filter(Boolean)
+    if (parts.length === 0) {
+      continue
+    }
+
+    const first = parsePassageReference(parts[0])
+    if (!first) {
+      expanded.push(segment)
+      continue
+    }
+
+    expanded.push(parts[0])
+
+    for (const part of parts.slice(1)) {
+      if (!part) continue
+      const hasBookAndChapter = /[a-zA-Z]+\s+\d+/.test(part)
+      if (hasBookAndChapter) {
+        expanded.push(part)
+        continue
+      }
+      expanded.push(`${first.book} ${first.chapterNumber}:${part}`)
+    }
+  }
+
+  return expanded
     .map((entry) => parsePassageReference(entry))
     .filter((entry): entry is PassageReference => Boolean(entry))
 }
