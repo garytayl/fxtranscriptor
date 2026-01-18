@@ -43,6 +43,12 @@ function VerseBadgeComponent({
   useEffect(() => {
     const badge = badgeRef.current;
     if (!badge) return;
+    if (typeof window !== "undefined") {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduceMotion) {
+        return;
+      }
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {

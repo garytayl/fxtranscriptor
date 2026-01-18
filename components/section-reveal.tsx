@@ -12,6 +12,7 @@ interface SectionRevealProps {
   index: number;
   isActive: boolean;
   onVerseHighlight?: (verseId: string) => void;
+  enableAnimations?: boolean;
   children: React.ReactNode;
 }
 
@@ -23,6 +24,7 @@ export function SectionReveal({
   index,
   isActive,
   onVerseHighlight,
+  enableAnimations = true,
   children,
 }: SectionRevealProps) {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -30,6 +32,7 @@ export function SectionReveal({
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!enableAnimations) return;
     if (!sectionRef.current) return;
 
     const ctx = gsap.context(() => {
@@ -105,7 +108,7 @@ export function SectionReveal({
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [enableAnimations]);
 
   return (
     <section

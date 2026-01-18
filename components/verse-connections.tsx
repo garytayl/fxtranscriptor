@@ -30,6 +30,9 @@ export function VerseConnections({
   const [connections, setConnections] = useState<Connection[]>([]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return;
     if (!containerRef.current || !svgRef.current) return;
 
     const updateConnections = () => {

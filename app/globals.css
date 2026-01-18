@@ -104,9 +104,6 @@
     /* Improve scroll performance */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: none;
-    /* GPU acceleration hints */
-    transform: translateZ(0);
-    will-change: scroll-position;
   }
   /* Webkit scrollbar styling for html and body */
   html::-webkit-scrollbar,

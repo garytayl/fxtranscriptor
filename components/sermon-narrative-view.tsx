@@ -23,11 +23,21 @@ interface SermonNarrativeViewProps {
 export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewProps) {
   const [activeSection, setActiveSection] = useState<number>(0);
   const [activeVerseIds, setActiveVerseIds] = useState<Set<string>>(new Set());
+  const [reduceMotion, setReduceMotion] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Track active section on scroll
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setReduceMotion(mediaQuery.matches);
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current || reduceMotion) return;
 
     const sectionElements = containerRef.current.querySelectorAll('[data-section-index]');
     
@@ -45,7 +55,7 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
     return () => {
       triggers.forEach((trigger) => trigger.kill());
     };
-  }, [sections]);
+  }, [sections, reduceMotion]);
 
   const handleVerseEnter = (verseId: string) => {
     setActiveVerseIds((prev) => {
@@ -97,11 +107,13 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
   return (
     <div ref={containerRef} className="relative">
       {/* Verse Connections Overlay */}
-      <VerseConnections
-        sections={sections}
-        activeVerseIds={activeVerseIds}
-        containerRef={containerRef}
-      />
+      {!reduceMotion && sections.length <= 8 && (
+        <VerseConnections
+          sections={sections}
+          activeVerseIds={activeVerseIds}
+          containerRef={containerRef}
+        />
+      )}
 
       {/* Flex Container for Content and Sidebar */}
       <div className="flex gap-6 items-start">
@@ -113,6 +125,7 @@ export function SermonNarrativeView({ sections, loading }: SermonNarrativeViewPr
               section={section}
               index={index}
               isActive={activeSection === index}
+              enableAnimations={!reduceMotion}
             >
               <VerseRichText
                 content={section.content}
