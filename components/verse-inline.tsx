@@ -1,8 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink } from "lucide-react";
-import { getBibleGatewayUrlFromReference } from "@/lib/bibleGateway";
+import { getReaderUrlFromReference } from "@/lib/bible/reference";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -76,9 +75,7 @@ function VerseBadgeComponent({
   return (
     <a
       ref={badgeRef}
-      href={getBibleGatewayUrlFromReference(verse.full_reference)}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={getReaderUrlFromReference(verse.full_reference) ?? "#"}
       data-verse-reference={verse.full_reference}
       className={cn(
         "group inline-flex items-center gap-1 mx-1 transition-all duration-300",
@@ -95,7 +92,6 @@ function VerseBadgeComponent({
         )}
       >
         {content}
-        <ExternalLink className="size-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
       </Badge>
     </a>
   );

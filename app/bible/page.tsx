@@ -1,13 +1,25 @@
 import Link from "next/link"
 
-import { getBooksByTestament } from "@/lib/bible/api"
+import { TranslationSelect } from "@/app/bible/_components/translation-select"
+import { getBooksByTestamentWithId } from "@/lib/bible/api"
+import { getAvailableTranslations, getTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
 
-function BookGrid({ title, books }: { title: string; books: { name: string; slug: string; nameLong?: string }[] }) {
+function BookGrid({
+  title,
+  books,
+  translationKey,
+}: {
+  title: string
+  books: { name: string; slug: string; nameLong?: string }[]
+  translationKey?: string | null
+}) {
   if (books.length === 0) {
     return null
   }
+
+  const query = translationKey ? `?t=${translationKey}` : ""
 
   return (
     <section className="space-y-4">
@@ -16,7 +28,7 @@ function BookGrid({ title, books }: { title: string; books: { name: string; slug
         {books.map((book) => (
           <Link
             key={book.slug}
-            href={`/bible/${book.slug}`}
+            href={`/bible/${book.slug}${query}`}
             className="group flex h-full flex-col justify-between rounded-lg border border-border bg-card/70 p-4 transition hover:border-accent/60 hover:bg-card"
           >
             <div className="space-y-1">
@@ -35,14 +47,22 @@ function BookGrid({ title, books }: { title: string; books: { name: string; slug
   )
 }
 
-export default async function BibleIndexPage() {
+export default async function BibleIndexPage({
+  searchParams,
+}: {
+  searchParams: { t?: string | string[] }
+}) {
+  const translationKey = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
+  const translations = getAvailableTranslations()
+  const translation = getTranslationByKey(translationKey)
+  const activeKey = translation?.key ?? translationKey ?? null
   let errorMessage: string | null = null
   let oldTestament: { name: string; slug: string; nameLong?: string }[] = []
   let newTestament: { name: string; slug: string; nameLong?: string }[] = []
   let other: { name: string; slug: string; nameLong?: string }[] = []
 
   try {
-    const data = await getBooksByTestament()
+    const data = await getBooksByTestamentWithId(translation?.bibleId)
     oldTestament = data.oldTestament
     newTestament = data.newTestament
     other = data.other
@@ -64,6 +84,13 @@ export default async function BibleIndexPage() {
           <p className="max-w-2xl text-sm text-muted-foreground">
             Ad-free, privacy-first Bible reading. Choose a book to begin.
           </p>
+          <TranslationSelect translations={translations} currentKey={activeKey} />
+          <Link
+            href={`/bible/search${activeKey ? `?t=${activeKey}` : ""}`}
+            className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+          >
+            Search scripture -&gt;
+          </Link>
         </header>
 
         {errorMessage ? (
@@ -74,13 +101,19 @@ export default async function BibleIndexPage() {
           <div className="space-y-12">
             {hasGroupedTestaments ? (
               <>
-                <BookGrid title="Old Testament" books={oldTestament} />
-                <BookGrid title="New Testament" books={newTestament} />
+                <BookGrid title="Old Testament" books={oldTestament} translationKey={activeKey} />
+                <BookGrid title="New Testament" books={newTestament} translationKey={activeKey} />
               </>
             ) : (
-              <BookGrid title="Books" books={[...oldTestament, ...newTestament, ...other]} />
+              <BookGrid
+                title="Books"
+                books={[...oldTestament, ...newTestament, ...other]}
+                translationKey={activeKey}
+              />
             )}
-            {other.length > 0 && hasGroupedTestaments && <BookGrid title="Other" books={other} />}
+            {other.length > 0 && hasGroupedTestaments && (
+              <BookGrid title="Other" books={other} translationKey={activeKey} />
+            )}
           </div>
         )}
       </div>

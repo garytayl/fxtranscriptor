@@ -10,9 +10,10 @@ type ChapterJumpProps = {
   bookSlug: string
   chapters: ChapterOption[]
   currentChapter: number
+  translationKey?: string | null
 }
 
-export function ChapterJump({ bookSlug, chapters, currentChapter }: ChapterJumpProps) {
+export function ChapterJump({ bookSlug, chapters, currentChapter, translationKey }: ChapterJumpProps) {
   const router = useRouter()
 
   return (
@@ -23,7 +24,14 @@ export function ChapterJump({ bookSlug, chapters, currentChapter }: ChapterJumpP
       <select
         id="chapter-jump"
         value={currentChapter}
-        onChange={(event) => router.push(`/bible/${bookSlug}/${event.target.value}`)}
+        onChange={(event) => {
+          const params = new URLSearchParams()
+          if (translationKey) {
+            params.set("t", translationKey)
+          }
+          const query = params.toString()
+          router.push(`/bible/${bookSlug}/${event.target.value}${query ? `?${query}` : ""}`)
+        }}
         className="h-10 min-w-[140px] rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         aria-label="Jump to chapter"
       >

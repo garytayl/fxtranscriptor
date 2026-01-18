@@ -3,6 +3,7 @@ import "server-only"
 import { getBookTestament } from "@/lib/bible/constants"
 import { parseChapterHtmlToVerses, sanitizeChapterHtml } from "@/lib/bible/parse"
 import { slugifyBookName } from "@/lib/bible/reference"
+import { getDefaultBibleId } from "@/lib/bible/translations"
 import type { BibleBook, BibleChapter, BibleChapterContent, BibleVerse } from "@/lib/bible/types"
 
 const DEFAULT_BASE_URL = "https://api.scripture.api.bible/v1"
@@ -33,12 +34,11 @@ type ApiBibleChapterContent = {
   content: string
 }
 
-let cachedBooks: BibleBook[] | null = null
-let cachedBooksAt = 0
+const cachedBooks = new Map<string, { books: BibleBook[]; cachedAt: number }>()
 
 function getBibleEnv(): { apiKey: string; bibleId: string; baseUrl: string } {
   const apiKey = process.env.API_BIBLE_KEY
-  const bibleId = process.env.API_BIBLE_BIBLE_ID
+  const bibleId = process.env.API_BIBLE_BIBLE_ID || getDefaultBibleId()
   const baseUrlRaw = process.env.API_BIBLE_BASE_URL || DEFAULT_BASE_URL
 
   const missing = []
@@ -87,16 +87,21 @@ async function bibleFetch<T>(path: string, searchParams?: Record<string, string 
   return (await response.json()) as T
 }
 
-export async function listBooks(): Promise<ApiBibleBook[]> {
-  const { bibleId } = getBibleEnv()
-  const response = await bibleFetch<ApiBibleResponse<ApiBibleBook[]>>(`/bibles/${bibleId}/books`)
+function resolveBibleId(bibleId?: string) {
+  const { bibleId: envBibleId } = getBibleEnv()
+  return bibleId ?? envBibleId
+}
+
+export async function listBooks(bibleId?: string): Promise<ApiBibleBook[]> {
+  const resolvedBibleId = resolveBibleId(bibleId)
+  const response = await bibleFetch<ApiBibleResponse<ApiBibleBook[]>>(`/bibles/${resolvedBibleId}/books`)
   return response.data ?? []
 }
 
-export async function listChapters(bookId: string): Promise<BibleChapter[]> {
-  const { bibleId } = getBibleEnv()
+export async function listChapters(bookId: string, bibleId?: string): Promise<BibleChapter[]> {
+  const resolvedBibleId = resolveBibleId(bibleId)
   const response = await bibleFetch<ApiBibleResponse<ApiBibleChapter[]>>(
-    `/bibles/${bibleId}/books/${bookId}/chapters`
+    `/bibles/${resolvedBibleId}/books/${bookId}/chapters`
   )
 
   return (response.data ?? []).reduce<BibleChapter[]>((acc, chapter) => {
@@ -114,9 +119,10 @@ export async function listChapters(bookId: string): Promise<BibleChapter[]> {
 }
 
 export async function getChapterText(
-  input: { chapterId: string; bookId?: string } | { bookId: string; chapterNumber: number }
+  input: { chapterId: string; bookId?: string } | { bookId: string; chapterNumber: number },
+  bibleId?: string
 ): Promise<BibleChapterContent> {
-  const { bibleId } = getBibleEnv()
+  const resolvedBibleId = resolveBibleId(bibleId)
   let chapterId: string
   let bookId = "bookId" in input ? input.bookId : undefined
   let chapterNumber: number | undefined
@@ -125,7 +131,7 @@ export async function getChapterText(
     chapterId = input.chapterId
   } else {
     chapterNumber = input.chapterNumber
-    const chapters = await listChapters(input.bookId)
+    const chapters = await listChapters(input.bookId, resolvedBibleId)
     const match = chapters.find((chapter) => chapter.number === input.chapterNumber)
     if (!match) {
       throw new Error(`Chapter ${input.chapterNumber} not found for book ${input.bookId}`)
@@ -134,7 +140,7 @@ export async function getChapterText(
   }
 
   const response = await bibleFetch<ApiBibleResponse<ApiBibleChapterContent>>(
-    `/bibles/${bibleId}/chapters/${chapterId}`,
+    `/bibles/${resolvedBibleId}/chapters/${chapterId}`,
     {
       "content-type": "html",
       "include-verse-numbers": true,
@@ -159,21 +165,24 @@ export async function getChapterText(
 }
 
 export async function getChapterVerses(
-  input: { chapterId: string; bookId?: string } | { bookId: string; chapterNumber: number }
+  input: { chapterId: string; bookId?: string } | { bookId: string; chapterNumber: number },
+  bibleId?: string
 ): Promise<{ chapter: BibleChapterContent; verses: BibleVerse[] }> {
-  const chapter = await getChapterText(input)
+  const chapter = await getChapterText(input, bibleId)
   const sanitized = sanitizeChapterHtml(chapter.content)
   const verses = parseChapterHtmlToVerses(sanitized)
   return { chapter: { ...chapter, content: sanitized }, verses }
 }
 
-export async function getBooksWithSlugs(): Promise<BibleBook[]> {
+export async function getBooksWithSlugs(bibleId?: string): Promise<BibleBook[]> {
+  const resolvedBibleId = resolveBibleId(bibleId)
   const now = Date.now()
-  if (cachedBooks && now - cachedBooksAt < BIBLE_CACHE_SECONDS * 1000) {
-    return cachedBooks
+  const cached = cachedBooks.get(resolvedBibleId)
+  if (cached && now - cached.cachedAt < BIBLE_CACHE_SECONDS * 1000) {
+    return cached.books
   }
 
-  const books = await listBooks()
+  const books = await listBooks(resolvedBibleId)
   const mapped = books.map((book) => ({
     id: book.id,
     name: book.name,
@@ -183,14 +192,13 @@ export async function getBooksWithSlugs(): Promise<BibleBook[]> {
     testament: getBookTestament(book.id),
   }))
 
-  cachedBooks = mapped
-  cachedBooksAt = now
+  cachedBooks.set(resolvedBibleId, { books: mapped, cachedAt: now })
 
   return mapped
 }
 
-export async function getBookBySlug(slug: string): Promise<BibleBook | null> {
-  const books = await getBooksWithSlugs()
+export async function getBookBySlug(slug: string, bibleId?: string): Promise<BibleBook | null> {
+  const books = await getBooksWithSlugs(bibleId)
   return books.find((book) => book.slug === slug) ?? null
 }
 
@@ -200,6 +208,19 @@ export async function getBooksByTestament(): Promise<{
   other: BibleBook[]
 }> {
   const books = await getBooksWithSlugs()
+  return groupBooksByTestament(books)
+}
+
+export async function getBooksByTestamentWithId(bibleId?: string): Promise<{
+  oldTestament: BibleBook[]
+  newTestament: BibleBook[]
+  other: BibleBook[]
+}> {
+  const books = await getBooksWithSlugs(bibleId)
+  return groupBooksByTestament(books)
+}
+
+function groupBooksByTestament(books: BibleBook[]) {
   const oldTestament: BibleBook[] = []
   const newTestament: BibleBook[] = []
   const other: BibleBook[] = []

@@ -9,9 +9,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ExternalLink, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import type { SermonChunkVerse } from "@/lib/supabase";
-import { getBibleGatewayUrl } from "@/lib/bibleGateway";
+import { getReaderUrlFromVerse } from "@/lib/bible/reference";
 import { Button } from "@/components/ui/button";
 
 interface VerseDisplayProps {
@@ -46,9 +46,7 @@ export function InlineVerseDisplay({ verses, isMainChapter = false }: VerseDispl
           {verses.map((verse) => (
             <div key={verse.id} className="flex items-start gap-2">
               <a
-                href={getBibleGatewayUrl(verse)}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={getReaderUrlFromVerse(verse)}
                 className="group flex items-center gap-2 text-sm font-mono text-foreground hover:text-accent transition-colors"
               >
                 <Badge
@@ -57,7 +55,6 @@ export function InlineVerseDisplay({ verses, isMainChapter = false }: VerseDispl
                 >
                   {verse.full_reference}
                 </Badge>
-                <ExternalLink className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
               </a>
             </div>
           ))}
@@ -102,12 +99,12 @@ export function VerseBadges({ verses }: VerseDisplayProps) {
               {selectedVerse?.full_reference}
             </DialogTitle>
             <DialogDescription className="font-mono text-xs">
-              View on Bible Gateway (HCSB translation)
+              Open the passage in the Scripture Reader.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground font-mono">
-              Click the link below to read this passage on Bible Gateway with the HCSB translation.
+              Click below to read this passage in the Scripture Reader.
             </p>
             {selectedVerse && (
               <Button
@@ -116,14 +113,11 @@ export function VerseBadges({ verses }: VerseDisplayProps) {
                 className="w-full font-mono text-xs uppercase tracking-widest"
               >
                 <a
-                  href={getBibleGatewayUrl(selectedVerse)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={getReaderUrlFromVerse(selectedVerse)}
                   className="flex items-center justify-center gap-2"
                 >
                   <BookOpen className="size-4" />
-                  Read {selectedVerse.full_reference} on Bible Gateway
-                  <ExternalLink className="size-4" />
+                  Read {selectedVerse.full_reference}
                 </a>
               </Button>
             )}

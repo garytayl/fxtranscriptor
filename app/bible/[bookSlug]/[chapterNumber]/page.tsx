@@ -4,6 +4,8 @@ import { notFound } from "next/navigation"
 import { ChapterJump } from "@/app/bible/_components/chapter-jump"
 import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { isVerseInRange, parseVerseRange } from "@/lib/bible/reference"
+import { TranslationSelect } from "@/app/bible/_components/translation-select"
+import { getAvailableTranslations, getTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
 
@@ -24,12 +26,18 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
     notFound()
   }
 
-  const book = await getBookBySlug(resolvedParams.bookSlug)
+  const verseQuery = Array.isArray(searchParams.v) ? searchParams.v[0] : searchParams.v
+  const translationParam = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
+  const translations = getAvailableTranslations()
+  const translation = getTranslationByKey(translationParam)
+  const activeKey = translation?.key ?? translationParam ?? null
+
+  const book = await getBookBySlug(resolvedParams.bookSlug, translation?.bibleId)
   if (!book) {
     notFound()
   }
 
-  let chapters = await listChapters(book.id)
+  let chapters = await listChapters(book.id, translation?.bibleId)
   chapters = chapters.sort((a, b) => a.number - b.number)
 
   const currentChapter = chapters.find((chapter) => chapter.number === chapterNumber)
@@ -37,14 +45,16 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
     notFound()
   }
 
-  const verseQuery = Array.isArray(searchParams.v) ? searchParams.v[0] : searchParams.v
   const highlightRange = parseVerseRange(verseQuery)
   let errorMessage: string | null = null
   let verses: { number: number; text: string }[] = []
   let chapterReference = ""
 
   try {
-    const chapterResponse = await getChapterVerses({ chapterId: currentChapter.id, bookId: book.id })
+    const chapterResponse = await getChapterVerses(
+      { chapterId: currentChapter.id, bookId: book.id },
+      translation?.bibleId
+    )
     verses = chapterResponse.verses
     chapterReference = chapterResponse.chapter.reference
   } catch (error) {
@@ -54,6 +64,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const currentIndex = chapters.findIndex((chapter) => chapter.id === currentChapter.id)
   const previousChapter = currentIndex > 0 ? chapters[currentIndex - 1] : null
   const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null
+  const query = activeKey ? `?t=${activeKey}` : ""
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -62,7 +73,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
           <div className="flex flex-wrap items-center justify-between gap-6 pb-4">
             <div className="space-y-1">
               <Link
-                href={`/bible/${book.slug}`}
+                href={`/bible/${book.slug}${query}`}
                 className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
               >
                 &lt;- {book.name} chapters
@@ -72,11 +83,15 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
               </h1>
               {chapterReference && <p className="text-sm text-muted-foreground">{chapterReference}</p>}
             </div>
-            <ChapterJump
-              bookSlug={book.slug}
-              chapters={chapters}
-              currentChapter={chapterNumber}
-            />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <TranslationSelect translations={translations} currentKey={activeKey} />
+              <ChapterJump
+                bookSlug={book.slug}
+                chapters={chapters}
+                currentChapter={chapterNumber}
+                translationKey={activeKey}
+              />
+            </div>
           </div>
         </div>
 
@@ -124,7 +139,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6">
           {previousChapter ? (
             <Link
-              href={`/bible/${book.slug}/${previousChapter.number}`}
+              href={`/bible/${book.slug}/${previousChapter.number}${query}`}
               className="rounded-md border border-border bg-card/70 px-4 py-2 text-sm text-foreground transition hover:border-accent/60 hover:bg-card"
             >
               &lt;- {book.name} {previousChapter.number}
@@ -134,7 +149,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
           )}
           {nextChapter ? (
             <Link
-              href={`/bible/${book.slug}/${nextChapter.number}`}
+              href={`/bible/${book.slug}/${nextChapter.number}${query}`}
               className="rounded-md border border-border bg-card/70 px-4 py-2 text-sm text-foreground transition hover:border-accent/60 hover:bg-card"
             >
               {book.name} {nextChapter.number} -&gt;

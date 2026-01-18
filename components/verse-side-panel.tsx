@@ -2,8 +2,8 @@
 
 import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, ExternalLink } from "lucide-react";
-import { getBibleGatewayUrlFromReference } from "@/lib/bibleGateway";
+import { BookOpen } from "lucide-react";
+import { getReaderUrlFromReference } from "@/lib/bible/reference";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 import { cn } from "@/lib/utils";
 
@@ -49,13 +49,11 @@ function VerseCard({ verse, isActive, onClick }: VerseCardProps) {
           {verse.full_reference}
         </Badge>
         <a
-          href={getBibleGatewayUrlFromReference(verse.full_reference)}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={getReaderUrlFromReference(verse.full_reference) ?? "#"}
           onClick={(e) => e.stopPropagation()}
           className="opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <ExternalLink className="size-3 text-muted-foreground hover:text-accent" />
+          <BookOpen className="size-3 text-muted-foreground hover:text-accent" />
         </a>
       </div>
     </button>
