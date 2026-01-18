@@ -90,11 +90,19 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
           </Suspense>
         </header>
 
-        <PassageSearch
-          initialRefs={refsParam ?? ""}
-          translationKey={activeKey}
-          books={books}
-        />
+        <Suspense
+          fallback={
+            <div className="rounded-lg border border-border bg-card/60 p-6 text-sm text-muted-foreground">
+              Loading search...
+            </div>
+          }
+        >
+          <PassageSearch
+            initialRefs={refsParam ?? ""}
+            translationKey={activeKey}
+            books={books}
+          />
+        </Suspense>
 
         {refsParam && results.length === 0 && (
           <div className="rounded-lg border border-border bg-card/60 p-4 text-sm text-muted-foreground">
