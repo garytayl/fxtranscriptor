@@ -6,9 +6,10 @@ export const runtime = "nodejs"
 
 export async function GET(
   _request: Request,
-  { params }: { params: { bookId: string } }
+  context: { params: Promise<{ bookId: string }> }
 ) {
-  const bookId = params.bookId
+  const params = await context.params
+  const bookId = params?.bookId
   if (!bookId) {
     return NextResponse.json({ error: "Book id is required." }, { status: 400 })
   }
