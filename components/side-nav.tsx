@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 
@@ -60,6 +61,16 @@ export function SideNav() {
             </span>
           </button>
         ))}
+        <Link
+          href="/bible"
+          className="group relative flex items-center gap-3"
+          aria-label="Open Scripture Reader"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 transition-all duration-300 group-hover:bg-foreground/60" />
+          <span className="absolute left-6 font-mono text-[10px] uppercase tracking-widest opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:left-8 whitespace-nowrap text-muted-foreground group-hover:text-foreground">
+            Scripture
+          </span>
+        </Link>
       </div>
     </nav>
   )

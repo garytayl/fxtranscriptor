@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useRef } from "react"
 import { ScrambleTextOnHover } from "@/components/scramble-text"
 import { SplitFlapText, SplitFlapMuteToggle, SplitFlapAudioProvider } from "@/components/split-flap-text"
@@ -83,6 +84,12 @@ export function HeroSection() {
           >
             Recent Transcripts
           </a>
+          <Link
+            href="/bible"
+            className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
+          >
+            Scripture Reader
+          </Link>
         </div>
       </div>
 
