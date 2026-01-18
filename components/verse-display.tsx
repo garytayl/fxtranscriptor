@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { BookOpen, Loader2 } from "lucide-react";
 import type { SermonChunkVerse } from "@/lib/supabase";
+import { getReaderUrlFromVerse } from "@/lib/bible/reference";
 import { Button } from "@/components/ui/button";
 
 interface VerseDisplayProps {
@@ -92,6 +93,7 @@ type HoverVerseCardProps = {
 };
 
 function HoverVerseCard({ verse, children }: HoverVerseCardProps) {
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<VerseApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -123,10 +125,24 @@ function HoverVerseCard({ verse, children }: HoverVerseCardProps) {
     }
   };
 
+  const readerUrl = getReaderUrlFromVerse(verse)
+
   return (
-    <HoverCard onOpenChange={(open) => open && load()}>
+    <HoverCard
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          load();
+        }
+      }}
+    >
       <HoverCardTrigger asChild>
-        <button type="button" className="group">
+        <button
+          type="button"
+          className="group"
+          onClick={() => setOpen((prev) => !prev)}
+        >
           {children}
         </button>
       </HoverCardTrigger>
@@ -163,6 +179,17 @@ function HoverVerseCard({ verse, children }: HoverVerseCardProps) {
           {!loading && response && response.verses?.length === 0 && (
             <p className="text-xs text-muted-foreground">No verses returned for this passage.</p>
           )}
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="w-full text-xs uppercase tracking-[0.2em]"
+          >
+            <a href={readerUrl} className="flex items-center justify-center gap-2">
+              <BookOpen className="size-3.5" />
+              Open in reader
+            </a>
+          </Button>
         </div>
       </HoverCardContent>
     </HoverCard>

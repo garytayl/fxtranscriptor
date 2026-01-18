@@ -2,7 +2,8 @@
 
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Loader2 } from "lucide-react";
+import { getReaderUrlFromReference } from "@/lib/bible/reference";
+import { BookOpen, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ function VerseBadgeComponent({
   onLeave?: () => void;
 }) {
   const badgeRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<{
     translation: string;
@@ -104,8 +106,18 @@ function VerseBadgeComponent({
     }
   };
 
+  const readerUrl = getReaderUrlFromReference(verse.full_reference);
+
   return (
-    <HoverCard onOpenChange={(open) => open && loadVerse()}>
+    <HoverCard
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          loadVerse();
+        }
+      }}
+    >
       <HoverCardTrigger asChild>
         <button
           ref={badgeRef}
@@ -115,6 +127,7 @@ function VerseBadgeComponent({
             "group inline-flex items-center gap-1 mx-1 transition-all duration-300",
             isActive && "scale-105"
           )}
+          onClick={() => setOpen((prev) => !prev)}
         >
           <Badge
             variant="outline"
@@ -161,6 +174,17 @@ function VerseBadgeComponent({
           )}
           {!loading && response && response.verses?.length === 0 && (
             <p className="text-xs text-muted-foreground">No verses returned for this passage.</p>
+          )}
+          {readerUrl && (
+            <div className="pt-1">
+              <a
+                href={readerUrl}
+                className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-accent hover:text-accent/80"
+              >
+                <BookOpen className="size-3.5" />
+                <span>Open in reader</span>
+              </a>
+            </div>
           )}
         </div>
       </HoverCardContent>
