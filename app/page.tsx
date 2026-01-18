@@ -39,6 +39,7 @@ import { format } from "date-fns";
 
 export default function Home() {
   const router = useRouter();
+  const pageSize = 24;
   const [sermons, setSermons] = useState<Sermon[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -56,6 +57,7 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [loadedTranscript, setLoadedTranscript] = useState<string | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(pageSize);
 
   // Filter sermons based on search and status
   const filteredSermons = useMemo(() => {
@@ -83,6 +85,10 @@ export default function Home() {
     return groupSermonsBySeries(filteredSermons, playlistSeriesMap);
   }, [filteredSermons, playlistSeriesMap]);
 
+  const visibleUngrouped = useMemo(() => {
+    return ungrouped.slice(0, visibleCount);
+  }, [ungrouped, visibleCount]);
+
   // Load sermons on mount (which will also reload playlist series)
   useEffect(() => {
     loadSermons();
@@ -90,6 +96,10 @@ export default function Home() {
     loadPlaylistSeries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [searchQuery, statusFilter, sermons.length]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -998,7 +1008,7 @@ export default function Home() {
                           </p>
                         </div>
                       ) : (
-                        ungrouped.map((sermon) => (
+                        visibleUngrouped.map((sermon) => (
                           <SermonCard
                             key={sermon.id}
                             sermon={sermon}
@@ -1008,6 +1018,21 @@ export default function Home() {
                         ))
                       )}
                     </div>
+                    {!loading && ungrouped.length > visibleUngrouped.length && (
+                      <div className="mt-8 flex flex-col items-center gap-3">
+                        <p className="font-mono text-xs text-muted-foreground">
+                          Showing {visibleUngrouped.length} of {ungrouped.length} sermons
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="font-mono text-xs uppercase tracking-widest"
+                          onClick={() => setVisibleCount((count) => Math.min(count + pageSize, ungrouped.length))}
+                        >
+                          Load More Sermons
+                        </Button>
+                      </div>
+                    )}
                   </section>
                 )}
               </>
