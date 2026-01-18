@@ -19,31 +19,38 @@ type SearchPageProps = {
 
 export default async function BibleSearchPage({ searchParams }: SearchPageProps) {
   const refsParam = Array.isArray(searchParams.refs) ? searchParams.refs[0] : searchParams.refs
+  const hasRefs = Boolean(refsParam?.trim())
   const translationParam = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
   const translations = await getResolvedTranslations()
   const translation = await getResolvedTranslationByKey(translationParam)
   const activeKey = translation?.key ?? translationParam ?? null
 
-  const passages = refsParam ? parsePassageList(refsParam) : []
-  const books = await getBooksWithSlugs(translation?.bibleId)
+  const passages = hasRefs ? parsePassageList(refsParam ?? "") : []
+  let books = [] as Awaited<ReturnType<typeof getBooksWithSlugs>>
+  let booksError: string | null = null
+  try {
+    books = await getBooksWithSlugs(translation?.bibleId)
+  } catch (error) {
+    booksError = error instanceof Error ? error.message : "Unable to load Bible book data."
+  }
 
   const results = await Promise.all(
     passages.map(async (passage) => {
-      const book = await getBookBySlug(passage.bookSlug, translation?.bibleId)
-      if (!book) {
-        return { passage, error: `Book "${passage.book}" was not found.` }
-      }
-
-      const chapters = await listChapters(book.id, translation?.bibleId)
-      const chapter = chapters.find((item) => item.number === passage.chapterNumber)
-      if (!chapter) {
-        return {
-          passage,
-          error: `Chapter ${passage.chapterNumber} was not found for ${book.name}.`,
-        }
-      }
-
       try {
+        const book = await getBookBySlug(passage.bookSlug, translation?.bibleId)
+        if (!book) {
+          return { passage, error: `Book "${passage.book}" was not found.` }
+        }
+
+        const chapters = await listChapters(book.id, translation?.bibleId)
+        const chapter = chapters.find((item) => item.number === passage.chapterNumber)
+        if (!chapter) {
+          return {
+            passage,
+            error: `Chapter ${passage.chapterNumber} was not found for ${book.name}.`,
+          }
+        }
+
         const chapterResponse = await getChapterVerses(
           { chapterId: chapter.id, bookId: book.id },
           translation?.bibleId
@@ -104,7 +111,19 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
           />
         </Suspense>
 
-        {refsParam && results.length === 0 && (
+        {booksError && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            {booksError}
+          </div>
+        )}
+
+        {hasRefs && (
+          <div className="rounded-lg border border-border bg-card/60 p-4 text-sm text-muted-foreground">
+            Searching for: <span className="text-foreground">{refsParam}</span>
+          </div>
+        )}
+
+        {hasRefs && results.length === 0 && (
           <div className="rounded-lg border border-border bg-card/60 p-4 text-sm text-muted-foreground">
             No valid references found. Try something like “John 3:16-18; Romans 8:1”.
           </div>

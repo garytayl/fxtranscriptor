@@ -28,6 +28,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   const searchParams = useSearchParams()
   const [rawInput, setRawInput] = useState(initialRefs)
   const [rows, setRows] = useState<PassageRow[]>([emptyRow])
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const formRef = useRef<HTMLFormElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -72,6 +73,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
     if (!finalRefs) {
       return
     }
+    setIsSubmitting(true)
     const params = new URLSearchParams()
     params.set("refs", finalRefs)
     if (translationKey) {
@@ -168,9 +170,10 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
 
       <button
         type="submit"
+        disabled={isSubmitting}
         className="w-full rounded-md border border-accent/40 bg-accent/10 px-4 py-2 text-xs uppercase tracking-[0.2em] text-accent transition hover:border-accent/60 hover:bg-accent/20"
       >
-        Search scripture
+        {isSubmitting ? "Searching..." : "Search scripture"}
       </button>
     </form>
   )
