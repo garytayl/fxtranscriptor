@@ -11,6 +11,7 @@ A modern sermon transcript archive for FX Church (Foot of the Cross). Automatica
 - ⚡ **Generate Once** - Click "Generate" once per sermon, all users see it
 - 🎨 **Beautiful UI** - Dark, monochrome design with orange accents (interface template)
 - 📋 **Copy & Download** - Easy transcript copying and .txt downloads
+- 📖 **Scripture Reader** - Ad-free Bible reader powered by API.Bible
 
 ## 🚀 Quick Start
 
@@ -34,6 +35,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://mfzrunlgkpbtiwuzmivq.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 PODBEAN_RSS_URL=https://feed.podbean.com/fxtalk/feed.xml
 YOUTUBE_CHANNEL_ID=@fxchurch
+API_BIBLE_KEY=your-api-bible-key
+API_BIBLE_BIBLE_ID=your-bible-id
+API_BIBLE_BASE_URL=https://api.scripture.api.bible/v1
 ```
 
 **Note**: The app will work with hardcoded values, but using `.env.local` is recommended for production.
@@ -148,6 +152,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://mfzrunlgkpbtiwuzmivq.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 PODBEAN_RSS_URL=https://feed.podbean.com/fxtalk/feed.xml
 YOUTUBE_CHANNEL_ID=@fxchurch
+API_BIBLE_KEY=your-api-bible-key
+API_BIBLE_BIBLE_ID=your-bible-id
+API_BIBLE_BASE_URL=https://api.scripture.api.bible/v1
 ```
 
 ## 🎯 Usage
