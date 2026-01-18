@@ -3,7 +3,7 @@ import { Suspense } from "react"
 import { ArrowLeft } from "lucide-react"
 import { notFound } from "next/navigation"
 
-import { TranslationSelect } from "@/app/bible/_components/translation-select"
+import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { getBookBySlug, listChapters } from "@/lib/bible/api"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
@@ -49,7 +49,7 @@ export default async function BibleBookPage({
           <Suspense
             fallback={<div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>}
           >
-            <TranslationSelect translations={translations} currentKey={activeKey} />
+            <TranslationSettings translations={translations} currentKey={activeKey} />
           </Suspense>
         </header>
 

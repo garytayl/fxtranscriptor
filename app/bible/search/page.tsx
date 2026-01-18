@@ -3,7 +3,7 @@ import { Suspense } from "react"
 import { ArrowLeft } from "lucide-react"
 
 import { PassageSearch } from "@/app/bible/_components/passage-search"
-import { TranslationSelect } from "@/app/bible/_components/translation-select"
+import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { getBookBySlug, getBooksWithSlugs, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { parsePassageList, isVerseInRange } from "@/lib/bible/reference"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
@@ -86,7 +86,7 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
           <Suspense
             fallback={<div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>}
           >
-            <TranslationSelect translations={translations} currentKey={activeKey} />
+            <TranslationSettings translations={translations} currentKey={activeKey} />
           </Suspense>
         </header>
 

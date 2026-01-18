@@ -6,7 +6,7 @@ import { notFound } from "next/navigation"
 import { ChapterJump } from "@/app/bible/_components/chapter-jump"
 import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { isVerseInRange, parseVerseRange } from "@/lib/bible/reference"
-import { TranslationSelect } from "@/app/bible/_components/translation-select"
+import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const revalidate = 3600
@@ -93,7 +93,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
                   <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>
                 }
               >
-                <TranslationSelect translations={translations} currentKey={activeKey} />
+                <TranslationSettings translations={translations} currentKey={activeKey} />
               </Suspense>
               <ChapterJump
                 bookSlug={book.slug}
