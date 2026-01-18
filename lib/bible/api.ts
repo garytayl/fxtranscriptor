@@ -39,21 +39,24 @@ let cachedBooksAt = 0
 function getBibleEnv(): { apiKey: string; bibleId: string; baseUrl: string } {
   const apiKey = process.env.API_BIBLE_KEY
   const bibleId = process.env.API_BIBLE_BIBLE_ID
-  const baseUrl = process.env.API_BIBLE_BASE_URL || DEFAULT_BASE_URL
+  const baseUrlRaw = process.env.API_BIBLE_BASE_URL || DEFAULT_BASE_URL
 
   const missing = []
   if (!apiKey) missing.push("API_BIBLE_KEY")
   if (!bibleId) missing.push("API_BIBLE_BIBLE_ID")
-  if (!baseUrl) missing.push("API_BIBLE_BASE_URL")
+  if (!baseUrlRaw) missing.push("API_BIBLE_BASE_URL")
 
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
   }
 
+  const trimmedBaseUrl = baseUrlRaw.replace(/\/$/, "")
+  const baseUrl = trimmedBaseUrl.endsWith("/v1") ? trimmedBaseUrl : `${trimmedBaseUrl}/v1`
+
   return {
     apiKey: apiKey as string,
     bibleId: bibleId as string,
-    baseUrl: baseUrl.replace(/\/$/, ""),
+    baseUrl,
   }
 }
 
