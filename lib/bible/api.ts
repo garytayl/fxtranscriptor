@@ -36,7 +36,7 @@ type ApiBibleChapterContent = {
 let cachedBooks: BibleBook[] | null = null
 let cachedBooksAt = 0
 
-function getBibleEnv() {
+function getBibleEnv(): { apiKey: string; bibleId: string; baseUrl: string } {
   const apiKey = process.env.API_BIBLE_KEY
   const bibleId = process.env.API_BIBLE_BIBLE_ID
   const baseUrl = process.env.API_BIBLE_BASE_URL || DEFAULT_BASE_URL
@@ -51,8 +51,8 @@ function getBibleEnv() {
   }
 
   return {
-    apiKey,
-    bibleId,
+    apiKey: apiKey as string,
+    bibleId: bibleId as string,
     baseUrl: baseUrl.replace(/\/$/, ""),
   }
 }
