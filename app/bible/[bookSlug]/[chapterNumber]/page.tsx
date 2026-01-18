@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Suspense } from "react"
+import { ArrowLeft } from "lucide-react"
 import { notFound } from "next/navigation"
 
 import { ChapterJump } from "@/app/bible/_components/chapter-jump"
@@ -76,9 +77,10 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
             <div className="space-y-1">
               <Link
                 href={`/bible/${book.slug}${query}`}
-                className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+                className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
               >
-                &lt;- {book.name} chapters
+                <ArrowLeft className="size-3" />
+                {book.name} chapters
               </Link>
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 {book.name} {chapterNumber}
@@ -148,9 +150,10 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
           {previousChapter ? (
             <Link
               href={`/bible/${book.slug}/${previousChapter.number}${query}`}
-              className="rounded-md border border-border bg-card/70 px-4 py-2 text-sm text-foreground transition hover:border-accent/60 hover:bg-card"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card/70 px-4 py-2 text-sm text-foreground transition hover:border-accent/60 hover:bg-card"
             >
-              &lt;- {book.name} {previousChapter.number}
+              <ArrowLeft className="size-3" />
+              {book.name} {previousChapter.number}
             </Link>
           ) : (
             <div />

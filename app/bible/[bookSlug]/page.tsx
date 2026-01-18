@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Suspense } from "react"
+import { ArrowLeft } from "lucide-react"
 import { notFound } from "next/navigation"
 
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
@@ -34,8 +35,12 @@ export default async function BibleBookPage({
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-10">
         <header className="space-y-3">
-          <Link href={`/bible${query}`} className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent">
-            &lt;- All books
+          <Link
+            href={`/bible${query}`}
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+          >
+            <ArrowLeft className="size-3" />
+            All books
           </Link>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{book.name}</h1>
           {book.nameLong && book.nameLong !== book.name && (

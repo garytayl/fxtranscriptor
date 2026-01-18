@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Suspense } from "react"
+import { ArrowLeft } from "lucide-react"
 
 import { PassageSearch } from "@/app/bible/_components/passage-search"
 import { TranslationSelect } from "@/app/bible/_components/translation-select"
@@ -70,8 +71,12 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-10">
         <header className="space-y-3">
-          <Link href={`/bible${activeKey ? `?t=${activeKey}` : ""}`} className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent">
-            &lt;- Back to Bible
+          <Link
+            href={`/bible${activeKey ? `?t=${activeKey}` : ""}`}
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+          >
+            <ArrowLeft className="size-3" />
+            Back to Bible
           </Link>
           <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Scripture Reader</p>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Scripture Search</h1>
