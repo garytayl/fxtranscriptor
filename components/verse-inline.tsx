@@ -1,7 +1,8 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { getReaderUrlFromReference } from "@/lib/bible/reference";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +38,14 @@ function VerseBadgeComponent({
   onEnter?: () => void;
   onLeave?: () => void;
 }) {
-  const badgeRef = useRef<HTMLAnchorElement>(null);
+  const badgeRef = useRef<HTMLButtonElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [response, setResponse] = useState<{
+    translation: string;
+    verses: { number: number; text: string }[];
+    error?: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const badge = badgeRef.current;
@@ -72,28 +80,91 @@ function VerseBadgeComponent({
     };
   }, [onEnter, onLeave]);
 
+  const loadVerse = async () => {
+    if (loading || response) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ ref: verse.full_reference });
+      const res = await fetch(`/api/bible/passage?${params.toString()}`);
+      const data = (await res.json()) as {
+        translation: string;
+        verses: { number: number; text: string }[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to load passage.");
+      }
+      setResponse(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load passage.");
+      setResponse(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <a
-      ref={badgeRef}
-      href={getReaderUrlFromReference(verse.full_reference) ?? "#"}
-      data-verse-reference={verse.full_reference}
-      className={cn(
-        "group inline-flex items-center gap-1 mx-1 transition-all duration-300",
-        isActive && "scale-105"
-      )}
-    >
-      <Badge
-        variant="outline"
-        className={cn(
-          "font-mono text-xs transition-all cursor-pointer",
-          isActive
-            ? "border-accent text-accent bg-accent/20 shadow-[0_0_15px_rgba(255,165,0,0.4)]"
-            : "border-accent/50 text-accent bg-accent/10 hover:bg-accent/20 hover:border-accent/70"
-        )}
-      >
-        {content}
-      </Badge>
-    </a>
+    <HoverCard onOpenChange={(open) => open && loadVerse()}>
+      <HoverCardTrigger asChild>
+        <button
+          ref={badgeRef}
+          type="button"
+          data-verse-reference={verse.full_reference}
+          className={cn(
+            "group inline-flex items-center gap-1 mx-1 transition-all duration-300",
+            isActive && "scale-105"
+          )}
+        >
+          <Badge
+            variant="outline"
+            className={cn(
+              "font-mono text-xs transition-all cursor-pointer",
+              isActive
+                ? "border-accent text-accent bg-accent/20 shadow-[0_0_15px_rgba(255,165,0,0.4)]"
+                : "border-accent/50 text-accent bg-accent/10 hover:bg-accent/20 hover:border-accent/70"
+            )}
+          >
+            {content}
+          </Badge>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-96">
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">{verse.full_reference}</p>
+              <p className="text-xs text-muted-foreground">
+                {response?.translation ? `Translation: ${response.translation}` : "Loading translation..."}
+              </p>
+            </div>
+            <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Verse</span>
+          </div>
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Loading verses...
+            </div>
+          )}
+          {!loading && error && <p className="text-xs text-destructive">{error}</p>}
+          {!loading && response && response.verses?.length > 0 && (
+            <ol className="space-y-2 text-sm leading-relaxed">
+              {response.verses.map((item) => (
+                <li key={item.number} className="text-foreground">
+                  <span className="mr-2 align-super text-[10px] font-semibold text-muted-foreground">
+                    {item.number}
+                  </span>
+                  <span>{item.text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+          {!loading && response && response.verses?.length === 0 && (
+            <p className="text-xs text-muted-foreground">No verses returned for this passage.</p>
+          )}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
