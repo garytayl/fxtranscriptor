@@ -8,7 +8,7 @@ import { getBookBySlug, getBooksWithSlugs, getChapterVerses, listChapters } from
 import { parsePassageList, isVerseInRange } from "@/lib/bible/reference"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
-export const revalidate = 3600
+export const dynamic = "force-dynamic"
 
 type SearchPageProps = {
   searchParams: {
