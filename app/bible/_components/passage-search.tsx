@@ -27,6 +27,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   const [rows, setRows] = useState<PassageRow[]>([emptyRow])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const refsInputRef = useRef<HTMLInputElement | null>(null)
 
   const bookOptions = useMemo(
     () => books.map((book) => ({ label: book.name, value: book.slug })),
@@ -75,6 +76,9 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
           event.preventDefault()
           return
         }
+        if (refsInputRef.current) {
+          refsInputRef.current.value = finalRefs
+        }
         if (finalRefs && textareaRef.current) {
           textareaRef.current.value = finalRefs
           setRawInput(finalRefs)
@@ -82,6 +86,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
         setIsSubmitting(true)
       }}
     >
+      <input ref={refsInputRef} type="hidden" name="refs" defaultValue={initialRefs} />
       {translationKey ? <input type="hidden" name="t" value={translationKey} /> : null}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -89,7 +94,6 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
         </h2>
         <textarea
           ref={textareaRef}
-          name="refs"
           value={rawInput}
           onChange={(event) => setRawInput(event.target.value)}
           placeholder="Example: John 3:16-18; Romans 8:1"
