@@ -129,13 +129,15 @@ export function groupSermonsBySeries(
 
   for (const sermon of sermons) {
     // Priority order for series name:
-    // 1. Playlist-based series name (highest priority)
-    // 2. Extracted series metadata from transcript (second priority)
-    // 3. Ungrouped if neither exists
+    // 1. Admin override (highest priority)
+    // 2. Playlist-based series name
+    // 3. Extracted series metadata from transcript
+    // 4. Ungrouped if neither exists
+    const overrideSeriesName = sermon.series_override || null;
     const playlistSeriesName = playlistSeriesMap?.get(sermon.id);
     const extractedSeriesName = sermon.series; // From transcript metadata
     
-    const seriesName = playlistSeriesName || extractedSeriesName;
+    const seriesName = overrideSeriesName || playlistSeriesName || extractedSeriesName;
 
     if (seriesName) {
       const seriesId = generateSeriesId(seriesName);

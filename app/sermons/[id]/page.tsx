@@ -715,7 +715,11 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
           {/* Series and Speaker Metadata */}
           <div className="mb-6">
-            <SermonMetadata series={sermon.series} speaker={sermon.speaker} />
+          <SermonMetadata
+            series={sermon.series}
+            seriesOverride={sermon.series_override}
+            speaker={sermon.speaker}
+          />
           </div>
 
           {/* Links */}

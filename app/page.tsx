@@ -1073,7 +1073,11 @@ export default function Home() {
                 </div>
                 {/* Series and Speaker Metadata */}
                 {selectedSermon && (
-                  <SermonMetadata series={selectedSermon.series} speaker={selectedSermon.speaker} />
+                  <SermonMetadata
+                    series={selectedSermon.series}
+                    seriesOverride={selectedSermon.series_override}
+                    speaker={selectedSermon.speaker}
+                  />
                 )}
                 {/* Links */}
                 <div className="flex flex-wrap gap-4">

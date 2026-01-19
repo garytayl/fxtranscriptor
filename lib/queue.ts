@@ -3,7 +3,7 @@
  * Used by both API routes to avoid HTTP calls between routes
  */
 
-import { supabase } from "@/lib/supabase";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export interface AddToQueueResult {
   success: boolean;
@@ -19,12 +19,7 @@ export interface AddToQueueResult {
  */
 export async function addSermonToQueue(sermonId: string): Promise<AddToQueueResult> {
   try {
-    if (!supabase) {
-      return {
-        success: false,
-        error: "Supabase not configured",
-      };
-    }
+    const supabase = createSupabaseAdminClient();
 
     // Check if sermon exists
     const { data: sermon, error: fetchError } = await supabase

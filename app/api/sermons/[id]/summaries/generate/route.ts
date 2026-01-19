@@ -4,7 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { generateChunkSummary } from "@/lib/generateChunkSummaries";
 import type { SermonMetadata } from "@/lib/generateChunkSummaries";
 
@@ -15,7 +16,15 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -33,7 +42,7 @@ export async function POST(
     }
 
     // Since we're regenerating chunk summaries, invalidate any stored unified summary
-    const { error: invalidateUnifiedError } = await supabase
+    const { error: invalidateUnifiedError } = await supabaseClient
       .from("sermons")
       .update({
         unified_summary_json: null,
@@ -56,7 +65,7 @@ export async function POST(
     }
 
     // Fetch sermon to get chunks
-    const { data: sermon, error: sermonError } = await supabase
+    const { data: sermon, error: sermonError } = await supabaseClient
       .from("sermons")
       .select("*")
       .eq("id", sermonId)
@@ -102,7 +111,7 @@ export async function POST(
     }
 
     // Clear existing summaries and verses for this sermon
-    const { data: existingSummaries } = await supabase
+    const { data: existingSummaries } = await supabaseClient
       .from("sermon_chunk_summaries")
       .select("id")
       .eq("sermon_id", sermonId);
@@ -111,13 +120,13 @@ export async function POST(
       const existingIds = existingSummaries.map((s) => s.id);
       
       // Delete verses first (foreign key constraint)
-      await supabase
+      await supabaseClient
         .from("sermon_chunk_verses")
         .delete()
         .in("summary_id", existingIds);
 
       // Delete summaries
-      await supabase
+      await supabaseClient
         .from("sermon_chunk_summaries")
         .delete()
         .eq("sermon_id", sermonId);
@@ -136,7 +145,7 @@ export async function POST(
     const sermonMetadata: SermonMetadata = {
       speaker: sermon.speaker || null,
       title: sermon.title || null,
-      series: sermon.series || null,
+      series: sermon.series_override || sermon.series || null,
     };
 
     // Generate summaries for each chunk
@@ -156,7 +165,7 @@ export async function POST(
         previousSummaries.push(summaryResult.summary);
 
         // Insert summary
-        const { data: summary, error: summaryError } = await supabase
+        const { data: summary, error: summaryError } = await supabaseClient
           .from("sermon_chunk_summaries")
           .insert({
             sermon_id: sermonId,
@@ -183,7 +192,7 @@ export async function POST(
             full_reference: verse.full_reference,
           }));
 
-          const { error: versesError } = await supabase
+          const { error: versesError } = await supabaseClient
             .from("sermon_chunk_verses")
             .insert(verseInserts);
 

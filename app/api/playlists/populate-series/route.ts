@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchYouTubePlaylist, extractPlaylistId } from "@/lib/fetchYouTubePlaylist";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,15 @@ async function fetchVideoDetails(videoIds: string[], apiKey?: string): Promise<A
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -134,7 +143,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Get existing sermons with these video IDs
-    const { data: existingSermons, error: sermonsError } = await supabase
+    const { data: existingSermons, error: sermonsError } = await supabaseClient
       .from("sermons")
       .select("id, youtube_video_id, title")
       .in("youtube_video_id", playlist.videoIds);
@@ -188,7 +197,7 @@ export async function POST(request: NextRequest) {
 
             // Only update if there are changes
             if (Object.keys(updateData).length > 1) { // More than just updated_at
-              const { error: updateError } = await supabase
+              const { error: updateError } = await supabaseClient
                 .from("sermons")
                 .update(updateData)
                 .eq("id", existingSermon.id);
@@ -218,7 +227,7 @@ export async function POST(request: NextRequest) {
           status: "pending" as const,
         };
 
-        const { data: newSermon, error: insertError } = await supabase
+        const { data: newSermon, error: insertError } = await supabaseClient
           .from("sermons")
           .insert(sermonData)
           .select()
@@ -231,7 +240,7 @@ export async function POST(request: NextRequest) {
         // Add sermon source for tracking
         if (newSermon) {
           try {
-            await supabase.from("sermon_sources").insert({
+            await supabaseClient.from("sermon_sources").insert({
               sermon_id: newSermon.id,
               source_type: "youtube",
               source_url: sermonData.youtube_url,

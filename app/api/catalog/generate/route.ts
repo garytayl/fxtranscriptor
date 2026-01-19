@@ -4,7 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { transcribeWithWhisper } from "@/lib/transcribeWithWhisper";
 import { transcribeChunks } from "@/lib/transcribeChunks";
 import { extractMetadata } from "@/lib/extractMetadata";
@@ -13,12 +14,12 @@ export const runtime = "nodejs";
 
 // Helper function to update progress in database
 async function updateProgress(
+  supabaseClient: ReturnType<typeof createSupabaseAdminClient>,
   sermonId: string,
   progress: { step: string; current?: number; total?: number; message?: string; details?: string[] }
 ) {
-  if (!supabase) return;
   try {
-    await supabase
+    await supabaseClient
       .from("sermons")
       .update({ progress_json: progress })
       .eq("id", sermonId);
@@ -28,8 +29,23 @@ async function updateProgress(
 }
 
 export async function POST(request: NextRequest) {
+  let supabaseClient: ReturnType<typeof createSupabaseAdminClient> | null = null;
+
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Supabase not configured" },
+        { status: 500 }
+      );
+    }
+    if (!supabaseClient) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -47,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get sermon from database
-    const { data: sermon, error: fetchError } = await supabase
+    const { data: sermon, error: fetchError } = await supabaseClient
       .from("sermons")
       .select("*")
       .eq("id", sermonId)
@@ -113,7 +129,7 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Generate] ❌ Worker not configured for YouTube transcription`);
       
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -158,7 +174,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get updated sermon with queue info
-        const { data: updatedSermon } = await supabase
+        const { data: updatedSermon } = await supabaseClient
           .from("sermons")
           .select("*")
           .eq("id", sermonId)
@@ -199,7 +215,7 @@ export async function POST(request: NextRequest) {
           ? error.message 
           : "Unknown error";
         
-        await supabase
+        await supabaseClient
           .from("sermons")
           .update({ 
             status: "failed",
@@ -224,7 +240,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Generate] Using Vercel transcription (worker not configured or no audio_url)`);
     
     // Update status to "generating"
-    await supabase
+    await supabaseClient
       .from("sermons")
       .update({ status: "generating", progress_json: { step: "initializing", message: "Initializing transcription..." } })
       .eq("id", sermonId);
@@ -233,7 +249,7 @@ export async function POST(request: NextRequest) {
     if (!sermon.audio_url && !sermon.youtube_url && !sermon.podbean_url) {
       const errorMessage = "No audio_url, YouTube URL, or Podbean URL available for this sermon. Cannot generate transcript.\n\nTo fix: Re-sync the catalog to populate audio_url from Podbean RSS feed.";
       
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -275,7 +291,7 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Generate] ❌ Cannot generate transcript: ${errorMessage}`);
       
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -305,7 +321,7 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Generate] ❌ Cannot extract YouTube audio on Vercel: ${errorMessage}`);
       
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -330,7 +346,7 @@ export async function POST(request: NextRequest) {
     // Check file size to determine if chunking is needed
     const CHUNKING_THRESHOLD_MB = 20; // Files >20MB must be chunked
     
-    await updateProgress(sermonId, { step: "checking_size", message: "Checking audio file size..." });
+    await updateProgress(supabaseClient, sermonId, { step: "checking_size", message: "Checking audio file size..." });
     
     // First, try to get file size from HEAD request (if supported)
     let fileSizeMB = 0;
@@ -340,7 +356,7 @@ export async function POST(request: NextRequest) {
       if (contentLength) {
         fileSizeMB = parseInt(contentLength) / 1024 / 1024;
         console.log(`[Generate] Audio file size: ${fileSizeMB.toFixed(2)} MB (from Content-Length header)`);
-        await updateProgress(sermonId, { step: "checked_size", message: `Audio file size: ${fileSizeMB.toFixed(2)} MB` });
+        await updateProgress(supabaseClient, sermonId, { step: "checked_size", message: `Audio file size: ${fileSizeMB.toFixed(2)} MB` });
       }
     } catch (error) {
       console.log(`[Generate] Could not determine file size from HEAD request, will check after download if needed`);
@@ -356,7 +372,7 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Generate] ❌ ${errorMessage}`);
       
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -410,19 +426,19 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[Generate] ✅ Audio chunked into ${chunkData.chunks.length} chunks`);
-        await updateProgress(sermonId, { step: "chunked", message: `Audio chunked into ${chunkData.chunks.length} chunks`, total: chunkData.chunks.length });
+        await updateProgress(supabaseClient, sermonId, { step: "chunked", message: `Audio chunked into ${chunkData.chunks.length} chunks`, total: chunkData.chunks.length });
 
         // Step 2: Transcribe each chunk
         const chunks = chunkData.chunks;
         console.log(`[Generate] Starting transcription of ${chunks.length} chunks...`);
-        await updateProgress(sermonId, { step: "transcribing_chunks", message: "Starting transcription...", current: 0, total: chunks.length });
+        await updateProgress(supabaseClient, sermonId, { step: "transcribing_chunks", message: "Starting transcription...", current: 0, total: chunks.length });
         
         const chunksResult = await transcribeChunks(
           chunks,
           huggingFaceKey,
           async (chunkNum, totalChunks) => {
             console.log(`[Generate] Progress: Chunk ${chunkNum}/${totalChunks} completed`);
-            await updateProgress(sermonId, { step: "transcribing_chunks", message: `Transcribing chunk ${chunkNum}/${totalChunks}...`, current: chunkNum, total: totalChunks });
+            await updateProgress(supabaseClient, sermonId, { step: "transcribing_chunks", message: `Transcribing chunk ${chunkNum}/${totalChunks}...`, current: chunkNum, total: totalChunks });
           }
         );
 
@@ -480,7 +496,7 @@ export async function POST(request: NextRequest) {
     // Use direct transcription for smaller files or if chunking was skipped
     if (!transcriptResult || !transcriptResult.success) {
       console.log(`[Generate] 🎯 Using direct Whisper AI transcription for: ${sermon.audio_url.substring(0, 100)}...`);
-      await updateProgress(sermonId, { step: "transcribing", message: "Transcribing audio..." });
+      await updateProgress(supabaseClient, sermonId, { step: "transcribing", message: "Transcribing audio..." });
       
       try {
         const whisperResult = await transcribeWithWhisper(sermon.audio_url, huggingFaceKey);
@@ -518,7 +534,7 @@ export async function POST(request: NextRequest) {
       // Extract metadata from transcript (series, speaker, summary)
       const metadata = extractMetadata(transcriptResult.transcript);
       
-      const { data: updatedSermon, error: updateError } = await supabase
+      const { data: updatedSermon, error: updateError } = await supabaseClient
         .from("sermons")
         .update({
           transcript: transcriptResult.transcript.trim(),
@@ -546,7 +562,7 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Generate] Transcript generation failed for sermon "${sermon.title}": ${errorMessage}`);
       
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -574,8 +590,9 @@ export async function POST(request: NextRequest) {
     // Update sermon status to failed
     try {
       const body = await request.json();
-      if (body.sermonId && supabase) {
-        await supabase
+      if (body.sermonId) {
+        const adminClient = supabaseClient ?? createSupabaseAdminClient();
+        await adminClient
           .from("sermons")
           .update({
             status: "failed",

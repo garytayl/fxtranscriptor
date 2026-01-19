@@ -4,13 +4,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find queue item
-    const { data: queueItem, error: fetchError } = await supabase
+    const { data: queueItem, error: fetchError } = await supabaseClient
       .from("transcription_queue")
       .select("*")
       .eq("sermon_id", sermonId)
@@ -65,13 +68,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await supabase
+    await supabaseClient
       .from("transcription_queue")
       .update(updateData)
       .eq("id", queueItem.id);
 
     // Reorder remaining queued items
-    const { data: remainingItems } = await supabase
+    const { data: remainingItems } = await supabaseClient
       .from("transcription_queue")
       .select("*")
       .eq("status", "queued")
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     if (remainingItems && remainingItems.length > 0) {
       for (let i = 0; i < remainingItems.length; i++) {
-        await supabase
+        await supabaseClient
           .from("transcription_queue")
           .update({ position: i + 1 })
           .eq("id", remainingItems[i].id);

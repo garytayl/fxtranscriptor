@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SermonMetadata } from "@/lib/generateChunkSummaries";
 
 export const runtime = "nodejs";
@@ -86,7 +88,15 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let adminClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      adminClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -115,7 +125,7 @@ export async function POST(
     }
 
     // Fetch sermon metadata
-    const { data: sermon, error: sermonError } = await supabase
+    const { data: sermon, error: sermonError } = await adminClient
       .from("sermons")
       .select("*")
       .eq("id", sermonId)
@@ -148,7 +158,7 @@ export async function POST(
     }
 
     // Fetch all chunk summaries with verses
-    const { data: summaries, error: summariesError } = await supabase
+    const { data: summaries, error: summariesError } = await adminClient
       .from("sermon_chunk_summaries")
       .select(`
         *,
@@ -176,7 +186,7 @@ export async function POST(
     const sermonMetadata: SermonMetadata = {
       speaker: sermon.speaker || null,
       title: sermon.title || null,
-      series: sermon.series || null,
+      series: sermon.series_override || sermon.series || null,
     };
 
     // Build context from all chunk summaries
@@ -343,7 +353,7 @@ Important:
       }
 
       // Persist the unified summary on the sermon row
-      const { error: persistError } = await supabase
+      const { error: persistError } = await adminClient
         .from("sermons")
         .update({
           unified_summary_json: validatedSections as any,

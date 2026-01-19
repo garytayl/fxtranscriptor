@@ -6,13 +6,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
     const workerUrl = process.env.AUDIO_WORKER_URL?.trim();
     if (!workerUrl) {
       // Mark as failed
-      await supabase
+      await supabaseClient
         .from("transcription_queue")
         .update({
           status: "failed",
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", queueItem.id);
 
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
     const audioSource = sermon.audio_url || sermon.youtube_url;
     if (!audioSource) {
       // Mark as failed
-      await supabase
+      await supabaseClient
         .from("transcription_queue")
         .update({
           status: "failed",
@@ -97,7 +100,7 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", queueItem.id);
 
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already cancelled
-    const { data: currentQueueItem } = await supabase
+    const { data: currentQueueItem } = await supabaseClient
       .from("transcription_queue")
       .select("status")
       .eq("id", queueItem.id)
@@ -167,7 +170,7 @@ export async function POST(request: NextRequest) {
         error instanceof Error ? error.message : "Unknown error";
 
       // Mark as failed
-      await supabase
+      await supabaseClient
         .from("transcription_queue")
         .update({
           status: "failed",
@@ -176,7 +179,7 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", queueItem.id);
 
-      await supabase
+      await supabaseClient
         .from("sermons")
         .update({
           status: "failed",

@@ -9,13 +9,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchPodbeanCatalog } from "@/lib/fetchPodbeanCatalog";
 import { fetchYouTubeCatalog } from "@/lib/fetchYouTubeCatalog";
 import { matchSermons } from "@/lib/matchSermons";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY" },
         { status: 500 }
@@ -23,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Test database connection first
-    const { error: testError } = await supabase.from("sermons").select("id").limit(1);
+    const { error: testError } = await supabaseClient.from("sermons").select("id").limit(1);
     if (testError) {
       console.error("Database connection error:", testError);
       
@@ -143,7 +152,7 @@ export async function GET(request: NextRequest) {
     console.log(`[Sync] Performing reverse lookup for existing YouTube-only sermons...`);
     let reverseMatchedCount = 0;
     try {
-      const { data: existingYouTubeOnlySermons, error: fetchError } = await supabase
+      const { data: existingYouTubeOnlySermons, error: fetchError } = await supabaseClient
         .from("sermons")
         .select("id, title, youtube_url, youtube_video_id, date")
         .is("podbean_url", null)
@@ -242,7 +251,7 @@ export async function GET(request: NextRequest) {
           
           if (bestMatch) {
             // Update existing sermon with Podbean data
-            const { error: updateError } = await supabase
+            const { error: updateError } = await supabaseClient
               .from("sermons")
               .update({
                 podbean_url: bestMatch.url,
@@ -286,7 +295,7 @@ export async function GET(request: NextRequest) {
         let existingSermonId: string | null = null;
 
         if (matched.podbeanEpisode?.url) {
-          const { data: existingByPodbean, error: podbeanCheckError } = await supabase
+          const { data: existingByPodbean, error: podbeanCheckError } = await supabaseClient
             .from("sermons")
             .select("id")
             .eq("podbean_url", matched.podbeanEpisode.url)
@@ -302,7 +311,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!existingSermonId && matched.youtubeVideo?.videoId) {
-          const { data: existingByYouTube, error: youtubeCheckError } = await supabase
+          const { data: existingByYouTube, error: youtubeCheckError } = await supabaseClient
             .from("sermons")
             .select("id")
             .eq("youtube_video_id", matched.youtubeVideo.videoId)
@@ -333,7 +342,7 @@ export async function GET(request: NextRequest) {
         if (existingSermonId) {
           // Update existing sermon
           // Preserve audio_url if it already exists and new match doesn't have one
-          const { data: existingSermon, error: fetchExistingError } = await supabase
+          const { data: existingSermon, error: fetchExistingError } = await supabaseClient
             .from("sermons")
             .select("audio_url, podbean_url, youtube_url")
             .eq("id", existingSermonId)
@@ -365,7 +374,7 @@ export async function GET(request: NextRequest) {
             console.log(`[Sync] Merging Podbean URL from existing sermon: ${matched.title.substring(0, 50)}...`);
           }
           
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseClient
             .from("sermons")
             .update(sermonData)
             .eq("id", existingSermonId);
@@ -377,7 +386,7 @@ export async function GET(request: NextRequest) {
           console.log(`[Sync] Updated existing sermon: ${matched.title.substring(0, 50)}...`);
         } else {
           // Create new sermon
-          const { data: newSermon, error: insertError } = await supabase
+          const { data: newSermon, error: insertError } = await supabaseClient
             .from("sermons")
             .insert(sermonData)
             .select()
@@ -398,7 +407,7 @@ export async function GET(request: NextRequest) {
           // Add sermon sources for deduplication tracking (non-blocking)
           if (matched.podbeanEpisode && existingSermonId) {
             try {
-              await supabase.from("sermon_sources").insert({
+              await supabaseClient.from("sermon_sources").insert({
                 sermon_id: existingSermonId,
                 source_type: "podbean",
                 source_url: matched.podbeanEpisode.url,
@@ -411,7 +420,7 @@ export async function GET(request: NextRequest) {
 
           if (matched.youtubeVideo && existingSermonId) {
             try {
-              await supabase.from("sermon_sources").insert({
+              await supabaseClient.from("sermon_sources").insert({
                 sermon_id: existingSermonId,
                 source_type: "youtube",
                 source_url: matched.youtubeVideo.url,

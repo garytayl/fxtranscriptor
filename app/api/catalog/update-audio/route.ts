@@ -4,14 +4,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { extractFromPodbean } from "@/lib/extractFromPodbean";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -71,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update sermon with audio URL
-    const { data: updatedSermon, error: updateError } = await supabase
+    const { data: updatedSermon, error: updateError } = await supabaseClient
       .from("sermons")
       .update({
         audio_url: finalAudioUrl,

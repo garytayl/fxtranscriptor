@@ -4,7 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,15 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -31,7 +40,7 @@ export async function POST(
     }
 
     // Fetch existing summaries to get IDs for verse deletion
-    const { data: existingSummaries, error: fetchError } = await supabase
+    const { data: existingSummaries, error: fetchError } = await supabaseClient
       .from("sermon_chunk_summaries")
       .select("id")
       .eq("sermon_id", sermonId);
@@ -48,7 +57,7 @@ export async function POST(
     if (existingSummaries && existingSummaries.length > 0) {
       const summaryIds = existingSummaries.map((s) => s.id);
       
-      const { error: versesError } = await supabase
+      const { error: versesError } = await supabaseClient
         .from("sermon_chunk_verses")
         .delete()
         .in("summary_id", summaryIds);
@@ -63,7 +72,7 @@ export async function POST(
     }
 
     // Delete summaries
-    const { error: summariesError } = await supabase
+    const { error: summariesError } = await supabaseClient
       .from("sermon_chunk_summaries")
       .delete()
       .eq("sermon_id", sermonId);
@@ -77,7 +86,7 @@ export async function POST(
     }
 
     // Clear unified summary cache on sermon (since source summaries are gone)
-    const { error: clearUnifiedError } = await supabase
+    const { error: clearUnifiedError } = await supabaseClient
       .from("sermons")
       .update({
         unified_summary_json: null,

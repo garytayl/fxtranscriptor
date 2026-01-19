@@ -17,12 +17,18 @@ https://mfzrunlgkpbtiwuzmivq.supabase.co
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1menJ1bmxna3BidGl3dXptaXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNzExOTcsImV4cCI6MjA4MzY0NzE5N30.0t5wve3InEVRGev5i_FwTohcxvZ_rmo4QwWTULv5RSc
 ```
 
-### 3. PODBEAN_RSS_URL (Optional)
+### 3. SUPABASE_SERVICE_ROLE_KEY
+```
+YOUR_SUPABASE_SERVICE_ROLE_KEY
+```
+Keep this secret. Do not expose it in client-side code.
+
+### 4. PODBEAN_RSS_URL (Optional)
 ```
 https://feed.podbean.com/fxtalk/feed.xml
 ```
 
-### 4. YOUTUBE_CHANNEL_ID (Optional)
+### 5. YOUTUBE_CHANNEL_ID (Optional)
 ```
 @fxchurch
 ```

@@ -4,13 +4,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -35,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current sermon state
-    const { data: sermon, error: fetchError } = await supabase
+    const { data: sermon, error: fetchError } = await supabaseClient
       .from("sermons")
       .select("*")
       .eq("id", sermonId)
@@ -116,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update sermon
-    const { data: updatedSermon, error: updateError } = await supabase
+    const { data: updatedSermon, error: updateError } = await supabaseClient
       .from("sermons")
       .update(updateData)
       .eq("id", sermonId)

@@ -5,13 +5,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!supabase) {
+    let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabaseClient = createSupabaseAdminClient();
+    } catch (error) {
       return NextResponse.json(
         { error: "Supabase not configured" },
         { status: 500 }
@@ -19,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if there's already a processing item
-    const { data: processingItem } = await supabase
+    const { data: processingItem } = await supabaseClient
       .from("transcription_queue")
       .select("*")
       .eq("status", "processing")
@@ -27,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     if (processingItem) {
       // Return the currently processing item
-      const { data: sermon } = await supabase
+      const { data: sermon } = await supabaseClient
         .from("sermons")
         .select("*")
         .eq("id", processingItem.sermon_id)
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get next queued item (lowest position, status = 'queued')
-    const { data: nextItem, error: fetchError } = await supabase
+    const { data: nextItem, error: fetchError } = await supabaseClient
       .from("transcription_queue")
       .select("*")
       .eq("status", "queued")
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark as processing
-    const { data: updatedItem, error: updateError } = await supabase
+    const { data: updatedItem, error: updateError } = await supabaseClient
       .from("transcription_queue")
       .update({
         status: "processing",
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get sermon details
-    const { data: sermon, error: sermonError } = await supabase
+    const { data: sermon, error: sermonError } = await supabaseClient
       .from("sermons")
       .select("*")
       .eq("id", nextItem.sermon_id)
@@ -103,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update sermon progress
-    await supabase
+    await supabaseClient
       .from("sermons")
       .update({
         status: "generating",
