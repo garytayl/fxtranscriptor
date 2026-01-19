@@ -14,18 +14,26 @@ type SearchPageProps = {
   searchParams: {
     refs?: string | string[]
     t?: string | string[]
+    bookSlug?: string | string[]
+    chapterNumber?: string | string[]
+    verseRange?: string | string[]
   }
+}
+
+function toArray(value?: string | string[]) {
+  if (!value) {
+    return []
+  }
+  return Array.isArray(value) ? value : [value]
 }
 
 export default async function BibleSearchPage({ searchParams }: SearchPageProps) {
   const refsParam = Array.isArray(searchParams.refs) ? searchParams.refs[0] : searchParams.refs
-  const hasRefs = Boolean(refsParam?.trim())
   const translationParam = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
   const translations = await getResolvedTranslations()
   const translation = await getResolvedTranslationByKey(translationParam)
   const activeKey = translation?.key ?? translationParam ?? null
 
-  const passages = hasRefs ? parsePassageList(refsParam ?? "") : []
   let books = [] as Awaited<ReturnType<typeof getBooksWithSlugs>>
   let booksError: string | null = null
   try {
@@ -33,6 +41,29 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
   } catch (error) {
     booksError = error instanceof Error ? error.message : "Unable to load Bible book data."
   }
+
+  const hasRefs = Boolean(refsParam?.trim())
+  const builderBookSlugs = toArray(searchParams.bookSlug).filter(Boolean)
+  const builderChapters = toArray(searchParams.chapterNumber).filter(Boolean)
+  const builderVerses = toArray(searchParams.verseRange)
+  let effectiveRefs = refsParam ?? ""
+
+  if (!hasRefs && builderBookSlugs.length > 0 && builderChapters.length > 0) {
+    const slugLookup = new Map(books.map((book) => [book.slug, book.name]))
+    const built = builderBookSlugs.map((slug, index) => {
+      const chapter = builderChapters[index] ?? ""
+      if (!slug || !chapter) {
+        return ""
+      }
+      const bookName = slugLookup.get(slug) ?? slug
+      const verse = builderVerses[index]?.trim()
+      const versePart = verse ? `:${verse}` : ""
+      return `${bookName} ${chapter}${versePart}`
+    })
+    effectiveRefs = built.filter(Boolean).join("; ")
+  }
+
+  const passages = effectiveRefs ? parsePassageList(effectiveRefs) : []
 
   const results = await Promise.all(
     passages.map(async (passage) => {
@@ -117,13 +148,13 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
           </div>
         )}
 
-        {hasRefs && (
+        {Boolean(effectiveRefs) && (
           <div className="rounded-lg border border-border bg-card/60 p-4 text-sm text-muted-foreground">
-            Searching for: <span className="text-foreground">{refsParam}</span>
+            Searching for: <span className="text-foreground">{effectiveRefs}</span>
           </div>
         )}
 
-        {hasRefs && results.length === 0 && (
+        {Boolean(effectiveRefs) && results.length === 0 && (
           <div className="rounded-lg border border-border bg-card/60 p-4 text-sm text-muted-foreground">
             No valid references found. Try something like “John 3:16-18; Romans 8:1”.
           </div>
