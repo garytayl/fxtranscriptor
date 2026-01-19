@@ -14,11 +14,14 @@ export const runtime = "nodejs";
 
 // Helper function to update progress in database
 async function updateProgress(
-  supabaseClient: ReturnType<typeof createSupabaseAdminClient>,
+  supabaseClient: ReturnType<typeof createSupabaseAdminClient> | null,
   sermonId: string,
   progress: { step: string; current?: number; total?: number; message?: string; details?: string[] }
 ) {
   try {
+    if (!supabaseClient) {
+      return;
+    }
     await supabaseClient
       .from("sermons")
       .update({ progress_json: progress })
