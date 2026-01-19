@@ -8,13 +8,13 @@ export type AdminProfile = {
 };
 
 export async function getCurrentUser() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   return data.user;
 }
 
 export async function getCurrentProfile() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
 
@@ -32,7 +32,7 @@ export async function getCurrentProfile() {
 }
 
 export async function requireAdmin() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
 
