@@ -27,7 +27,6 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
   const [rows, setRows] = useState<PassageRow[]>([emptyRow])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const refsInputRef = useRef<HTMLInputElement | null>(null)
 
   const bookOptions = useMemo(
     () => books.map((book) => ({ label: book.name, value: book.slug })),
@@ -65,28 +64,26 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
     return (builtRefs || rawInput.trim()).trim()
   }
 
+  const derivedRefs = buildFinalRefs()
+
   return (
     <form
       className="space-y-6 rounded-lg border border-border bg-card/60 p-6"
       action="/bible/search"
       method="get"
       onSubmit={(event) => {
-        const finalRefs = buildFinalRefs()
-        if (!finalRefs) {
+        if (!derivedRefs) {
           event.preventDefault()
           return
         }
-        if (refsInputRef.current) {
-          refsInputRef.current.value = finalRefs
-        }
-        if (finalRefs && textareaRef.current) {
-          textareaRef.current.value = finalRefs
-          setRawInput(finalRefs)
+        if (derivedRefs && textareaRef.current) {
+          textareaRef.current.value = derivedRefs
+          setRawInput(derivedRefs)
         }
         setIsSubmitting(true)
       }}
     >
-      <input ref={refsInputRef} type="hidden" name="refs" defaultValue={initialRefs} />
+      <input type="hidden" name="refs" value={derivedRefs} readOnly />
       {translationKey ? <input type="hidden" name="t" value={translationKey} /> : null}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
