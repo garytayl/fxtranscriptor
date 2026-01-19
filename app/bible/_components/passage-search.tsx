@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
 
 import type { BibleBook } from "@/lib/bible/types"
 
@@ -24,13 +23,11 @@ const emptyRow: PassageRow = {
 }
 
 export function PassageSearch({ initialRefs, translationKey, books = [] }: PassageSearchProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const [rawInput, setRawInput] = useState(initialRefs)
   const [rows, setRows] = useState<PassageRow[]>([emptyRow])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const formRef = useRef<HTMLFormElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const refsInputRef = useRef<HTMLInputElement | null>(null)
 
   const bookOptions = useMemo(
     () => books.map((book) => ({ label: book.name, value: book.slug })),
@@ -63,56 +60,40 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
     return refs.join("; ")
   }
 
-  const handleSearch = () => {
+  const buildFinalRefs = () => {
     const builtRefs = buildFromRows()
-    const finalRefs = builtRefs || rawInput.trim()
-    if (builtRefs && textareaRef.current) {
-      textareaRef.current.value = builtRefs
-      setRawInput(builtRefs)
-    }
-    if (!finalRefs) {
-      return
-    }
-    setIsSubmitting(true)
-    const params = new URLSearchParams()
-    params.set("refs", finalRefs)
-    if (translationKey) {
-      params.set("t", translationKey)
-    }
-    const targetUrl = `/bible/search?${params.toString()}`
-
-    if (typeof window !== "undefined") {
-      const currentRefs = searchParams.get("refs") ?? ""
-      const currentTranslation = searchParams.get("t") ?? ""
-      const nextRefs = params.get("refs") ?? ""
-      const nextTranslation = params.get("t") ?? ""
-      if (currentRefs === nextRefs && currentTranslation === nextTranslation) {
-        window.location.assign(targetUrl)
-        return
-      }
-      window.location.assign(targetUrl)
-      return
-    }
-
-    router.push(targetUrl)
+    return (builtRefs || rawInput.trim()).trim()
   }
 
   return (
     <form
-      ref={formRef}
       className="space-y-6 rounded-lg border border-border bg-card/60 p-6"
+      action="/bible/search"
+      method="get"
       onSubmit={(event) => {
-        event.preventDefault()
-        handleSearch()
+        const finalRefs = buildFinalRefs()
+        if (!finalRefs) {
+          event.preventDefault()
+          return
+        }
+        if (refsInputRef.current) {
+          refsInputRef.current.value = finalRefs
+        }
+        if (finalRefs && textareaRef.current) {
+          textareaRef.current.value = finalRefs
+          setRawInput(finalRefs)
+        }
+        setIsSubmitting(true)
       }}
     >
+      <input ref={refsInputRef} type="hidden" name="refs" defaultValue={initialRefs} />
+      {translationKey ? <input type="hidden" name="t" value={translationKey} /> : null}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Search by reference
         </h2>
         <textarea
           ref={textareaRef}
-          name="refs"
           value={rawInput}
           onChange={(event) => setRawInput(event.target.value)}
           placeholder="Example: John 3:16-18; Romans 8:1"
