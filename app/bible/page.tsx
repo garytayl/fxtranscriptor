@@ -26,21 +26,21 @@ function BookGrid({
   return (
     <section className="space-y-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">{title}</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3">
         {books.map((book) => (
           <Link
             key={book.slug}
             href={`/bible/${book.slug}${query}`}
-            className="group flex h-full flex-col justify-between rounded-lg border border-border bg-card/70 p-4 transition hover:border-accent/60 hover:bg-card"
+            className="group flex h-full flex-col justify-between rounded-lg border border-border bg-card/70 p-3 sm:p-4 transition hover:border-accent/60 hover:bg-card active:border-accent/70 min-h-[60px]"
           >
-            <div className="space-y-1">
-              <p className="text-lg font-semibold text-foreground">{book.name}</p>
+            <div className="space-y-0.5">
+              <p className="text-sm sm:text-lg font-semibold text-foreground leading-tight">{book.name}</p>
               {book.nameLong && book.nameLong !== book.name && (
-                <p className="text-xs text-muted-foreground">{book.nameLong}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{book.nameLong}</p>
               )}
             </div>
-            <span className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground group-hover:text-accent">
-              View chapters -&gt;
+            <span className="mt-1.5 sm:mt-3 text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground group-hover:text-accent">
+              View →
             </span>
           </Link>
         ))}
@@ -52,9 +52,10 @@ function BookGrid({
 export default async function BibleIndexPage({
   searchParams,
 }: {
-  searchParams: { t?: string | string[] }
+  searchParams: Promise<{ t?: string | string[] }>
 }) {
-  const translationKey = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
+  const resolvedSearchParams = await searchParams
+  const translationKey = Array.isArray(resolvedSearchParams.t) ? resolvedSearchParams.t[0] : resolvedSearchParams.t
   const translations = await getResolvedTranslations()
   const translation = await getResolvedTranslationByKey(translationKey)
   const activeKey = translation?.key ?? translationKey ?? null
@@ -76,18 +77,18 @@ export default async function BibleIndexPage({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-16 pt-[var(--navbar-offset)]">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 sm:gap-10 px-4 pb-16 pt-[var(--navbar-offset)]">
         <header className="space-y-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
           >
             <ArrowLeft className="size-3" />
             Back to home
           </Link>
           <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Scripture Reader</p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Bible</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">Bible</h1>
+          <p className="max-w-2xl text-xs sm:text-sm text-muted-foreground">
             Ad-free, privacy-first Bible reading. Choose a book to begin.
           </p>
           <Suspense
@@ -97,7 +98,7 @@ export default async function BibleIndexPage({
           </Suspense>
           <Link
             href={`/bible/search${activeKey ? `?t=${activeKey}` : ""}`}
-            className="text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+            className="inline-flex items-center text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
           >
             Search scripture -&gt;
           </Link>

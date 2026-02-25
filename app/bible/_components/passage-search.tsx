@@ -68,7 +68,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
 
   return (
     <form
-      className="space-y-6 rounded-lg border border-border bg-card/60 p-6"
+      className="space-y-5 sm:space-y-6 rounded-lg border border-border bg-card/60 p-4 sm:p-6"
       action="/bible/search"
       method="get"
       onSubmit={(event) => {
@@ -86,7 +86,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
       <input type="hidden" name="refs" value={derivedRefs} readOnly />
       {translationKey ? <input type="hidden" name="t" value={translationKey} /> : null}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <h2 className="text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Search by reference
         </h2>
         <textarea
@@ -94,7 +94,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
           value={rawInput}
           onChange={(event) => setRawInput(event.target.value)}
           placeholder="Example: John 3:16-18; Romans 8:1"
-          className="min-h-[96px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="min-h-[80px] sm:min-h-[96px] w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         />
       </div>
 
@@ -105,12 +105,12 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
           </h3>
           <div className="space-y-3">
             {rows.map((row, index) => (
-              <div key={index} className="grid gap-3 md:grid-cols-[1fr_120px_140px]">
+              <div key={index} className="grid gap-2 sm:gap-3 grid-cols-[1fr_80px] sm:grid-cols-[1fr_120px_140px]">
                 <select
                   value={row.bookSlug}
                   onChange={(event) => handleRowChange(index, "bookSlug", event.target.value)}
                   name="bookSlug"
-                  className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  className="h-11 sm:h-10 rounded-md border border-border bg-background px-2.5 sm:px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 col-span-2 sm:col-span-1"
                 >
                   <option value="">Select book</option>
                   {bookOptions.map((book) => (
@@ -122,11 +122,11 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
                 <input
                   type="number"
                   min="1"
-                  placeholder="Chapter"
+                  placeholder="Ch."
                   value={row.chapterNumber}
                   onChange={(event) => handleRowChange(index, "chapterNumber", event.target.value)}
                   name="chapterNumber"
-                  className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  className="h-11 sm:h-10 rounded-md border border-border bg-background px-2.5 sm:px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                 />
                 <input
                   type="text"
@@ -134,7 +134,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
                   value={row.verseRange}
                   onChange={(event) => handleRowChange(index, "verseRange", event.target.value)}
                   name="verseRange"
-                  className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  className="h-11 sm:h-10 rounded-md border border-border bg-background px-2.5 sm:px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                 />
               </div>
             ))}
@@ -142,7 +142,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
           <button
             type="button"
             onClick={handleAddRow}
-            className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-accent"
+            className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-accent active:text-accent min-h-[44px] sm:min-h-0"
           >
             + Add another passage
           </button>
@@ -152,7 +152,7 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-md border border-accent/40 bg-accent/10 px-4 py-2 text-xs uppercase tracking-[0.2em] text-accent transition hover:border-accent/60 hover:bg-accent/20"
+        className="w-full rounded-md border border-accent/40 bg-accent/10 px-4 py-3 sm:py-2 text-xs uppercase tracking-[0.2em] text-accent transition hover:border-accent/60 hover:bg-accent/20 active:bg-accent/25 min-h-[48px] sm:min-h-0"
       >
         {isSubmitting ? "Searching..." : "Search scripture"}
       </button>

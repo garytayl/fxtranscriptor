@@ -14,10 +14,11 @@ export default async function BibleBookPage({
   searchParams,
 }: {
   params: Promise<{ bookSlug: string }>
-  searchParams: { t?: string | string[] }
+  searchParams: Promise<{ t?: string | string[] }>
 }) {
   const resolvedParams = await params
-  const translationKey = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
+  const resolvedSearchParams = await searchParams
+  const translationKey = Array.isArray(resolvedSearchParams.t) ? resolvedSearchParams.t[0] : resolvedSearchParams.t
   const translations = await getResolvedTranslations()
   const translation = await getResolvedTranslationByKey(translationKey)
   const activeKey = translation?.key ?? translationKey ?? null
@@ -33,16 +34,16 @@ export default async function BibleBookPage({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-[var(--navbar-offset)]">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 sm:gap-8 px-4 pb-16 pt-[var(--navbar-offset)]">
         <header className="space-y-3">
           <Link
             href={`/bible${query}`}
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
           >
             <ArrowLeft className="size-3" />
             All books
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{book.name}</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">{book.name}</h1>
           {book.nameLong && book.nameLong !== book.name && (
             <p className="text-sm text-muted-foreground">{book.nameLong}</p>
           )}
@@ -58,12 +59,12 @@ export default async function BibleBookPage({
             Chapters are not available for this book yet.
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-8">
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 sm:grid-cols-5 lg:grid-cols-8">
             {chapters.map((chapter) => (
               <Link
                 key={chapter.id}
                 href={`/bible/${book.slug}/${chapter.number}${query}`}
-                className="flex h-12 items-center justify-center rounded-md border border-border bg-card/70 text-sm font-medium text-foreground transition hover:border-accent/60 hover:bg-card"
+                className="flex h-12 sm:h-12 items-center justify-center rounded-md border border-border bg-card/70 text-sm font-medium text-foreground transition hover:border-accent/60 hover:bg-card active:border-accent/70 active:bg-card"
               >
                 {chapter.number}
               </Link>
