@@ -89,11 +89,37 @@ export async function requireAdmin() {
     };
   }
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("user_id, email, role")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  // First-admin bootstrap (same as middleware/getSession): promote FIRST_ADMIN_EMAIL user if no admin exists yet
+  const firstAdminEmail = process.env.FIRST_ADMIN_EMAIL?.trim()?.toLowerCase();
+  if (
+    (!profile || profile.role !== "admin") &&
+    firstAdminEmail &&
+    user.email?.toLowerCase() === firstAdminEmail
+  ) {
+    const { data: existingAdmin } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+    if (!existingAdmin) {
+      await supabase.from("profiles").upsert(
+        {
+          user_id: user.id,
+          email: user.email ?? null,
+          role: "admin",
+        },
+        { onConflict: "user_id" }
+      );
+      profile = { user_id: user.id, email: user.email ?? null, role: "admin" } as AdminProfile;
+    }
+  }
 
   if (!profile || profile.role !== "admin") {
     return {
