@@ -32,7 +32,9 @@ export function AdminLoginClient() {
 
   useEffect(() => {
     if (errorParam === "forbidden") {
-      setError("Your account does not have admin access.");
+      setError(
+        "Your account does not have admin access. If you just signed in for the first time, try again (the app promotes the FIRST_ADMIN_EMAIL user on first access). If the problem persists, add a row in Supabase → profiles with your user_id and role = 'admin'."
+      );
     }
   }, [errorParam]);
 
@@ -54,6 +56,16 @@ export function AdminLoginClient() {
       }
 
       router.replace(redirectTo);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isNetwork =
+        /load failed|failed to fetch|network error|networkconnection|lost/i.test(message) ||
+        (err instanceof TypeError && message.toLowerCase().includes("fetch"));
+      setError(
+        isNetwork
+          ? "Connection failed. Check your network and that Supabase is reachable (NEXT_PUBLIC_SUPABASE_URL). Try again."
+          : message
+      );
     } finally {
       setLoading(false);
     }

@@ -49,11 +49,37 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    const { data: profile } = await supabase
+    let { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
+
+    // First-admin bootstrap: if FIRST_ADMIN_EMAIL matches and no admin exists yet, promote this user (so first sign-in works)
+    const firstAdminEmail = process.env.FIRST_ADMIN_EMAIL?.trim()?.toLowerCase();
+    if (
+      (!profile || profile.role !== "admin") &&
+      firstAdminEmail &&
+      user.email?.toLowerCase() === firstAdminEmail
+    ) {
+      const { data: existingAdmin } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
+      if (!existingAdmin) {
+        await supabase.from("profiles").upsert(
+          {
+            user_id: user.id,
+            email: user.email ?? null,
+            role: "admin",
+          },
+          { onConflict: "user_id" }
+        );
+        profile = { role: "admin" };
+      }
+    }
 
     if (!profile || profile.role !== "admin") {
       if (isAdminApi) {
