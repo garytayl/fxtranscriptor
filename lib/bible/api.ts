@@ -221,9 +221,18 @@ export async function getBooksWithSlugs(bibleId?: string): Promise<BibleBook[]> 
   return mapped
 }
 
+/** Alias slug -> canonical slug for API book lookup (e.g. scripture.api uses "Psalms" not "Psalm") */
+const BOOK_SLUG_ALIASES: Record<string, string> = {
+  psalm: "psalms",
+}
+
 export async function getBookBySlug(slug: string, bibleId?: string): Promise<BibleBook | null> {
   const books = await getBooksWithSlugs(bibleId)
-  return books.find((book) => book.slug === slug) ?? null
+  const found = books.find((book) => book.slug === slug) ?? null
+  if (found) return found
+  const canonical = BOOK_SLUG_ALIASES[slug]
+  if (canonical) return books.find((book) => book.slug === canonical) ?? null
+  return null
 }
 
 export async function getBooksByTestament(): Promise<{
