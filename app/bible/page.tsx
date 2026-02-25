@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Suspense } from "react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 
 import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { getBooksByTestamentWithId } from "@/lib/bible/api"
@@ -99,9 +99,10 @@ export default async function BibleIndexPage({
             </Suspense>
             <Link
               href={`/bible/search${activeKey ? `?t=${activeKey}` : ""}`}
-              className="inline-flex items-center text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3.5 py-2 text-[11px] sm:text-xs font-medium uppercase tracking-[0.15em] text-foreground/90 transition hover:border-accent/50 hover:bg-accent/10 hover:text-accent min-h-[44px] sm:min-h-0"
             >
-              Search scripture →
+              <Search className="size-3.5 shrink-0" aria-hidden />
+              Look up passage
             </Link>
           </div>
         </header>

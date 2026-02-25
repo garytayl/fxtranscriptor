@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { Search } from "lucide-react"
 
 import type { BibleBook } from "@/lib/bible/types"
 
@@ -152,9 +153,10 @@ export function PassageSearch({ initialRefs, translationKey, books = [] }: Passa
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-md border border-accent/40 bg-accent/10 px-4 py-3 sm:py-2 text-xs uppercase tracking-[0.2em] text-accent transition hover:border-accent/60 hover:bg-accent/20 active:bg-accent/25 min-h-[48px] sm:min-h-0"
+        className="flex w-full items-center justify-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-3 sm:py-2.5 text-xs font-medium uppercase tracking-[0.2em] text-accent transition hover:border-accent/60 hover:bg-accent/20 active:bg-accent/25 disabled:opacity-60 min-h-[48px] sm:min-h-0"
       >
-        {isSubmitting ? "Searching..." : "Search scripture"}
+        <Search className="size-3.5 shrink-0" aria-hidden />
+        {isSubmitting ? "Searching…" : "Look up passage"}
       </button>
     </form>
   )
