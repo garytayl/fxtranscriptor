@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import type { StrongsEntry } from "@/lib/bible/lexicon"
 
@@ -55,36 +55,35 @@ export function WordStudyEntryContent({ entry }: { entry: StrongsEntry }) {
 
 export function WordStudy({ code, children, entry: entryProp, className, onSelect }: WordStudyProps) {
   const [entry, setEntry] = useState<StrongsEntry | null>(entryProp ?? null)
-  const [loading, setLoading] = useState(!entryProp)
+  const [loading, setLoading] = useState(false)
+  const [fetched, setFetched] = useState(!!entryProp)
 
-  useEffect(() => {
-    if (entryProp != null) {
-      setEntry(entryProp)
-      setLoading(false)
-      return
-    }
-    let cancelled = false
+  const fetchEntry = useCallback(() => {
+    if (entryProp != null || fetched) return
+    setFetched(true)
     setLoading(true)
     fetch(`/api/bible/lexicon/${encodeURIComponent(code)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: StrongsEntry | null) => {
-        if (!cancelled) {
-          setEntry(data ?? null)
-        }
+        setEntry(data ?? null)
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
-  }, [code, entryProp])
+  }, [code, entryProp, fetched])
+
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open && !entry && !entryProp) fetchEntry()
+    },
+    [entry, entryProp, fetchEntry]
+  )
 
   const displayText = children ?? entry?.transliteration ?? entry?.lemma ?? code
 
   if (entry) {
     return (
-      <HoverCard openDelay={200} closeDelay={100}>
+      <HoverCard openDelay={200} closeDelay={100} onOpenChange={handleOpenChange}>
         <HoverCardTrigger asChild>
           <button
             type="button"
@@ -107,13 +106,34 @@ export function WordStudy({ code, children, entry: entryProp, className, onSelec
     )
   }
 
-  if (loading) {
-    return (
-      <span className="animate-pulse border-b border-dashed border-muted-foreground/30 text-muted-foreground">
-        {displayText}
-      </span>
-    )
-  }
-
-  return <span className="text-muted-foreground">{displayText}</span>
+  return (
+    <HoverCard openDelay={200} closeDelay={100} onOpenChange={handleOpenChange}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          onClick={() => onSelect?.(code)}
+          className={`cursor-help border-b border-dashed border-amber-500/50 font-medium text-amber-200/90 hover:border-amber-500/80 hover:text-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 rounded-sm ${className ?? ""}`}
+          aria-label={`Word study: ${code}`}
+        >
+          {loading ? (
+            <span className="animate-pulse">{displayText}</span>
+          ) : (
+            displayText
+          )}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="top"
+        sideOffset={6}
+        className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
+      >
+        {loading ? (
+          <span className="text-sm text-white/60">Loading…</span>
+        ) : (
+          <span className="text-sm text-white/60">Definition not available.</span>
+        )}
+      </HoverCardContent>
+    </HoverCard>
+  )
 }
