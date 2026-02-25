@@ -35,7 +35,7 @@ export default async function StudyGuidePage({ params }: Props) {
   return (
     <main className="relative min-h-screen">
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-      <div className="relative z-10 pt-[var(--navbar-offset)] pb-24 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
+      <div className="relative z-10 w-full max-w-full pt-[var(--navbar-offset)] pb-24 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
         <header className="max-w-3xl mb-8">
           <Link
             href="/studies"
@@ -62,7 +62,7 @@ export default async function StudyGuidePage({ params }: Props) {
         </header>
 
         {content ? (
-          <article className="w-full min-w-0 study-guide prose overflow-x-hidden">
+          <article className="block w-full min-w-0 max-w-[85rem] study-guide prose overflow-x-hidden">
             <StudyGuideContent content={content} />
           </article>
         ) : (
