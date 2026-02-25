@@ -35,7 +35,7 @@ const prose = `
 .study-guide.prose h1 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; }
 .study-guide.prose h2 { font-size: 1.125rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.5rem; letter-spacing: 0.02em; }
 .study-guide.prose h3 { font-size: 1rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: var(--color-muted-foreground); }
-.study-guide.prose p { margin-bottom: 0.75rem; line-height: 1.65; }
+.study-guide.prose p { margin-bottom: 0.75rem; line-height: 1.65; white-space: normal; word-spacing: normal; }
 .study-guide.prose ul, .study-guide.prose ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
 .study-guide.prose ol { list-style-type: decimal; }
 .study-guide.prose ol li { margin-bottom: 0.6rem; padding-left: 0.25rem; line-height: 1.5; }
@@ -86,7 +86,7 @@ export function StudyGuideContent({ content }: { content: string }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: prose }} />
-      <div className="study-guide grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-[1fr,minmax(0,24rem)]">
+      <div className="study-guide grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-[minmax(20rem,1fr),minmax(0,24rem)]">
         {/* Left column: questions and content (verse links show as ref pills that link to right column) */}
         <div className="min-w-0 font-mono text-sm text-foreground leading-relaxed lg:col-start-1 lg:row-start-1">
           <ReactMarkdown
@@ -108,8 +108,8 @@ export function StudyGuideContent({ content }: { content: string }) {
         </div>
 
         {/* Right column: Bible passages sidebar (sticky); min-w-0 so it can shrink when zoomed */}
-        <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-2rem)] lg:overflow-y-auto">
-          <div className="space-y-4">
+        <aside className="min-w-0 border-l border-border/50 bg-background/40 pl-6 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-2rem)] lg:overflow-y-auto">
+          <div className="space-y-4 py-1">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Passages</p>
             {passageRefsOrdered.length === 0 ? (
               <p className="font-mono text-xs text-muted-foreground">No passages in this guide.</p>
