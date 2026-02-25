@@ -11,7 +11,7 @@ interface InlinePassageProps {
 
 type State =
   | { status: "loading" }
-  | { status: "loaded"; reference: string; translation: string; verses: { number: number; text: string }[] }
+  | { status: "loaded"; reference: string; translation: string; verses: { number: number; text: string }[]; emptyMessage?: string }
   | { status: "error"; message: string }
 
 export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
@@ -22,10 +22,16 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
     let cancelled = false
     const params = new URLSearchParams({ ref: refStr })
     fetch(`/api/bible/passage?${params.toString()}`)
-      .then((res) => res.json())
-      .then((data: { reference?: string; translation?: string; verses?: { number: number; text: string }[]; error?: string }) => {
+      .then((res) =>
+        res.json().then((data: { reference?: string; translation?: string; verses?: { number: number; text: string }[]; error?: string }) => ({
+          ok: res.ok,
+          data,
+        }))
+      )
+      .then(({ ok, data }) => {
         if (cancelled) return
-        if (data.error) {
+        const verses = data.verses ?? []
+        if (!ok && data.error) {
           setState({ status: "error", message: data.error })
           return
         }
@@ -33,7 +39,8 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
           status: "loaded",
           reference: data.reference ?? refStr,
           translation: data.translation ?? "",
-          verses: data.verses ?? [],
+          verses,
+          emptyMessage: verses.length === 0 ? (data.error ?? "No verses in this range.") : undefined,
         })
       })
       .catch((err) => {
@@ -71,14 +78,20 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
           <span className="text-[10px] text-muted-foreground">{state.translation}</span>
         )}
       </div>
-      <ol className="mt-2 space-y-1.5 text-sm leading-relaxed text-foreground">
-        {state.verses.map((v) => (
-          <li key={v.number} className="flex gap-2">
-            <span className="shrink-0 font-mono text-[10px] font-semibold text-muted-foreground align-super">{v.number}</span>
-            <span>{v.text}</span>
-          </li>
-        ))}
-      </ol>
+      {state.verses.length > 0 ? (
+        <ol className="mt-2 space-y-1.5 text-sm leading-relaxed text-foreground">
+          {state.verses.map((v) => (
+            <li key={v.number} className="flex gap-2">
+              <span className="shrink-0 font-mono text-[10px] font-semibold text-muted-foreground align-super">{v.number}</span>
+              <span>{v.text}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground italic" title={state.emptyMessage}>
+          {state.emptyMessage ?? "No verses in this range."}
+        </p>
+      )}
       {readerUrl && (
         <Link
           href={readerUrl}
