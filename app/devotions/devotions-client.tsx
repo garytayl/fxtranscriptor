@@ -589,6 +589,7 @@ export function DevotionsClient() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
