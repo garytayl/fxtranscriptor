@@ -52,7 +52,8 @@ export function SermonSeriesManager() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to load series options.");
       }
-      setSeriesOptions(data.seriesOptions ?? []);
+      const raw = data.seriesOptions ?? [];
+      setSeriesOptions(raw.filter((s: unknown) => typeof s === "string" && s.trim() !== ""));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load series options.";
       toast.error("Series Options Error", { description: message });

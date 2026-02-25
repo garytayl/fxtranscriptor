@@ -19,12 +19,10 @@ export async function GET() {
 
   const seriesSet = new Set<string>();
   (data || []).forEach((row) => {
-    if (row.series) {
-      seriesSet.add(row.series);
-    }
-    if (row.series_override) {
-      seriesSet.add(row.series_override);
-    }
+    const s = row.series?.trim();
+    if (s) seriesSet.add(s);
+    const o = row.series_override?.trim();
+    if (o) seriesSet.add(o);
   });
 
   const seriesOptions = Array.from(seriesSet).sort((a, b) => a.localeCompare(b));
