@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef } from "react"
+import React from "react"
 import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
@@ -43,24 +43,26 @@ const prose = `
 .study-guide-resonates.study-guide.prose hr { border-color: rgba(255,255,255,0.15); margin: 1.5rem 0; }
 `
 
-/** Verse ref pill that shows passage in a HoverCard on hover only (no sidebar) */
-function PassageHoverCard({ passageRef, label }: { passageRef: string; label: string }) {
+/** Verse ref pill: hover = preview in HoverCard, click = pin to side menu */
+function VersePill({
+  passageRef,
+  label,
+  onSelect,
+}: {
+  passageRef: string
+  label: string
+  onSelect: (ref: string) => void
+}) {
   return (
     <HoverCard openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
-        <span
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault()
-              ;(e.currentTarget as HTMLElement).click()
-            }
-          }}
-          className="cursor-pointer border-l-2 border-amber-500/50 pl-1.5 -ml-1.5 pr-1 rounded hover:bg-white/10 font-mono text-[11px] uppercase tracking-wider text-amber-200/90 hover:text-amber-200 inline"
+        <button
+          type="button"
+          onClick={() => onSelect(passageRef)}
+          className="cursor-pointer border-l-2 border-amber-500/50 pl-1.5 -ml-1.5 pr-1 rounded hover:bg-white/10 font-mono text-[11px] uppercase tracking-wider text-amber-200/90 hover:text-amber-200 inline text-left"
         >
           {label}
-        </span>
+        </button>
       </HoverCardTrigger>
       <HoverCardContent
         align="start"
@@ -76,9 +78,13 @@ function PassageHoverCard({ passageRef, label }: { passageRef: string; label: st
   )
 }
 
-export function StudyGuideContent({ content }: { content: string }) {
-  const nextVerseIndexRef = useRef(0)
-
+export function StudyGuideContent({
+  content,
+  onSelectPassage,
+}: {
+  content: string
+  onSelectPassage?: (ref: string) => void
+}) {
   const linkComponent = ({ href, children }: { href?: string; children?: React.ReactNode }) => {
     const text = getLinkText(children)
     const list = text.includes(",") ? parsePassageList(text) : null
@@ -86,11 +92,20 @@ export function StudyGuideContent({ content }: { content: string }) {
     const single = !refsForThisLink.length ? parsePassageReference(text) : null
     if (single) refsForThisLink.push(single.raw)
 
-    if (refsForThisLink.length > 0) {
+    if (refsForThisLink.length > 0 && onSelectPassage) {
       return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
           {refsForThisLink.map((ref, i) => (
-            <PassageHoverCard key={`${ref}-${i}`} passageRef={ref} label={ref} />
+            <VersePill key={`${ref}-${i}`} passageRef={ref} label={ref} onSelect={onSelectPassage} />
+          ))}
+        </span>
+      )
+    }
+    if (refsForThisLink.length > 0) {
+      return (
+        <span className="inline-flex flex-wrap items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-amber-200/90">
+          {refsForThisLink.map((ref, i) => (
+            <span key={`${ref}-${i}`}>{ref}</span>
           ))}
         </span>
       )

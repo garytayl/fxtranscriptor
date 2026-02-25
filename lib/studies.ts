@@ -30,6 +30,8 @@ export interface StudyGuideLink {
   url: string
   /** If set, guide content is hosted locally at /studies/{studySlug}/{slug} */
   slug?: string
+  /** Passage of the week: pre-filled in the verses sidebar (e.g. "Jonah 4:1-11") */
+  defaultPassageRef?: string
 }
 
 export interface BibleStudy {
@@ -65,7 +67,7 @@ export const STUDIES: BibleStudy[] = [
       { label: "Wk 1: The Word Came", url: "https://www.notion.so/Wk-1-The-Word-Came-2f4231166f6d8157a04feba149b920c6?pvs=21", slug: "wk-1" },
       { label: "Wk 2: Salvation is from the Lord", url: "https://www.notion.so/Wk-2-Salvation-is-from-the-Lord-303231166f6d80e094e7f5ef0c271fe9?pvs=21", slug: "wk-2" },
       { label: "Wk 3: The Word and The Decree", url: "https://www.notion.so/Wk-3-The-Word-and-The-Decree-304231166f6d80d689f3d2d5c21a30f1?pvs=21", slug: "wk-3" },
-      { label: "Wk 4: Is it right to be angry?", url: "https://www.notion.so/Wk-4-Is-it-right-to-be-angry-310231166f6d8069928ac4f6394b6e43?pvs=21", slug: "wk-4" },
+      { label: "Wk 4: Is it right to be angry?", url: "https://www.notion.so/Wk-4-Is-it-right-to-be-angry-310231166f6d8069928ac4f6394b6e43?pvs=21", slug: "wk-4", defaultPassageRef: "Jonah 4:1-11" },
     ],
     podcastUrl: "https://fxtalk.podbean.com/category/2501",
     vaultUrl: "http://fxchur.ch/rgvault",

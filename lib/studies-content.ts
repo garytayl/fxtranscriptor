@@ -1,6 +1,20 @@
+import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 import { getStudyBySlug } from "./studies"
 import fs from "fs"
 import path from "path"
+
+/** Extract the first Bible passage ref from markdown (from [text](url) where text parses as a ref). */
+export function getFirstPassageRefFromContent(content: string): string | null {
+  if (!content) return null
+  const linkRegex = /\[([^\]]+)\]\((https?:\S+)\)/g
+  const match = linkRegex.exec(content)
+  if (!match) return null
+  const text = match[1].trim()
+  const list = text.includes(",") ? parsePassageList(text) : null
+  if (list && list.length > 0) return list[0].raw
+  const single = parsePassageReference(text)
+  return single ? single.raw : null
+}
 
 /** Allow only safe slug chars to prevent path traversal */
 const SLUG_REGEX = /^[a-z0-9-]+$/
