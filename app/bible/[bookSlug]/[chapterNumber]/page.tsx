@@ -71,7 +71,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-16 pt-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-16 pt-[var(--navbar-offset)]">
         <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/90 px-4 pt-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-6 pb-4">
             <div className="space-y-1">

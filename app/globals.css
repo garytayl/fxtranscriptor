@@ -6,7 +6,7 @@
 /* Custom editorial design tokens - monochrome with orange accent */
 /* Navbar: safe-area + nav bar height so content never clips on mobile */
 :root {
-  --navbar-offset: calc(5.5rem + env(safe-area-inset-top, 0px));
+  --navbar-offset: calc(6rem + env(safe-area-inset-top, 0px));
   --background: oklch(0.08 0 0);
   --foreground: oklch(0.95 0 0);
   --card: oklch(0.12 0 0);

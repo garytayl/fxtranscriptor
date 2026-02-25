@@ -33,7 +33,7 @@ export default async function BibleBookPage({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-10">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-[var(--navbar-offset)]">
         <header className="space-y-3">
           <Link
             href={`/bible${query}`}
