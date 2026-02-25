@@ -38,33 +38,34 @@ export default async function StudyGuidePage({ params }: Props) {
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="grid-bg fixed inset-0 opacity-20 pointer-events-none" aria-hidden="true" />
       <div className="relative z-10 pt-[var(--navbar-offset)]">
-        <header className="mb-12 px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:pr-[calc(22rem+3rem)] pb-10 border-b border-white/10">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <header className="mb-8 sm:mb-12 px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:pr-[calc(22rem+3rem)] pb-8 sm:pb-10 border-b border-white/10">
+          <div className="flex items-center justify-between gap-3 mb-5 sm:mb-6">
             <Link
               href="/studies"
-              className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-[0.25em] text-white/50 hover:text-white/90 transition-colors uppercase"
+              className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-[0.25em] text-white/50 hover:text-white/90 active:text-white transition-colors uppercase min-h-[44px] sm:min-h-0"
             >
               <ArrowLeft className="size-3.5" />
-              Back to studies
+              <span className="hidden xs:inline">Back to</span> Studies
             </Link>
             <a
               href={guide.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-widest uppercase text-white/50 hover:text-amber-200/90 transition-colors border border-white/20 hover:border-amber-500/40 px-3 py-2 rounded"
+              className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-widest uppercase text-white/50 hover:text-amber-200/90 active:text-amber-200 transition-colors border border-white/20 hover:border-amber-500/40 px-3 py-2 rounded min-h-[44px] sm:min-h-0 shrink-0"
             >
-              Open on Notion
+              <span className="hidden sm:inline">Open on</span> Notion
               <ExternalLink className="size-3" />
             </a>
           </div>
           <p className="font-mono text-[10px] sm:text-xs tracking-[0.3em] text-amber-200/80 mb-2 uppercase">
             {study.title}
           </p>
-          <h1 className="font-sans text-3xl sm:text-4xl md:text-5xl font-light italic leading-[1.15] text-white mb-4">
+          <h1 className="font-sans text-2xl sm:text-4xl md:text-5xl font-light italic leading-[1.15] text-white mb-3 sm:mb-4">
             {guide.label}
           </h1>
-          <p className="font-sans text-sm sm:text-base text-white/60 font-light leading-relaxed max-w-2xl">
-            Click a verse to view it in the sidebar. Hover to preview.
+          <p className="font-sans text-xs sm:text-sm md:text-base text-white/50 font-light leading-relaxed max-w-2xl">
+            <span className="hidden lg:inline">Click a verse to view it in the sidebar. Hover to preview.</span>
+            <span className="lg:hidden">Tap a verse reference to read the passage.</span>
           </p>
         </header>
 
