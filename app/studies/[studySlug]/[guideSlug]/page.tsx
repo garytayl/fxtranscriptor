@@ -38,32 +38,34 @@ export default async function StudyGuidePage({ params }: Props) {
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="grid-bg fixed inset-0 opacity-20 pointer-events-none" aria-hidden="true" />
       <div className="relative z-10">
-        <header className="mb-10 px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:pr-[calc(22rem+3rem)]">
-          <Link
-            href="/studies"
-            className="inline-flex items-center gap-2 font-mono text-xs sm:text-sm tracking-[0.3em] text-white/40 hover:text-white/80 transition-colors mb-6"
-          >
-            <ArrowLeft className="size-3" />
-            Back to studies
-          </Link>
-          <p className="font-mono text-xs sm:text-sm tracking-[0.3em] text-white/40 mb-3 uppercase">
+        <header className="mb-12 px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:pr-[calc(22rem+3rem)] pb-10 border-b border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <Link
+              href="/studies"
+              className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-[0.25em] text-white/50 hover:text-white/90 transition-colors uppercase"
+            >
+              <ArrowLeft className="size-3.5" />
+              Back to studies
+            </Link>
+            <a
+              href={guide.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-widest uppercase text-white/50 hover:text-amber-200/90 transition-colors border border-white/20 hover:border-amber-500/40 px-3 py-2 rounded"
+            >
+              Open on Notion
+              <ExternalLink className="size-3" />
+            </a>
+          </div>
+          <p className="font-mono text-[10px] sm:text-xs tracking-[0.3em] text-amber-200/80 mb-2 uppercase">
             {study.title}
           </p>
-          <h1 className="font-sans text-3xl sm:text-4xl md:text-5xl font-light italic leading-tight mb-4">
+          <h1 className="font-sans text-3xl sm:text-4xl md:text-5xl font-light italic leading-[1.15] text-white mb-4">
             {guide.label}
           </h1>
-          <p className="font-sans text-base sm:text-lg text-white/70 font-light leading-relaxed max-w-2xl mb-6">
-            Click a verse reference to view the passage in the sidebar. Open on Notion for the full guide.
+          <p className="font-sans text-sm sm:text-base text-white/60 font-light leading-relaxed max-w-2xl">
+            Click a verse to view it in the sidebar. Hover to preview.
           </p>
-          <a
-            href={guide.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 font-sans text-sm text-amber-200/90 hover:text-amber-200 underline underline-offset-2"
-          >
-            Open on Notion
-            <ExternalLink className="size-3" />
-          </a>
         </header>
 
         {content ? (
