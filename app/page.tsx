@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
-import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save, ChevronDown, ChevronUp, Search, Filter, X, FileText } from "lucide-react";
+import { RefreshCw, Play, Copy, Download, CheckCircle2, AlertCircle, Loader2, Calendar, ExternalLink, Link2, Save, ChevronDown, ChevronUp, Search, Filter, X, FileText, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { HeroSection } from "@/components/hero-section";
-import { SideNav } from "@/components/side-nav";
 import { SermonSeriesSection } from "@/components/sermon-series-section";
 import dynamic from "next/dynamic";
 import { SermonCard } from "@/components/sermon-card";
@@ -58,6 +58,7 @@ export default function Home() {
   const [loadedTranscript, setLoadedTranscript] = useState<string | null>(null);
   const [loadingTranscript, setLoadingTranscript] = useState(false);
   const [visibleCount, setVisibleCount] = useState(pageSize);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Filter sermons based on search and status
   const filteredSermons = useMemo(() => {
@@ -88,6 +89,14 @@ export default function Home() {
   const visibleUngrouped = useMemo(() => {
     return ungrouped.slice(0, visibleCount);
   }, [ungrouped, visibleCount]);
+
+  // Load session for role-aware UI
+  useEffect(() => {
+    fetch("/api/auth/session", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setIsAdmin(!!data?.isAdmin))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   // Load sermons on mount (which will also reload playlist series)
   useEffect(() => {
@@ -121,7 +130,7 @@ export default function Home() {
       ctrl: true,
       shift: true,
       handler: () => {
-        if (!syncing) {
+        if (isAdmin && !syncing) {
           syncCatalog();
         }
       },
@@ -354,7 +363,7 @@ export default function Home() {
         description: "Fetching sermons from Podbean and YouTube",
       });
       
-      const response = await fetch("/api/catalog/sync");
+      const response = await fetch("/api/catalog/sync", { credentials: "include" });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -362,6 +371,17 @@ export default function Home() {
         const details = errorData.details ? `\n\nDetails: ${errorData.details}` : "";
         
         toast.dismiss(syncToastId);
+        if (response.status === 401 || response.status === 403) {
+          toast.error("Sign in required", {
+            description: "Sync catalog is only available to admins. Sign in at the admin page to sync.",
+            duration: 8000,
+            action: {
+              label: "Go to Admin",
+              onClick: () => router.push("/admin/login?redirect=" + encodeURIComponent(window.location.pathname || "/")),
+            },
+          });
+          return;
+        }
         if (errorMsg.includes("tables not found") || errorMsg.includes("schema")) {
           toast.error("Database Setup Required", {
             description: `${errorMsg}${details}\n\nPlease run the schema.sql file in your Supabase SQL Editor.`,
@@ -767,7 +787,6 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen">
-      <SideNav />
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
       
       <div className="relative z-10">
@@ -785,17 +804,19 @@ export default function Home() {
         ) : (
           <>
             {/* Actions */}
-            <div className="relative py-6 sm:py-12 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12 border-b border-border/30">
+            <div className="relative py-6 sm:py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12 border-b border-border/30">
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
-                <Button
-                  onClick={syncCatalog}
-                  disabled={syncing}
-                  variant="outline"
-                  className="gap-2 border-foreground/20 font-mono text-xs uppercase tracking-widest hover:border-accent hover:text-accent"
-                >
-                  <RefreshCw className={syncing ? "animate-spin size-4" : "size-4"} />
-                  {syncing ? "Syncing..." : "Sync Catalog"}
-                </Button>
+                {isAdmin && (
+                  <Button
+                    onClick={syncCatalog}
+                    disabled={syncing}
+                    variant="outline"
+                    className="gap-2 border-foreground/20 font-mono text-xs uppercase tracking-widest hover:border-accent hover:text-accent"
+                  >
+                    <RefreshCw className={syncing ? "animate-spin size-4" : "size-4"} />
+                    {syncing ? "Syncing..." : "Sync Catalog"}
+                  </Button>
+                )}
                 <Button
                   onClick={loadSermons}
                   disabled={loading}
@@ -810,50 +831,61 @@ export default function Home() {
                     <div className="text-xs sm:text-sm text-muted-foreground font-mono">
                       {sermons.length} {sermons.length === 1 ? "sermon" : "sermons"} • {sermonSeries.length} {sermonSeries.length === 1 ? "series" : "series"}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => {
-                          const csv = exportToCSV(sermons);
-                          downloadFile(csv, `sermons-export-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
-                          analytics.batchOperation('export_csv', sermons.length);
-                          toast.success("Export Started", {
-                            description: "CSV file download started",
-                            duration: 2000,
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        <Download className="size-3 mr-2" />
-                        Export CSV
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          const json = exportToJSON(sermons);
-                          downloadFile(json, `sermons-export-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
-                          analytics.batchOperation('export_json', sermons.length);
-                          toast.success("Export Started", {
-                            description: "JSON file download started",
-                            duration: 2000,
-                          });
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        <Download className="size-3 mr-2" />
-                        Export JSON
-                      </Button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => {
+                            const csv = exportToCSV(sermons);
+                            downloadFile(csv, `sermons-export-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+                            analytics.batchOperation('export_csv', sermons.length);
+                            toast.success("Export Started", {
+                              description: "CSV file download started",
+                              duration: 2000,
+                            });
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="font-mono text-xs uppercase tracking-widest"
+                        >
+                          <Download className="size-3 mr-2" />
+                          Export CSV
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            const json = exportToJSON(sermons);
+                            downloadFile(json, `sermons-export-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+                            analytics.batchOperation('export_json', sermons.length);
+                            toast.success("Export Started", {
+                              description: "JSON file download started",
+                              duration: 2000,
+                            });
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="font-mono text-xs uppercase tracking-widest"
+                        >
+                          <Download className="size-3 mr-2" />
+                          Export JSON
+                        </Button>
+                      </div>
+                    )}
                   </>
+                )}
+                {!isAdmin && (
+                  <Link
+                    href="/admin/login?redirect=/"
+                    className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <LogIn className="size-4" />
+                    Admin
+                  </Link>
                 )}
               </div>
             </div>
 
             {/* Loading State */}
             {loading ? (
-              <div className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+              <div className="relative py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
                 <div className="mb-16">
                   <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Loading</span>
                   <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERIES</h2>
@@ -863,7 +895,7 @@ export default function Home() {
                 </div>
               </div>
             ) : sermons.length === 0 ? (
-              <div className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+              <div className="relative py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
                 <div className="mb-16">
                   <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Empty</span>
                   <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">NO SERIES</h2>
@@ -872,16 +904,26 @@ export default function Home() {
                   No sermons in catalog yet.
                 </div>
                 <div className="text-center">
-                  <Button onClick={syncCatalog} disabled={syncing} variant="outline" className="font-mono text-xs uppercase tracking-widest">
-                    <RefreshCw className={syncing ? "animate-spin mr-2 size-4" : "mr-2 size-4"} />
-                    Sync Catalog to Load Sermons
-                  </Button>
+                  {isAdmin ? (
+                    <Button onClick={syncCatalog} disabled={syncing} variant="outline" className="font-mono text-xs uppercase tracking-widest">
+                      <RefreshCw className={syncing ? "animate-spin mr-2 size-4" : "mr-2 size-4"} />
+                      Sync Catalog to Load Sermons
+                    </Button>
+                  ) : (
+                    <Link
+                      href="/admin/login?redirect=/"
+                      className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors"
+                    >
+                      <LogIn className="size-4 mr-2" />
+                      Sign in as admin to sync
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : (
               <>
                 {/* Search and Filter Bar */}
-                <section className="relative py-12 pl-6 md:pl-28 pr-6 md:pr-12 border-b border-border/30">
+                <section id="sermons" className="relative py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12 border-b border-border/30">
                   <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
                     {/* Search Input */}
                     <div className="relative flex-1 max-w-md">
@@ -963,8 +1005,8 @@ export default function Home() {
                 
                 {/* Show ungrouped sermons after series */}
                 {ungrouped.length > 0 && (
-                  <section id="unsorted" className="relative py-16 sm:py-24 md:py-32 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12">
-                    <div className="mb-8 sm:mb-12 md:mb-16 pr-0 sm:pr-6 md:pr-12">
+                  <section id="unsorted" className="relative py-16 sm:py-24 md:py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
+                    <div className="mb-8 sm:mb-12 md:mb-16">
                       <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">02 / Unsorted</span>
                       <h2 className="mt-4 font-[var(--font-bebas)] text-3xl sm:text-5xl md:text-7xl tracking-tight">UNSORTED SERMONS</h2>
                       <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
@@ -972,9 +1014,9 @@ export default function Home() {
                       </p>
                     </div>
                     
-                    {/* Batch Operations */}
-                    {ungrouped.length > 0 && !loading && (
-                      <div className="mb-4 sm:mb-6 pr-0 sm:pr-6 md:pr-12">
+                    {/* Batch Operations - admin only */}
+                    {isAdmin && ungrouped.length > 0 && !loading && (
+                      <div className="mb-4 sm:mb-6">
                         <BatchOperations
                           sermons={ungrouped}
                           onGenerate={async (sermonIds) => {
@@ -989,7 +1031,7 @@ export default function Home() {
                     )}
                     
                     {/* Ungrouped sermons grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pr-0 sm:pr-6 md:pr-12">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                       {loading ? (
                         // Show skeletons while loading
                         Array.from({ length: 6 }).map((_, i) => (
@@ -1286,9 +1328,8 @@ export default function Home() {
               </>
             ) : (
               <div className="flex flex-col gap-6">
-                {/* Audio URL Override Section - Only show if no audio_url AND no youtube_url */}
-                {/* If youtube_url exists, worker can handle it automatically */}
-                {((!selectedSermon?.audio_url && !selectedSermon?.youtube_url) || 
+                {/* Audio URL Override Section - admin only */}
+                {isAdmin && ((!selectedSermon?.audio_url && !selectedSermon?.youtube_url) || 
                  (selectedSermon.status === "failed" && !selectedSermon?.youtube_url && !selectedSermon?.audio_url)) ? (
                   <div className="border rounded-lg p-4 bg-card">
                     <div className="flex items-center justify-between mb-3">
@@ -1421,7 +1462,39 @@ export default function Home() {
                   </div>
                 ) : null}
 
-                {/* Generate Transcript Button */}
+                {/* Progress Display - visible to all when generating */}
+                {selectedSermon?.status === "generating" && selectedSermon.progress_json?.message && (
+                  <div className="text-center">
+                    <div className="mb-4 p-4 border border-border/30 rounded-lg bg-card/50">
+                      <div className="flex items-start gap-3">
+                        <Loader2 className="size-4 animate-spin text-accent mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-mono text-muted-foreground">
+                            {selectedSermon.progress_json.message}
+                            {selectedSermon.progress_json.current && selectedSermon.progress_json.total && (
+                              <span className="ml-2 text-xs text-muted-foreground/70">
+                                ({selectedSermon.progress_json.current}/{selectedSermon.progress_json.total})
+                              </span>
+                            )}
+                          </p>
+                          {selectedSermon.progress_json.completedChunks && 
+                           Object.keys(selectedSermon.progress_json.completedChunks).length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-border/30">
+                              <p className="text-xs font-mono text-muted-foreground mb-1">
+                                Completed chunks: {Object.keys(selectedSermon.progress_json.completedChunks).length}
+                                {selectedSermon.progress_json.total && 
+                                 ` / ${selectedSermon.progress_json.total}`}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Generate Transcript Button - admin only */}
+                {isAdmin && (
                 <div className="text-center">
                   {selectedSermon?.status === "failed" && selectedSermon?.error_message && (
                     <div className="mb-4 p-3 border border-destructive/50 rounded-lg bg-destructive/5">
@@ -1433,45 +1506,6 @@ export default function Home() {
                   
                   {selectedSermon && (
                     <>
-                      {/* Progress Display */}
-                      {selectedSermon.status === "generating" && selectedSermon.progress_json?.message && (
-                        <div className="mb-4 p-4 border border-border/30 rounded-lg bg-card/50">
-                          <div className="flex items-start gap-3">
-                            <Loader2 className="size-4 animate-spin text-accent mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-mono text-muted-foreground">
-                                {selectedSermon.progress_json.message}
-                                {selectedSermon.progress_json.current && selectedSermon.progress_json.total && (
-                                  <span className="ml-2 text-xs text-muted-foreground/70">
-                                    ({selectedSermon.progress_json.current}/{selectedSermon.progress_json.total})
-                                  </span>
-                                )}
-                              </p>
-                              {/* Show completed chunks if available */}
-                              {selectedSermon.progress_json.completedChunks && 
-                               Object.keys(selectedSermon.progress_json.completedChunks).length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-border/30">
-                                  <p className="text-xs font-mono text-muted-foreground mb-1">
-                                    ✅ Completed chunks: {Object.keys(selectedSermon.progress_json.completedChunks).length}
-                                    {selectedSermon.progress_json.total && 
-                                     ` / ${selectedSermon.progress_json.total}`}
-                                  </p>
-                                  {selectedSermon.progress_json.failedChunks && 
-                                   Object.keys(selectedSermon.progress_json.failedChunks).length > 0 && (
-                                    <p className="text-xs font-mono text-destructive/70 mb-1">
-                                      ❌ Failed chunks: {Object.keys(selectedSermon.progress_json.failedChunks).length}
-                                    </p>
-                                  )}
-                                  <p className="text-xs text-muted-foreground/70 italic">
-                                    Progress is saved automatically. If transcription fails, you can retry and it will resume from the last completed chunk.
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
                       <Button
                         className="font-mono text-xs uppercase tracking-widest"
                         onClick={() => selectedSermon && generateTranscript(selectedSermon)}
@@ -1503,6 +1537,7 @@ export default function Home() {
                     </>
                   )}
                 </div>
+                )}
               </div>
             )}
           </DialogContent>

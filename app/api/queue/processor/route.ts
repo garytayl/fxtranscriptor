@@ -57,6 +57,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Item is already being processed by worker - do NOT call worker again (prevents runaway cron usage)
+    if (processData.alreadyProcessing) {
+      return NextResponse.json({
+        success: true,
+        message: "Item already being processed by worker, skipping",
+        processed: false,
+      });
+    }
+
     const { sermon, queueItem } = processData;
 
     // Check if worker is configured

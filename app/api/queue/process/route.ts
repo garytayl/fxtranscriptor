@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Stale threshold: if something has been "processing" longer than this, treat as failed so queue can advance
+    const STALE_PROCESSING_MS = 2 * 60 * 60 * 1000; // 2 hours
+
     // Check if there's already a processing item
     const { data: processingItem } = await supabaseClient
       .from("transcription_queue")
@@ -29,19 +32,43 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (processingItem) {
-      // Return the currently processing item
-      const { data: sermon } = await supabaseClient
-        .from("sermons")
-        .select("*")
-        .eq("id", processingItem.sermon_id)
-        .single();
+      const startedAt = processingItem.started_at ? new Date(processingItem.started_at).getTime() : 0;
+      const isStale = Date.now() - startedAt > STALE_PROCESSING_MS;
 
-      return NextResponse.json({
-        success: true,
-        processing: true,
-        queueItem: processingItem,
-        sermon: sermon,
-      });
+      if (isStale) {
+        // Mark stale item as failed so we can pick up the next one
+        await supabaseClient
+          .from("transcription_queue")
+          .update({
+            status: "failed",
+            error_message: "Processing timed out (worker may have stopped or failed to report completion)",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", processingItem.id);
+        await supabaseClient
+          .from("sermons")
+          .update({
+            status: "failed",
+            error_message: "Transcription timed out",
+          })
+          .eq("id", processingItem.sermon_id);
+        // Fall through to get next queued item
+      } else {
+        // Still within time window - return existing processing item so processor does NOT re-call worker
+        const { data: sermon } = await supabaseClient
+          .from("sermons")
+          .select("*")
+          .eq("id", processingItem.sermon_id)
+          .single();
+
+        return NextResponse.json({
+          success: true,
+          processing: true,
+          alreadyProcessing: true, // Processor must not call worker again
+          queueItem: processingItem,
+          sermon: sermon,
+        });
+      }
     }
 
     // Get next queued item (lowest position, status = 'queued')

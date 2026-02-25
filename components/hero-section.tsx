@@ -39,7 +39,7 @@ export function HeroSection() {
     <section 
       ref={sectionRef} 
       id="hero" 
-      className="relative min-h-screen flex items-center pl-6 md:pl-28 pr-6 md:pr-12"
+      className="relative min-h-screen flex items-center pt-[var(--navbar-offset)] pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12"
       style={{ willChange: "transform" }} // GPU acceleration hint
     >
       <AnimatedNoise opacity={0.03} />

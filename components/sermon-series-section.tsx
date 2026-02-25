@@ -75,9 +75,9 @@ export function SermonSeriesSection({ series, onSeriesClick }: SermonSeriesSecti
   }
 
   return (
-    <section ref={sectionRef} id="sermons" className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+    <section ref={sectionRef} className="relative py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
       {/* Section header */}
-      <div ref={headerRef} className="mb-16 pr-6 md:pr-12">
+      <div ref={headerRef} className="mb-16">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Series</span>
         <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERMON SERIES</h2>
         <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
