@@ -430,7 +430,7 @@ export function DevotionsClient() {
                   />
                   <button
                     type="button"
-                    onClick={loadPassage}
+                    onClick={() => loadPassage()}
                     disabled={loading}
                     className="min-h-[48px] px-6 rounded-lg font-mono text-xs tracking-wider text-white/90 border border-white/25 hover:bg-white/10 transition-colors disabled:opacity-50"
                   >
