@@ -204,3 +204,85 @@ export function parseStudyFromNotionPaste(pasted: string): Partial<BibleStudy> &
     vaultUrl,
   }
 }
+
+/**
+ * Result of parsing a pasted week/study blob for the admin "Paste to autofill" flow.
+ * Used to prefill the study form and one guide from pasted content (e.g. Week 1 from Notion/email).
+ */
+export type ParsedPasteResult = {
+  summary: string
+  title: string
+  podcast_url: string
+  vault_url: string
+  default_passage_ref: string
+  guide_label: string
+  content_md: string
+}
+
+/**
+ * Parse a pasted week or study guide (e.g. "here is week 1 from a different study" with Series Summary, READ:, podcast/vault links).
+ * Extracts summary, title hint, podcast/vault URLs, first passage ref, and uses the full text as the guide content.
+ */
+export function parsePastedWeekContent(pasted: string): ParsedPasteResult {
+  const raw = pasted.trim()
+  let summary = ""
+  let title = ""
+  let podcast_url = ""
+  let vault_url = ""
+  let default_passage_ref = ""
+  const guide_label = "Week 1"
+
+  const lines = raw.split(/\r?\n/)
+
+  // Series Summary: take the block after "### Series Summary:" or "Series Summary:" until next ## or ---
+  const summaryHeader = /^#*\s*Series Summary\s*:?\s*$/i
+  let inSummary = false
+  const summaryLines: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (summaryHeader.test(line.trim())) {
+      inSummary = true
+      continue
+    }
+    if (inSummary) {
+      if (/^#+\s|\s*---\s*$/.test(line) || (line.trim().startsWith("##") && line.trim().length > 2)) break
+      if (line.trim()) summaryLines.push(line.trim())
+    }
+  }
+  summary = summaryLines.join(" ").replace(/\s+/g, " ").trim()
+
+  // Title hint from summary: e.g. "gospel of John" + "πιστεύω" or "*#John #2025*"
+  const hashJohn = raw.match(/#John\s*#?\s*(\d{4})?/i)
+  const pisteuoMatch = raw.match(/πιστεύω|pisteuo/i)
+  const year = raw.match(/#(\d{4})\b|\b(20\d{2})\b/)?.[1] ?? raw.match(/\b(20\d{2})\b/)?.[0]
+  if (hashJohn || pisteuoMatch) {
+    title = [pisteuoMatch ? "John: πιστεύω" : "John", year].filter(Boolean).join(" ")
+  }
+
+  // Podcast URL: [series podcast](url) or podbean
+  const podcastLink = raw.match(/\[([^\]]*series[^\]]*podcast[^\]]*|[^\]]*podcast[^\]]*)\]\((https?:\S+)\)/i)
+    ?? raw.match(/(https:\/\/[^\s)]*podbean[^\s)]*)/i)
+  if (podcastLink) podcast_url = (podcastLink[2] ?? podcastLink[1] ?? "").replace(/[)\]>\s]+$/, "")
+
+  // Vault URL: [re:group vault](url) or fxchur.ch/rgvault
+  const vaultLink = raw.match(/\[([^\]]*re:?group[^\]]*vault[^\]]*|[^\]]*vault[^\]]*)\]\((https?:\S+)\)/i)
+    ?? raw.match(/(https?:\/\/fxchur\.ch\/rgvault\S*)/i)
+  if (vaultLink) vault_url = (vaultLink[2] ?? vaultLink[1] ?? "").replace(/[)\]>\s]+$/, "")
+
+  // First READ: **READ: [John 1:1-18](url)** or READ: [John 1:1-18](url) — use link text as passage ref
+  const readMatch = raw.match(/\*\*READ:\*\*\s*\[([^\]]+)\]\([^)]+\)|READ:\s*\[([^\]]+)\]\([^)]+\)/i)
+  if (readMatch) {
+    const ref = (readMatch[1] ?? readMatch[2] ?? "").trim()
+    if (ref && /\d+:\d+/.test(ref)) default_passage_ref = ref
+  }
+
+  return {
+    summary,
+    title: title || "New Study",
+    podcast_url,
+    vault_url,
+    default_passage_ref,
+    guide_label,
+    content_md: raw,
+  }
+}

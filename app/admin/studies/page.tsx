@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, Trash2, ChevronDown, ChevronUp, Save, Loader2, GripVertical, FileText } from "lucide-react"
+import { Plus, Trash2, ChevronDown, ChevronUp, Save, Loader2, GripVertical, FileText, ClipboardPaste } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { parsePastedWeekContent } from "@/lib/studies"
 
 type Guide = {
   slug: string
@@ -53,6 +54,8 @@ export default function AdminStudiesPage() {
   const [expandedGuide, setExpandedGuide] = useState<number | null>(null)
   const [pasteDialogGuideIndex, setPasteDialogGuideIndex] = useState<number | null>(null)
   const [pasteText, setPasteText] = useState("")
+  const [pasteAutofillOpen, setPasteAutofillOpen] = useState(false)
+  const [pasteAutofillText, setPasteAutofillText] = useState("")
 
   const loadStudies = useCallback(async () => {
     setLoading(true)
@@ -190,6 +193,38 @@ export default function AdminStudiesPage() {
     toast.success("Content pasted")
   }
 
+  const handlePasteAutofill = () => {
+    const raw = pasteAutofillText.trim()
+    if (!raw) return
+    try {
+      const parsed = parsePastedWeekContent(raw)
+      const study: Study = {
+        ...newStudy(),
+        title: parsed.title,
+        summary: parsed.summary,
+        podcast_url: parsed.podcast_url,
+        vault_url: parsed.vault_url,
+        study_guides: [
+          {
+            ...emptyGuide,
+            slug: "wk-1",
+            label: parsed.guide_label,
+            default_passage_ref: parsed.default_passage_ref,
+            content_md: parsed.content_md,
+          },
+        ],
+      }
+      setEditStudy(study)
+      setShowNew(true)
+      setExpandedGuide(0)
+      setPasteAutofillOpen(false)
+      setPasteAutofillText("")
+      toast.success("Form filled from paste. Review and save.")
+    } catch (err) {
+      toast.error("Could not parse paste", { description: err instanceof Error ? err.message : "Unknown error" })
+    }
+  }
+
   const isEditing = !!editStudy
 
   return (
@@ -202,13 +237,23 @@ export default function AdminStudiesPage() {
           </p>
         </div>
         {!isEditing && (
-          <Button
-            onClick={() => { setEditStudy(newStudy()); setShowNew(true); setExpandedGuide(0) }}
-            className="gap-2 font-mono text-xs uppercase tracking-widest"
-          >
-            <Plus className="size-4" />
-            New Study
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setPasteAutofillOpen(true); setPasteAutofillText("") }}
+              className="gap-2 font-mono text-xs uppercase tracking-widest"
+            >
+              <ClipboardPaste className="size-4" />
+              Paste to autofill
+            </Button>
+            <Button
+              onClick={() => { setEditStudy(newStudy()); setShowNew(true); setExpandedGuide(0) }}
+              className="gap-2 font-mono text-xs uppercase tracking-widest"
+            >
+              <Plus className="size-4" />
+              New Study
+            </Button>
+          </div>
         )}
       </div>
 
@@ -495,7 +540,39 @@ export default function AdminStudiesPage() {
         </div>
       )}
 
-      {/* Paste from Notion dialog */}
+      {/* Paste to autofill (full study/week) dialog */}
+      <Dialog open={pasteAutofillOpen} onOpenChange={(open) => { if (!open) setPasteAutofillOpen(false) }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Paste to autofill</DialogTitle>
+            <DialogDescription>
+              Paste a full week or study (e.g. from Notion or email). We’ll pull out the series summary, podcast/vault links, first passage ref, and use the rest as the guide content. Then you can tweak and save.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={pasteAutofillText}
+            onChange={(e) => setPasteAutofillText(e.target.value)}
+            rows={20}
+            className="flex-1 min-h-[320px] w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 leading-relaxed"
+            placeholder="Paste the full study guide or week content here (e.g. Series Summary, Starter, Pray, Study Questions with READ: refs, podcast/vault links at the end)..."
+            autoFocus
+          />
+          {pasteAutofillText && (
+            <p className="text-[10px] text-muted-foreground font-mono">
+              {pasteAutofillText.length.toLocaleString()} characters
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPasteAutofillOpen(false)}>Cancel</Button>
+            <Button onClick={handlePasteAutofill} disabled={!pasteAutofillText.trim()} className="gap-2 font-mono text-xs uppercase tracking-widest">
+              <ClipboardPaste className="size-4" />
+              Autofill form
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Paste from Notion dialog (single guide content) */}
       <Dialog open={pasteDialogGuideIndex !== null} onOpenChange={(open) => { if (!open) setPasteDialogGuideIndex(null) }}>
         <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
