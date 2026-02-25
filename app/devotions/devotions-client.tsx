@@ -37,10 +37,10 @@ type PassageData = {
   verses: { number: number; text: string }[]
 }
 
-type BibleBook = { id: string; name: string; slug: string }
+type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "book" | "chapter" | "verses" | "reading"
+type Step = "testament" | "book" | "chapter" | "verses" | "reading"
 
 function getReflectionPrompt(passageRef: string): string {
   const slug = passageRef.toLowerCase().replace(/\s/g, "").replace(/:/g, "")
@@ -69,9 +69,11 @@ export function DevotionsClient() {
   const [moreOpen, setMoreOpen] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [books, setBooks] = useState<BibleBook[]>([])
-  const [chapters, setChapters] = useState<BibleChapter[]>([])
+  const [oldTestament, setOldTestament] = useState<BibleBook[]>([])
+  const [newTestament, setNewTestament] = useState<BibleBook[]>([])
   const [booksLoading, setBooksLoading] = useState(true)
+  const [selectedTestament, setSelectedTestament] = useState<"old" | "new" | null>(null)
+  const [chapters, setChapters] = useState<BibleChapter[]>([])
   const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
   const [verseRange, setVerseRange] = useState("")
@@ -86,17 +88,15 @@ export function DevotionsClient() {
       .then((res) => res.json())
       .then((data) => {
         if (cancelled || data.error) return
-        const all: BibleBook[] = [
-          ...(data.oldTestament ?? []),
-          ...(data.newTestament ?? []),
-          ...(data.other ?? []),
-        ]
-        setBooks(all)
+        setOldTestament(data.oldTestament ?? [])
+        setNewTestament(data.newTestament ?? [])
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setBooksLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  const books = selectedTestament === "old" ? oldTestament : selectedTestament === "new" ? newTestament : []
 
   useEffect(() => {
     if (!selectedBook) {
@@ -170,13 +170,15 @@ export function DevotionsClient() {
 
   const goBack = useCallback(() => {
     setDir(-1)
-    if (step === "chapter") setStep("book")
+    if (step === "testament") return
+    if (step === "book") setStep("testament")
+    else if (step === "chapter") setStep("book")
     else if (step === "verses") setStep("chapter")
     else if (step === "reading") setStep("verses")
   }, [step])
 
   const goToBook = useCallback(() => {
-    setStep("book")
+    setStep("testament")
     setDir(-1)
     setError(null)
   }, [])

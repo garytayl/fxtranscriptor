@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getStrongsEntry, parseStrongsCode } from "@/lib/bible/lexicon"
 
 export const runtime = "nodejs"
+/** Allow time for first request to fetch full OpenScriptures dictionary from CDN. */
+export const maxDuration = 60
 
 /**
  * GET /api/bible/lexicon/[code]

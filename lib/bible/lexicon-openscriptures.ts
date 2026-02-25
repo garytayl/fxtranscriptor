@@ -9,6 +9,9 @@ import { normalizeStrongsCode } from "./lexicon-types"
 const OPEN_SCRIPTURES_BASE =
   "https://cdn.jsdelivr.net/gh/openscriptures/strongs@master"
 
+/** Timeout for fetching the full dictionary (large file in serverless). */
+const FETCH_TIMEOUT_MS = 45_000
+
 type RawGreek = {
   lemma?: string
   translit?: string
@@ -29,12 +32,27 @@ type RawHebrew = {
 let greekCache: Record<string, RawGreek> | null = null
 let hebrewCache: Record<string, RawHebrew> | null = null
 
+async function fetchWithTimeout(url: string): Promise<string> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/javascript, text/plain, */*" },
+    })
+    clearTimeout(timeoutId)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.text()
+  } catch (e) {
+    clearTimeout(timeoutId)
+    throw e
+  }
+}
+
 async function fetchGreekDictionary(): Promise<Record<string, RawGreek>> {
   if (greekCache) return greekCache
   const url = `${OPEN_SCRIPTURES_BASE}/greek/strongs-greek-dictionary.js`
-  const res = await fetch(url, { next: { revalidate: 86400 } })
-  if (!res.ok) throw new Error(`OpenScriptures Greek: ${res.status}`)
-  const text = await res.text()
+  const text = await fetchWithTimeout(url)
   const jsonStr = text
     .replace(/^var strongsGreekDictionary\s*=\s*/i, "")
     .replace(/;\s*$/, "")
@@ -45,9 +63,7 @@ async function fetchGreekDictionary(): Promise<Record<string, RawGreek>> {
 async function fetchHebrewDictionary(): Promise<Record<string, RawHebrew>> {
   if (hebrewCache) return hebrewCache
   const url = `${OPEN_SCRIPTURES_BASE}/hebrew/strongs-hebrew-dictionary.js`
-  const res = await fetch(url, { next: { revalidate: 86400 } })
-  if (!res.ok) throw new Error(`OpenScriptures Hebrew: ${res.status}`)
-  const text = await res.text()
+  const text = await fetchWithTimeout(url)
   const jsonStr = text
     .replace(/^var strongsHebrewDictionary\s*=\s*/i, "")
     .replace(/;\s*$/, "")
