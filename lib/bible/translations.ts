@@ -56,6 +56,17 @@ export function getAvailableTranslations(): BibleTranslation[] {
     return translations
   }
 
+  // BSB + WEBU only: use when API_BIBLE_BSB_ID is set (WEBU ID has a known default)
+  const bsbId = process.env.API_BIBLE_BSB_ID
+  const webuId = process.env.API_BIBLE_WEBU_ID || "72f4e6dc683324df-02"
+  if (bsbId) {
+    cachedTranslations = [
+      { key: "bsb", label: "Berean Standard Bible", bibleId: bsbId },
+      { key: "webu", label: "World English Bible (Updated)", bibleId: webuId },
+    ]
+    return cachedTranslations
+  }
+
   const singleId = process.env.API_BIBLE_BIBLE_ID
   if (singleId) {
     const label = process.env.API_BIBLE_TRANSLATION_LABEL || "Default"
