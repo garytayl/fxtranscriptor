@@ -39,6 +39,15 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
   const [unifiedSummary, setUnifiedSummary] = useState<UnifiedSummarySection[] | null>(null);
   const [generatingUnified, setGeneratingUnified] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Session for role-aware UI
+  useEffect(() => {
+    fetch("/api/auth/session", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setIsAdmin(!!data?.isAdmin))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   // Extract ID from params (Next.js 15+ always uses Promise)
   useEffect(() => {
@@ -643,7 +652,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return (
       <main className="relative min-h-screen">
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-        <div className="relative z-10 py-12 pl-6 md:pl-28 pr-6 md:pr-12">
+        <div className="relative z-10 pt-[var(--navbar-offset)] py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
           <div className="mb-8">
             <div className="h-10 w-32 bg-muted animate-pulse rounded mb-4" />
             <div className="h-16 w-3/4 bg-muted animate-pulse rounded mb-6" />
@@ -666,7 +675,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return (
       <main className="relative min-h-screen">
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-        <div className="relative z-10 py-32 pl-6 md:pl-28 pr-6 md:pr-12">
+        <div className="relative z-10 pt-[var(--navbar-offset)] py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
           <div className="text-center">
             <h1 className="font-[var(--font-bebas)] text-4xl mb-4">Sermon Not Found</h1>
             <Button onClick={() => router.push("/")} variant="outline" className="font-mono text-xs uppercase tracking-widest">
@@ -683,7 +692,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     <main className="relative min-h-screen">
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
       
-      <div className="relative z-10 py-6 sm:py-12 pl-4 sm:pl-6 md:pl-28 pr-4 sm:pr-6 md:pr-12">
+      <div className="relative z-10 pt-[var(--navbar-offset)] py-6 sm:py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
         {/* Back Button */}
         <Button
           onClick={() => router.push("/")}
@@ -829,7 +838,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     )}
                   </div>
                 )}
-                {/* Cancel and Delete buttons - Always show cancel when generating */}
+                {/* Cancel and Delete buttons - admin only */}
+                {isAdmin && (
                 <div className="flex gap-2 mt-4">
                   {sermon.status === "generating" && (
                     <Button
@@ -908,6 +918,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     </Button>
                   )}
                 </div>
+                )}
               </div>
             </div>
           </div>
@@ -927,6 +938,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   {sermon.progress_json.total && ` / ${sermon.progress_json.total}`} chunks completed
                 </p>
               </div>
+              {isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
@@ -958,6 +970,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 <Trash2 className="size-3 mr-1" />
                 Delete All
               </Button>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -1052,7 +1065,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
         {/* Actions */}
         <div className="mb-8 sm:mb-12 flex flex-wrap gap-3 sm:gap-4">
-          {!sermon.audio_url && !sermon.youtube_url && (
+          {isAdmin && !sermon.audio_url && !sermon.youtube_url && (
             <Button
               variant="outline"
               size="lg"
@@ -1076,7 +1089,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             </Button>
           )}
           
-          {!sermon.transcript && (
+          {isAdmin && !sermon.transcript && (
             <Button
               variant={sermon.status === "generating" ? "secondary" : "default"}
               size="lg"
@@ -1164,7 +1177,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-mono text-sm uppercase tracking-widest">Sermon Summary</h2>
               <div className="flex items-center gap-2">
-                {summaries.length > 0 && (
+                {isAdmin && summaries.length > 0 && (
                   <div className="relative" ref={optionsMenuRef}>
                     <Button
                       variant="ghost"
@@ -1222,6 +1235,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 <p className="font-mono text-sm text-muted-foreground mb-4">
                   No summaries generated yet.
                 </p>
+                {isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1231,6 +1245,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   <RefreshCw className="size-3 mr-2" />
                   Generate Summaries
                 </Button>
+                )}
               </div>
             ) : unifiedSummary && unifiedSummary.length > 0 ? (
               <SermonNarrativeView
@@ -1242,6 +1257,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                 <p className="font-mono text-sm text-muted-foreground mb-4">
                   Summaries generated. Generating unified view...
                 </p>
+                {isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1261,6 +1277,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     </>
                   )}
                 </Button>
+                )}
               </div>
             )}
           </div>

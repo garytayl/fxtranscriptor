@@ -44,28 +44,21 @@ type ApiBibleChapterContent = {
 const cachedBooks = new Map<string, { books: BibleBook[]; cachedAt: number }>()
 const cachedBibleInfo = new Map<string, { info: ApiBibleInfo; cachedAt: number }>()
 
-function getBibleEnv(): { apiKey: string; bibleId: string; baseUrl: string } {
+/** For routes that only need key + base URL (e.g. listing bibles). Does not require bibleId. */
+function getBibleApiKeyAndBaseUrl(): { apiKey: string; baseUrl: string } {
   const apiKey = process.env.API_BIBLE_KEY
-  const bibleId = process.env.API_BIBLE_BIBLE_ID || getDefaultBibleId()
   const baseUrlRaw = process.env.API_BIBLE_BASE_URL || DEFAULT_BASE_URL
-
-  const missing = []
-  if (!apiKey) missing.push("API_BIBLE_KEY")
-  if (!bibleId) missing.push("API_BIBLE_BIBLE_ID")
-  if (!baseUrlRaw) missing.push("API_BIBLE_BASE_URL")
-
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(", ")}`)
-  }
-
+  if (!apiKey) throw new Error("Missing required environment variable: API_BIBLE_KEY")
   const trimmedBaseUrl = baseUrlRaw.replace(/\/$/, "")
   const baseUrl = trimmedBaseUrl.endsWith("/v1") ? trimmedBaseUrl : `${trimmedBaseUrl}/v1`
+  return { apiKey: apiKey as string, baseUrl }
+}
 
-  return {
-    apiKey: apiKey as string,
-    bibleId: bibleId as string,
-    baseUrl,
-  }
+function getBibleEnv(): { apiKey: string; bibleId: string; baseUrl: string } {
+  const { apiKey, baseUrl } = getBibleApiKeyAndBaseUrl()
+  const bibleId = process.env.API_BIBLE_BIBLE_ID || getDefaultBibleId()
+  if (!bibleId) throw new Error("Missing required environment variable: API_BIBLE_BIBLE_ID (or set API_BIBLE_BSB_ID and API_BIBLE_WEBU_ID)")
+  return { apiKey, bibleId: bibleId as string, baseUrl }
 }
 
 async function bibleFetch<T>(path: string, searchParams?: Record<string, string | number | boolean>) {
@@ -89,7 +82,8 @@ async function bibleFetch<T>(path: string, searchParams?: Record<string, string 
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`API.Bible error ${response.status}: ${errorText || response.statusText}`)
+    const hint = response.status === 403 ? ` (bible in path: ${path}) — use GET /api/bible/bibles to see IDs your key can access` : ""
+    throw new Error(`API.Bible error ${response.status}: ${errorText || response.statusText}${hint}`)
   }
 
   return (await response.json()) as T
@@ -98,6 +92,21 @@ async function bibleFetch<T>(path: string, searchParams?: Record<string, string 
 function resolveBibleId(bibleId?: string) {
   const { bibleId: envBibleId } = getBibleEnv()
   return bibleId ?? envBibleId
+}
+
+/** List all bibles your API key can access. Use this to get exact IDs for API_BIBLE_BSB_ID / API_BIBLE_WEBU_ID. */
+export async function listAllBibles(): Promise<{ id: string; name: string; abbreviation?: string }[]> {
+  const { apiKey, baseUrl } = getBibleApiKeyAndBaseUrl()
+  const response = await fetch(`${baseUrl}/bibles`, {
+    headers: { "api-key": apiKey },
+    next: { revalidate: BIBLE_CACHE_SECONDS },
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`API.Bible error ${response.status}: ${text || response.statusText}`)
+  }
+  const json = (await response.json()) as ApiBibleResponse<Array<{ id: string; name: string; abbreviation?: string }>>
+  return json.data ?? []
 }
 
 export async function listBooks(bibleId?: string): Promise<ApiBibleBook[]> {
@@ -221,9 +230,18 @@ export async function getBooksWithSlugs(bibleId?: string): Promise<BibleBook[]> 
   return mapped
 }
 
+/** Alias slug -> canonical slug for API book lookup (e.g. scripture.api uses "Psalms" not "Psalm") */
+const BOOK_SLUG_ALIASES: Record<string, string> = {
+  psalm: "psalms",
+}
+
 export async function getBookBySlug(slug: string, bibleId?: string): Promise<BibleBook | null> {
   const books = await getBooksWithSlugs(bibleId)
-  return books.find((book) => book.slug === slug) ?? null
+  const found = books.find((book) => book.slug === slug) ?? null
+  if (found) return found
+  const canonical = BOOK_SLUG_ALIASES[slug]
+  if (canonical) return books.find((book) => book.slug === canonical) ?? null
+  return null
 }
 
 export async function getBooksByTestament(): Promise<{

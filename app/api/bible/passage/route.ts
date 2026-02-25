@@ -48,11 +48,20 @@ export async function GET(request: NextRequest) {
         )
       : chapterResponse.verses
 
+    const maxVerse = chapterResponse.verses.length > 0
+      ? Math.max(...chapterResponse.verses.map((v) => v.number))
+      : 0
+    const outOfRangeMessage =
+      verses.length === 0 && parsed.verseRange && maxVerse > 0
+        ? `${book.name} ${parsed.chapterNumber} has ${maxVerse} verse${maxVerse !== 1 ? "s" : ""}.`
+        : undefined
+
     return NextResponse.json({
       reference: parsed.raw,
       translation: translation?.label ?? "Default",
       chapterReference: chapterResponse.chapter.reference,
       verses,
+      ...(outOfRangeMessage && { error: outOfRangeMessage }),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load passage."

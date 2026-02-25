@@ -23,6 +23,12 @@ const ordinalReplacements: Record<string, string> = {
   III: "3",
 }
 
+/** Map common book name variants to canonical names used by scripture APIs (e.g. "Psalms" not "Psalm") */
+const BOOK_NAME_ALIASES: Record<string, string> = {
+  Psalm: "Psalms",
+  psalm: "Psalms",
+}
+
 export function normalizeBookName(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) {
@@ -35,7 +41,7 @@ export function normalizeBookName(raw: string): string {
     }
   }
 
-  return trimmed
+  return BOOK_NAME_ALIASES[trimmed] ?? trimmed
 }
 
 export function slugifyBookName(name: string): string {
@@ -76,7 +82,7 @@ export function parseVerseRange(raw?: string | null): VerseRange | null {
 }
 
 export function parsePassageReference(raw: string): PassageReference | null {
-  const normalized = raw.trim()
+  const normalized = raw.trim().replace(/\s*:\s*/g, ":")
   if (!normalized) {
     return null
   }

@@ -60,13 +60,16 @@ export function AdminLoginClient() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-6">
+    <div className="min-h-screen bg-background flex items-center justify-center px-6 pt-[var(--navbar-offset)]">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Admin Sign In</CardTitle>
           <CardDescription>Sign in to manage sermons and series.</CardDescription>
         </CardHeader>
         <CardContent>
+          <p className="text-xs text-muted-foreground mb-4">
+            Passwords are managed by Supabase Auth. First time? Set <code className="bg-muted px-1 rounded">FIRST_ADMIN_EMAIL</code> to your email in env, create that user in Supabase Dashboard → Authentication → Users, then sign in here once to become admin. See SETUP.md for details.
+          </p>
           <form onSubmit={handleSignIn} className="space-y-4">
             <Input
               type="email"

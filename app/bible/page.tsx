@@ -76,7 +76,7 @@ export default async function BibleIndexPage({
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-16 pt-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-16 pt-[var(--navbar-offset)]">
         <header className="space-y-3">
           <Link
             href="/"

@@ -1,15 +1,21 @@
 /**
  * API Route: Cancel Transcription Queue Item
- * Cancels a sermon in the transcription queue
+ * Cancels a sermon in the transcription queue. Admin only.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdmin();
+    if ("response" in auth) {
+      return auth.response;
+    }
+
     let supabaseClient: ReturnType<typeof createSupabaseAdminClient>;
     try {
       supabaseClient = createSupabaseAdminClient();

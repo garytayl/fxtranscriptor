@@ -4,7 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Custom editorial design tokens - monochrome with orange accent */
+/* Navbar: safe-area + nav bar height so content never clips on mobile */
 :root {
+  --navbar-offset: calc(6rem + env(safe-area-inset-top, 0px));
   --background: oklch(0.08 0 0);
   --foreground: oklch(0.95 0 0);
   --card: oklch(0.12 0 0);
@@ -24,7 +26,7 @@
   --border: oklch(0.25 0 0);
   --input: oklch(0.2 0 0);
   --ring: oklch(0.7 0.2 45);
-  --radius: 0rem;
+  --radius: 0.625rem;
   --sidebar: oklch(0.1 0 0);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.7 0.2 45);
@@ -106,22 +108,31 @@
     overscroll-behavior: none;
   }
   /* Webkit scrollbar styling for html and body */
+  /* Slim scrollbar (maniafueled-style) */
   html::-webkit-scrollbar,
   body::-webkit-scrollbar {
-    width: 10px;
+    width: 6px;
   }
   html::-webkit-scrollbar-track,
   body::-webkit-scrollbar-track {
-    background: hsl(0, 0%, 8%);
+    background: var(--background);
   }
   html::-webkit-scrollbar-thumb,
   body::-webkit-scrollbar-thumb {
-    background: hsl(0, 0%, 24%);
-    border-radius: 0px;
+    background: var(--border);
+    border-radius: 3px;
   }
   html::-webkit-scrollbar-thumb:hover,
   body::-webkit-scrollbar-thumb:hover {
-    background: hsl(0, 0%, 32%);
+    background: var(--muted);
+  }
+}
+
+/* Mobile: improve touch targets and tap highlight */
+@media (hover: none) and (pointer: coarse) {
+  a, button {
+    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+    touch-action: manipulation;
   }
 }
 
