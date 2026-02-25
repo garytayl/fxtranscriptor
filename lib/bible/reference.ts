@@ -82,7 +82,7 @@ export function parseVerseRange(raw?: string | null): VerseRange | null {
 }
 
 export function parsePassageReference(raw: string): PassageReference | null {
-  const normalized = raw.trim()
+  const normalized = raw.trim().replace(/\s*:\s*/g, ":")
   if (!normalized) {
     return null
   }
