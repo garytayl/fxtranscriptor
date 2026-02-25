@@ -86,9 +86,9 @@ export function StudyGuideContent({ content }: { content: string }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: prose }} />
-      <div className="study-guide grid grid-cols-1 gap-8 lg:grid-cols-[1fr,minmax(320px,380px)]">
+      <div className="study-guide grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-[1fr,minmax(0,24rem)]">
         {/* Left: questions and content (verse links show as ref pills that link to right column) */}
-        <div className="font-mono text-sm text-foreground leading-relaxed">
+        <div className="min-w-0 font-mono text-sm text-foreground leading-relaxed">
           <ReactMarkdown
             components={{
               a: linkComponent,
@@ -107,8 +107,8 @@ export function StudyGuideContent({ content }: { content: string }) {
           </ReactMarkdown>
         </div>
 
-        {/* Right: verses sidebar (sticky) */}
-        <aside className="lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-2rem)] lg:overflow-y-auto">
+        {/* Right: verses sidebar (sticky); min-w-0 so it can shrink when zoomed */}
+        <aside className="min-w-0 lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-2rem)] lg:overflow-y-auto">
           <div className="space-y-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Passages</p>
             {passageRefsOrdered.length === 0 ? (
