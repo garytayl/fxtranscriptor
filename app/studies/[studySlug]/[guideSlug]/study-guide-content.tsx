@@ -39,14 +39,14 @@ export function StudyGuideContent({ content }: { content: string }) {
                 return (
                   <>
                     {list.map((p, i) => (
-                      <InlinePassage key={`${p.raw}-${i}`} ref={p.raw} />
+                      <InlinePassage key={`${p.raw}-${i}`} passageRef={p.raw} />
                     ))}
                   </>
                 )
               }
               const single = parsePassageReference(text)
               if (single) {
-                return <InlinePassage ref={single.raw} />
+                return <InlinePassage passageRef={single.raw} />
               }
               return (
                 <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:no-underline">

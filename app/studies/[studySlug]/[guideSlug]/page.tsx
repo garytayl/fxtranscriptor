@@ -6,6 +6,7 @@ import { StudyGuideContent } from "./study-guide-content"
 import { ArrowLeft, ExternalLink } from "lucide-react"
 
 export const revalidate = 3600
+export const runtime = "nodejs"
 
 type Props = {
   params: Promise<{ studySlug: string; guideSlug: string }>

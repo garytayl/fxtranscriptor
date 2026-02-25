@@ -6,7 +6,7 @@ import { getReaderUrlFromReference } from "@/lib/bible/reference"
 import { BookOpen, Loader2 } from "lucide-react"
 
 interface InlinePassageProps {
-  ref: string
+  passageRef: string
 }
 
 type State =
@@ -14,10 +14,11 @@ type State =
   | { status: "loaded"; reference: string; translation: string; verses: { number: number; text: string }[] }
   | { status: "error"; message: string }
 
-export function InlinePassage({ ref: refStr }: InlinePassageProps) {
+export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
   const [state, setState] = useState<State>({ status: "loading" })
 
   useEffect(() => {
+    if (!refStr || typeof refStr !== "string") return
     let cancelled = false
     const params = new URLSearchParams({ ref: refStr })
     fetch(`/api/bible/passage?${params.toString()}`)
@@ -43,13 +44,13 @@ export function InlinePassage({ ref: refStr }: InlinePassageProps) {
     }
   }, [refStr])
 
-  const readerUrl = getReaderUrlFromReference(refStr)
+  const readerUrl = refStr ? getReaderUrlFromReference(refStr) : null
 
   if (state.status === "loading") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded border border-border bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground">
         <Loader2 className="size-3 animate-spin" />
-        {refStr}
+        {refStr || "…"}
       </span>
     )
   }
@@ -57,7 +58,7 @@ export function InlinePassage({ ref: refStr }: InlinePassageProps) {
   if (state.status === "error") {
     return (
       <span className="rounded border border-destructive/30 bg-destructive/5 px-2 py-1 font-mono text-xs text-destructive" title={state.message}>
-        {refStr} (unavailable)
+        {refStr || "Passage"} (unavailable)
       </span>
     )
   }

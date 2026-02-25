@@ -2,29 +2,35 @@ import { getStudyBySlug } from "./studies"
 import fs from "fs"
 import path from "path"
 
+/** Allow only safe slug chars to prevent path traversal */
+const SLUG_REGEX = /^[a-z0-9-]+$/
+
 /**
  * Read markdown content for a study guide from content/studies/{studySlug}/{guideSlug}.md.
- * Returns null if file doesn't exist.
+ * Returns null if file doesn't exist or path is invalid.
  */
 export async function getGuideContent(
   studySlug: string,
   guideSlug: string
 ): Promise<string | null> {
+  if (!studySlug || !guideSlug || !SLUG_REGEX.test(studySlug) || !SLUG_REGEX.test(guideSlug)) {
+    return null
+  }
+
   const study = getStudyBySlug(studySlug)
   if (!study) return null
 
   const guide = study.guideLinks.find((g) => g.slug === guideSlug)
   if (!guide) return null
 
-  const filePath = path.join(
-    process.cwd(),
-    "content",
-    "studies",
-    studySlug,
-    `${guideSlug}.md`
-  )
-
   try {
+    const filePath = path.join(
+      process.cwd(),
+      "content",
+      "studies",
+      studySlug,
+      `${guideSlug}.md`
+    )
     const raw = await fs.promises.readFile(filePath, "utf-8")
     return raw
   } catch {
