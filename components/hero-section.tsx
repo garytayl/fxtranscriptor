@@ -44,8 +44,8 @@ export function HeroSection() {
     >
       <AnimatedNoise opacity={0.03} />
 
-      {/* Left vertical label */}
-      <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2">
+      {/* Left vertical label — hidden on small mobile to avoid overlapping content */}
+      <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 hidden sm:block">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground -rotate-90 origin-left block whitespace-nowrap">
           FX ARCHIVE
         </span>
@@ -70,26 +70,28 @@ export function HeroSection() {
           Sermon transcript archive for FX Church (Foot of the Cross). Automatically syncs from Podbean and YouTube with one-click transcript generation.
         </p>
 
-        <div className="mt-16 flex items-center gap-8">
+        <div className="mt-10 sm:mt-16 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8">
           <a
             href="#sermons"
-            className="group inline-flex items-center gap-3 border border-foreground/20 px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
+            className="group inline-flex items-center gap-3 border border-foreground/20 px-5 sm:px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
           >
             <ScrambleTextOnHover text="View Sermons" as="span" duration={0.6} />
             <BitmapChevron className="transition-transform duration-[400ms] ease-in-out group-hover:rotate-45" />
           </a>
-          <a
-            href="#recent"
-            className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
-          >
-            Recent Transcripts
-          </a>
-          <Link
-            href="/bible"
-            className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
-          >
-            Scripture Reader
-          </Link>
+          <div className="flex items-center gap-5 sm:gap-8">
+            <a
+              href="#recent"
+              className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
+            >
+              Recent Transcripts
+            </a>
+            <Link
+              href="/bible"
+              className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
+            >
+              Scripture Reader
+            </Link>
+          </div>
         </div>
       </div>
 

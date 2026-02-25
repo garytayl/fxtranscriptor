@@ -65,20 +65,15 @@ export function TranslationSettings({ translations, currentKey }: TranslationSet
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-        Translation: {currentLabel}
-      </div>
-      <Button
+    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <button
         type="button"
-        variant="outline"
-        size="sm"
-        className="gap-2 text-xs uppercase tracking-[0.2em]"
         onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] text-muted-foreground hover:text-accent transition-colors min-w-0"
       >
-        <Settings2 className="size-3.5" />
-        Settings
-      </Button>
+        <Settings2 className="size-3 sm:size-3.5 shrink-0" />
+        <span className="truncate max-w-[120px] sm:max-w-none">{currentLabel}</span>
+      </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
