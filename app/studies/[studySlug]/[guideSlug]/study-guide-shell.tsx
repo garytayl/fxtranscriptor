@@ -6,6 +6,7 @@ import {
   AnimatePresence,
   useMotionValue,
   useTransform,
+  useDragControls,
   type PanInfo,
 } from "framer-motion"
 import { X, ChevronDown, BookOpen } from "lucide-react"
@@ -20,7 +21,7 @@ type StudyGuideShellProps = {
 const sidebarPassageClasses =
   "font-sans text-base font-light text-white/90 leading-relaxed [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20 [&_.bg-card]:bg-white/5 [&_.text-destructive]:text-red-300 [&_.bg-muted]:bg-white/10 [&_.text-accent]:text-amber-200/90 [&_a]:text-amber-200/90 [&_a:hover]:text-amber-200"
 
-const DISMISS_THRESHOLD = 80
+const DISMISS_THRESHOLD = 60
 
 function MobileBottomSheet({
   passageRef,
@@ -31,23 +32,17 @@ function MobileBottomSheet({
 }) {
   const sheetY = useMotionValue(0)
   const backdropOpacity = useTransform(sheetY, [0, 300], [1, 0])
+  const dragControls = useDragControls()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const isScrolledTop = useRef(true)
 
   const handleDragEnd = useCallback(
     (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-      if (info.offset.y > DISMISS_THRESHOLD || info.velocity.y > 400) {
+      if (info.offset.y > DISMISS_THRESHOLD || info.velocity.y > 300) {
         onDismiss()
       }
     },
     [onDismiss],
   )
-
-  const handleScroll = useCallback(() => {
-    if (scrollRef.current) {
-      isScrolledTop.current = scrollRef.current.scrollTop <= 0
-    }
-  }, [])
 
   return (
     <>
@@ -62,7 +57,7 @@ function MobileBottomSheet({
         onClick={onDismiss}
       />
 
-      {/* Bottom sheet — draggable */}
+      {/* Bottom sheet — draggable via handle */}
       <motion.div
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
@@ -70,26 +65,39 @@ function MobileBottomSheet({
         transition={{ type: "spring", damping: 30, stiffness: 350 }}
         style={{ y: sheetY }}
         drag="y"
-        dragConstraints={{ top: 0 }}
-        dragElastic={{ top: 0, bottom: 0.6 }}
+        dragControls={dragControls}
+        dragListener={false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.5 }}
         onDragEnd={handleDragEnd}
         className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0c0c0c] border-t border-white/10 rounded-t-[20px] max-h-[75vh] flex flex-col shadow-[0_-4px_40px_rgba(0,0,0,0.5)]"
         data-lenis-prevent
       >
-        {/* Drag handle area — large touch target */}
-        <div className="shrink-0 flex flex-col items-center pt-2.5 pb-1 cursor-grab active:cursor-grabbing touch-none">
-          <div className="w-12 h-1.5 rounded-full bg-white/25" />
+        {/* Drag handle area — initiates drag, large touch target */}
+        <div
+          className="shrink-0 flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
+          style={{ touchAction: "none" }}
+          onPointerDown={(e) => dragControls.start(e)}
+        >
+          <div className="w-14 h-1.5 rounded-full bg-white/30 active:bg-white/50 transition-colors" />
         </div>
 
-        {/* Header */}
-        <div className="shrink-0 px-5 pb-3 flex items-center justify-between gap-3">
+        {/* Header — also initiates drag */}
+        <div
+          className="shrink-0 px-5 pb-3 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
+          style={{ touchAction: "none" }}
+          onPointerDown={(e) => dragControls.start(e)}
+        >
           <div className="flex items-center gap-2.5 min-w-0">
             <BookOpen className="size-4 shrink-0 text-amber-200/70" />
             <p className="font-mono text-[11px] tracking-[0.2em] text-amber-200/80 uppercase truncate">
               {passageRef}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div
+            className="flex items-center gap-2 shrink-0"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               onClick={onDismiss}
@@ -107,7 +115,6 @@ function MobileBottomSheet({
         {/* Scrollable content */}
         <div
           ref={scrollRef}
-          onScroll={handleScroll}
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
@@ -127,9 +134,9 @@ function MobileBottomSheet({
 
         {/* Swipe hint at bottom */}
         <div className="shrink-0 flex items-center justify-center gap-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
-          <ChevronDown className="size-3 text-white/20" />
-          <span className="font-mono text-[9px] tracking-widest text-white/20 uppercase">
-            Swipe down to close
+          <ChevronDown className="size-3 text-white/25" />
+          <span className="font-mono text-[9px] tracking-widest text-white/25 uppercase">
+            Drag down to close
           </span>
         </div>
       </motion.div>
