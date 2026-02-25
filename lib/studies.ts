@@ -91,6 +91,38 @@ export function getAllStudies(): BibleStudy[] {
   return [...STUDIES]
 }
 
+/** Async versions that check the database first, falling back to hardcoded data. */
+export async function getAllStudiesAsync(): Promise<BibleStudy[]> {
+  try {
+    const { getStudiesFromDb } = await import("./studies-db")
+    const db = await getStudiesFromDb()
+    if (db && db.studies.length > 0) return db.studies
+  } catch {}
+  return getAllStudies()
+}
+
+export async function getCurrentStudyAsync(): Promise<BibleStudy | null> {
+  try {
+    const { getStudiesFromDb } = await import("./studies-db")
+    const db = await getStudiesFromDb()
+    if (db && db.studies.length > 0) {
+      return db.studies.find((s) => s.id === db.currentId) ?? db.studies[0] ?? null
+    }
+  } catch {}
+  return getCurrentStudy()
+}
+
+export async function getStudyBySlugAsync(slug: string): Promise<BibleStudy | null> {
+  try {
+    const { getStudiesFromDb } = await import("./studies-db")
+    const db = await getStudiesFromDb()
+    if (db && db.studies.length > 0) {
+      return db.studies.find((s) => s.slug === slug) ?? null
+    }
+  } catch {}
+  return getStudyBySlug(slug)
+}
+
 /**
  * Parse pasted Notion-style text into a partial BibleStudy for adding new studies.
  * Paste the title, summary, and study guide list from Notion; this extracts links and text.

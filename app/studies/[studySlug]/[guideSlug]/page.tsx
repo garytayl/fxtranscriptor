@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { getStudyBySlug } from "@/lib/studies"
+import { getStudyBySlugAsync } from "@/lib/studies"
 import { getGuideContent as readGuideContent, getFirstPassageRefFromContent } from "@/lib/studies-content"
 import { StudyGuideShell } from "./study-guide-shell"
 import { ArrowLeft, ExternalLink } from "lucide-react"
@@ -14,7 +14,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props) {
   const { studySlug, guideSlug } = await params
-  const study = getStudyBySlug(studySlug)
+  const study = await getStudyBySlugAsync(studySlug)
   const guide = study?.guideLinks.find((g) => g.slug === guideSlug)
   if (!study || !guide) return { title: "Study guide" }
   return {
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function StudyGuidePage({ params }: Props) {
   const { studySlug, guideSlug } = await params
-  const study = getStudyBySlug(studySlug)
+  const study = await getStudyBySlugAsync(studySlug)
   const guide = study?.guideLinks.find((g) => g.slug === guideSlug)
 
   if (!study || !guide) notFound()

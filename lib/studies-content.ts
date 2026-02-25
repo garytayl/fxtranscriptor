@@ -1,5 +1,6 @@
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 import { getStudyBySlug } from "./studies"
+import { getGuideContentFromDb } from "./studies-db"
 import fs from "fs"
 import path from "path"
 
@@ -30,6 +31,9 @@ export async function getGuideContent(
   if (!studySlug || !guideSlug || !SLUG_REGEX.test(studySlug) || !SLUG_REGEX.test(guideSlug)) {
     return null
   }
+
+  const dbContent = await getGuideContentFromDb(studySlug, guideSlug)
+  if (dbContent) return dbContent
 
   const study = getStudyBySlug(studySlug)
   if (!study) return null

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { getCurrentStudy, getAllStudies } from "@/lib/studies"
+import { getCurrentStudyAsync, getAllStudiesAsync } from "@/lib/studies"
 import { ExternalLink, Headphones, BookOpen, FileText, ChevronRight } from "lucide-react"
 
 export const revalidate = 3600
@@ -9,9 +9,9 @@ export const metadata = {
   description: "FX Church Bible studies and small group guides. Study guides hosted on Notion.",
 }
 
-export default function StudiesPage() {
-  const current = getCurrentStudy()
-  const all = getAllStudies()
+export default async function StudiesPage() {
+  const current = await getCurrentStudyAsync()
+  const all = await getAllStudiesAsync()
 
   return (
     <main className="relative min-h-screen">
