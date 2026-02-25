@@ -1,0 +1,115 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import type { StrongsEntry } from "@/lib/bible/lexicon"
+
+type WordStudyProps = {
+  /** Strong's code, e.g. "G26" or "H3045" */
+  code: string
+  /** Optional display text (e.g. "love", "agapē"). Defaults to transliteration or code. */
+  children?: React.ReactNode
+  /** Optional: pass entry directly to avoid fetch (e.g. from server). */
+  entry?: StrongsEntry | null
+  /** Class name for the trigger button. */
+  className?: string
+}
+
+function EntryContent({ entry }: { entry: StrongsEntry }) {
+  const isGreek = entry.language === "greek"
+  return (
+    <div className="space-y-2 text-left">
+      <div className="flex items-center gap-2 border-b border-border pb-2">
+        <span
+          className="text-xl font-semibold text-foreground"
+          lang={isGreek ? "el" : "he"}
+          dir={isGreek ? "ltr" : "rtl"}
+        >
+          {entry.lemma}
+        </span>
+        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
+          {entry.code}
+        </span>
+      </div>
+      {entry.transliteration && (
+        <p className="font-mono text-sm text-muted-foreground">
+          {entry.transliteration}
+          {entry.pronunciation && (
+            <span className="ml-1.5 text-xs opacity-80">[{entry.pronunciation}]</span>
+          )}
+        </p>
+      )}
+      <p className="text-sm font-medium text-foreground">{entry.meaning}</p>
+      {entry.definition && (
+        <p className="text-xs leading-relaxed text-muted-foreground">{entry.definition}</p>
+      )}
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+        {isGreek ? "Greek" : "Hebrew"} · Strong’s
+      </p>
+    </div>
+  )
+}
+
+export function WordStudy({ code, children, entry: entryProp, className }: WordStudyProps) {
+  const [entry, setEntry] = useState<StrongsEntry | null>(entryProp ?? null)
+  const [loading, setLoading] = useState(!entryProp)
+
+  useEffect(() => {
+    if (entryProp != null) {
+      setEntry(entryProp)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    fetch(`/api/bible/lexicon/${encodeURIComponent(code)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: StrongsEntry | null) => {
+        if (!cancelled) {
+          setEntry(data ?? null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [code, entryProp])
+
+  const displayText = children ?? entry?.transliteration ?? entry?.lemma ?? code
+
+  if (entry) {
+    return (
+      <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          <button
+            type="button"
+            className={`cursor-help border-b border-dashed border-amber-500/50 font-medium text-amber-200/90 hover:border-amber-500/80 hover:text-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 rounded-sm ${className ?? ""}`}
+            aria-label={`Word study: ${entry.transliteration ?? entry.lemma} (${entry.code})`}
+          >
+            {displayText}
+          </button>
+        </HoverCardTrigger>
+        <HoverCardContent
+          align="start"
+          side="top"
+          sideOffset={6}
+          className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
+        >
+          <EntryContent entry={entry} />
+        </HoverCardContent>
+      </HoverCard>
+    )
+  }
+
+  if (loading) {
+    return (
+      <span className="animate-pulse border-b border-dashed border-muted-foreground/30 text-muted-foreground">
+        {displayText}
+      </span>
+    )
+  }
+
+  return <span className="text-muted-foreground">{displayText}</span>
+}

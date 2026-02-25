@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { InlinePassage } from "./inline-passage"
+import { WordStudy } from "@/components/word-study"
 
 function getLinkText(children: React.ReactNode): string {
   if (typeof children === "string") return children.trim()
@@ -97,6 +98,15 @@ export function StudyGuideContent({
 }) {
   const linkComponent = ({ href, children }: { href?: string; children?: React.ReactNode }) => {
     const text = getLinkText(children)
+    // Greek/Hebrew word study: [love](strong:G26) or [agapē](strong:G26)
+    const strongsMatch = href?.match(/^strong:(G\d+|H\d+)$/i)
+    if (strongsMatch) {
+      return (
+        <WordStudy code={strongsMatch[1]} className="text-amber-200/90 hover:text-amber-200">
+          {children}
+        </WordStudy>
+      )
+    }
     const list = text.includes(",") ? parsePassageList(text) : null
     const refsForThisLink: string[] = list && list.length > 0 ? list.map((p) => p.raw) : []
     const single = !refsForThisLink.length ? parsePassageReference(text) : null

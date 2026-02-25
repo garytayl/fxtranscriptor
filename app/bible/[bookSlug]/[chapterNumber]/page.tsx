@@ -8,7 +8,9 @@ import { ScrollToVerse } from "@/app/bible/_components/scroll-to-verse"
 import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { isVerseInRange, parseVerseRange } from "@/lib/bible/reference"
 import { TranslationSettings } from "@/app/bible/_components/translation-settings"
+import { ChapterWordStudy } from "@/app/bible/_components/chapter-word-study"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
+import { getKeyTermsForChapter } from "@/lib/bible/chapter-key-terms"
 
 export const revalidate = 3600
 
@@ -70,6 +72,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const previousChapter = currentIndex > 0 ? chapters[currentIndex - 1] : null
   const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null
   const query = activeKey ? `?t=${activeKey}` : ""
+  const keyTerms = getKeyTermsForChapter(book.slug, chapterNumber)
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -153,6 +156,10 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
               )
             })}
           </ol>
+        )}
+
+        {(verses.length > 0 || keyTerms.length > 0) && (
+          <ChapterWordStudy bookSlug={book.slug} chapterNumber={chapterNumber} keyTerms={keyTerms} />
         )}
 
         <div className="flex items-center justify-between gap-3 border-t border-border pt-5 sm:pt-6">

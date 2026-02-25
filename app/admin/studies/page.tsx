@@ -80,7 +80,7 @@ export default function AdminStudiesPage() {
     } catch {
       setHasDraft(false)
     }
-  }, [isEditing])
+  }, [editStudy])
 
   const newStudy = (): Study => ({
     id: "",

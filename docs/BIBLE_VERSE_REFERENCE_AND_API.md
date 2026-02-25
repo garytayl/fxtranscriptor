@@ -162,8 +162,36 @@ BibleVerse   → number, text
 
 ---
 
-## 4. Summary
+## 4. Greek and Hebrew word study (Strong’s)
+
+Studies and the scripture reader can show **original-language word explanations** (Strong’s Concordance) so users can dive deeper into the text.
+
+### In study guides (markdown)
+
+Use a special link so a word becomes a hoverable “word study” with Greek/Hebrew lemma, transliteration, and definition:
+
+- **Syntax**: `[display text](strong:G26)` or `[display text](strong:H3045)`
+- **Codes**: `G` + number = Greek; `H` + number = Hebrew (Strong’s number).
+- **Example**: `[love](strong:G26)` or `[agapē](strong:G26)` — hovering shows the Strong’s entry for ἀγάπη (agapē).
+
+Definitions come from a local sample (`lib/bible/lexicon-data.ts`) and, when missing, from the full **OpenScriptures Strong's** dictionaries (Greek and Hebrew) fetched from jsDelivr and cached in memory. No API key required. API: `GET /api/bible/lexicon/[code]` returns one entry.
+
+### In the scripture reader
+
+- Each chapter page has a **“Dive deeper”** section at the bottom.
+- If the chapter has **key terms** configured in `lib/bible/chapter-key-terms.ts`, those Strong’s codes are shown as hoverable word studies.
+- Otherwise, the section still explains that study guides offer word-study links.
+
+### Adding more terms
+
+- **Lexicon**: Add entries to `LEXICON_SAMPLE` in `lib/bible/lexicon-data.ts` (format: `code`, `lemma`, `transliteration`, `pronunciation`, `meaning`, `definition?`, `language`).
+- **Chapter key terms**: Add a key `"bookSlug-chapterNumber"` (e.g. `"john-3"`) to `CHAPTER_KEY_TERMS` in `lib/bible/chapter-key-terms.ts` with an array of Strong’s codes.
+
+---
+
+## 5. Summary
 
 - **References**: `Book Chapter` or `Book Chapter:Verse` or `Book Chapter:Start-End`; lists with `;` or newline; comma for same-book shorthand.
 - **Parsing**: `lib/bible/reference.ts` turns strings into `PassageReference` / `VerseRange` and builds reader URLs.
 - **API**: API.Bible v1 with `api-key`; we call books, chapters, and chapter HTML; we parse HTML to `BibleVerse[]` and support multiple translations via `bibleId` and env config.
+- **Word study**: Study guides use `[word](strong:G26)` links; reader shows a “Dive deeper” section with optional key terms from `lib/bible/chapter-key-terms.ts` and `lib/bible/lexicon-data.ts`.

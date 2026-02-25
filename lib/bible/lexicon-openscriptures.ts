@@ -1,0 +1,108 @@
+/**
+ * Lazy-load full Strong's dictionaries from OpenScriptures (CC-BY-SA) via jsDelivr.
+ * Used when a code is not in the local LEXICON_SAMPLE. Data: public domain (Strong 1890).
+ */
+
+import type { StrongsEntry } from "./lexicon-types"
+import { normalizeStrongsCode } from "./lexicon-types"
+
+const OPEN_SCRIPTURES_BASE =
+  "https://cdn.jsdelivr.net/gh/openscriptures/strongs@master"
+
+type RawGreek = {
+  lemma?: string
+  translit?: string
+  kjv_def?: string
+  strongs_def?: string
+  derivation?: string
+}
+
+type RawHebrew = {
+  lemma?: string
+  xlit?: string
+  pron?: string
+  kjv_def?: string
+  strongs_def?: string
+  derivation?: string
+}
+
+let greekCache: Record<string, RawGreek> | null = null
+let hebrewCache: Record<string, RawHebrew> | null = null
+
+async function fetchGreekDictionary(): Promise<Record<string, RawGreek>> {
+  if (greekCache) return greekCache
+  const url = `${OPEN_SCRIPTURES_BASE}/greek/strongs-greek-dictionary.js`
+  const res = await fetch(url, { next: { revalidate: 86400 } })
+  if (!res.ok) throw new Error(`OpenScriptures Greek: ${res.status}`)
+  const text = await res.text()
+  const jsonStr = text
+    .replace(/^var strongsGreekDictionary\s*=\s*/i, "")
+    .replace(/;\s*$/, "")
+  greekCache = JSON.parse(jsonStr) as Record<string, RawGreek>
+  return greekCache
+}
+
+async function fetchHebrewDictionary(): Promise<Record<string, RawHebrew>> {
+  if (hebrewCache) return hebrewCache
+  const url = `${OPEN_SCRIPTURES_BASE}/hebrew/strongs-hebrew-dictionary.js`
+  const res = await fetch(url, { next: { revalidate: 86400 } })
+  if (!res.ok) throw new Error(`OpenScriptures Hebrew: ${res.status}`)
+  const text = await res.text()
+  const jsonStr = text
+    .replace(/^var strongsHebrewDictionary\s*=\s*/i, "")
+    .replace(/;\s*$/, "")
+  hebrewCache = JSON.parse(jsonStr) as Record<string, RawHebrew>
+  return hebrewCache
+}
+
+function mapGreek(code: string, raw: RawGreek): StrongsEntry {
+  return {
+    code,
+    lemma: raw.lemma ?? "",
+    transliteration: raw.translit,
+    pronunciation: undefined,
+    meaning: raw.kjv_def?.trim() ?? "",
+    definition: raw.strongs_def?.trim(),
+    language: "greek",
+  }
+}
+
+function mapHebrew(code: string, raw: RawHebrew): StrongsEntry {
+  return {
+    code,
+    lemma: raw.lemma ?? "",
+    transliteration: raw.xlit,
+    pronunciation: raw.pron,
+    meaning: raw.kjv_def?.trim() ?? "",
+    definition: raw.strongs_def?.trim(),
+    language: "hebrew",
+  }
+}
+
+/**
+ * Fetch a Strong's entry from OpenScriptures (lazy-loads full dictionary by language).
+ * Returns null if code is invalid or not found.
+ */
+export async function getStrongsFromOpenScriptures(
+  code: string
+): Promise<StrongsEntry | null> {
+  const normalized = normalizeStrongsCode(code)
+  if (!normalized) return null
+
+  const isGreek = normalized.startsWith("G")
+  try {
+    if (isGreek) {
+      const dict = await fetchGreekDictionary()
+      const raw = dict[normalized]
+      if (!raw) return null
+      return mapGreek(normalized, raw)
+    } else {
+      const dict = await fetchHebrewDictionary()
+      const raw = dict[normalized]
+      if (!raw) return null
+      return mapHebrew(normalized, raw)
+    }
+  } catch {
+    return null
+  }
+}

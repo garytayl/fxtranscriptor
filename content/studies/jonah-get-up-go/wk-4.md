@@ -20,7 +20,7 @@ Lord, since the beginning of creation you have been telling your people to Get u
 
 ### RECAP
 
-*"The word of the Lord came to Jonah son of Amittai: "Get up! Go to the great city of Nineveh and preach against it, because their wickedness has confronted Me." However, Jonah got up to flee…from the Lord's presence. Then the Lord hurled a violent wind on the sea and appointed a huge fish to swallow Jonah, and Jonah was in the fish three days and three nights. Jonah prayed to the Lord his God from inside the fish." God has the fish spit Jonah out. Jonah* chooses to *"Get up! Go to the great city of Nineveh and preach the message." "The men of Nineveh believed in God."! A public repentance was called for and practiced. "God saw their actions—that they had turned from their evil ways—so God relented from the disaster."*
+*"The word of the Lord came to Jonah son of Amittai: "Get up! Go to the great city of Nineveh and preach against it, because their wickedness has confronted Me." However, Jonah got up to flee…from the Lord's presence. Then the Lord hurled a violent wind on the sea and appointed a huge fish to swallow Jonah, and Jonah was in the fish three days and three nights. Jonah prayed to the Lord his God from inside the fish." God has the fish spit Jonah out. Jonah* chooses to *"Get up! Go to the great city of Nineveh and preach the message." "The men of Nineveh believed in God."! A public repentance was called for and practiced. "God saw their actions—that they had turned from their [evil](strong:H7451) ways—so God [relented](strong:H7725) from the disaster."*
 
 ### READ: [Jonah 4:1-11](https://www.biblegateway.com/passage/?search=%20Jonah%204%3A1-11&version=HCSB)
 
