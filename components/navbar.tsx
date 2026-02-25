@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion"
 const routeLinks = [
   { label: "Home", href: "/" },
   { label: "Sermons", href: "/#sermons" },
+  { label: "Studies", href: "/studies" },
   { label: "Scripture", href: "/bible" },
   { label: "Admin", href: "/admin/login" },
 ]
@@ -20,6 +21,7 @@ export function Navbar() {
     if (href === "/") return pathname === "/"
     if (href.startsWith("/bible")) return pathname.startsWith("/bible")
     if (href.startsWith("/admin")) return pathname.startsWith("/admin")
+    if (href.startsWith("/studies")) return pathname.startsWith("/studies")
     return pathname === href
   }
 
