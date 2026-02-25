@@ -1,27 +1,10 @@
 "use client"
 
-import React, { useMemo, useRef } from "react"
+import React, { useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { InlinePassage } from "./inline-passage"
-
-/** Extract passage refs from markdown in document order (from [text](url) where text parses as ref(s)) */
-function extractPassageRefsInOrder(content: string): string[] {
-  const refs: string[] = []
-  const linkRegex = /\[([^\]]+)\]\((https?:\S+)\)/g
-  let match
-  while ((match = linkRegex.exec(content)) !== null) {
-    const text = match[1].trim()
-    const list = text.includes(",") ? parsePassageList(text) : null
-    if (list && list.length > 0) {
-      list.forEach((p) => refs.push(p.raw))
-    } else {
-      const single = parsePassageReference(text)
-      if (single) refs.push(single.raw)
-    }
-  }
-  return refs
-}
 
 function getLinkText(children: React.ReactNode): string {
   if (typeof children === "string") return children.trim()
@@ -31,28 +14,60 @@ function getLinkText(children: React.ReactNode): string {
   return ""
 }
 
+/** Resonates-style prose: single column, font-sans body, border-white/15, amber accent */
 const prose = `
-.study-guide.prose h1 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; }
-.study-guide.prose h2 { font-size: 1.125rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.5rem; letter-spacing: 0.02em; }
-.study-guide.prose h3 { font-size: 1rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: var(--color-muted-foreground); }
-.study-guide.prose p { margin-bottom: 0.75rem; line-height: 1.65; white-space: normal; word-spacing: normal; }
-.study-guide.prose ul, .study-guide.prose ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
-.study-guide.prose ol { list-style-type: decimal; }
-.study-guide.prose ol li { margin-bottom: 0.6rem; padding-left: 0.25rem; line-height: 1.5; }
-.study-guide.prose ul li { margin-bottom: 0.35rem; }
-/* Indented sub-questions under numbered items: show as a., b., c. */
-.study-guide.prose ol li ul { list-style-type: lower-alpha; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; }
-.study-guide.prose ol li ul li { margin-bottom: 0.4rem; }
-.study-guide.prose li::marker { color: var(--color-accent); font-weight: 600; }
-.study-guide.prose a { color: var(--color-accent); text-decoration: underline; }
-.study-guide.prose a:hover { text-decoration: none; }
-.study-guide.prose strong { font-weight: 600; }
-.study-guide.prose em { font-style: italic; }
-.study-guide.prose hr { border-color: var(--color-border); margin: 1.5rem 0; }
+.study-guide-resonates.study-guide.prose h1 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; color: white; }
+.study-guide-resonates.study-guide.prose h2 { font-size: 1.125rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.5rem; letter-spacing: 0.02em; color: white; border-color: rgba(255,255,255,0.15); }
+.study-guide-resonates.study-guide.prose h3 { font-size: 1rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: rgba(255,255,255,0.7); }
+.study-guide-resonates.study-guide.prose p { margin-bottom: 0.75rem; line-height: 1.65; color: rgba(255,255,255,0.9); white-space: normal; word-spacing: normal; }
+.study-guide-resonates.study-guide.prose ul, .study-guide-resonates.study-guide.prose ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
+.study-guide-resonates.study-guide.prose ol { list-style-type: decimal; }
+.study-guide-resonates.study-guide.prose ol li { margin-bottom: 0.6rem; padding-left: 0.25rem; line-height: 1.5; color: rgba(255,255,255,0.9); }
+.study-guide-resonates.study-guide.prose ul li { margin-bottom: 0.35rem; }
+.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; }
+.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.4rem; }
+.study-guide-resonates.study-guide.prose li::marker { color: rgba(251,191,36,0.9); font-weight: 600; }
+.study-guide-resonates.study-guide.prose a { color: rgba(251,191,36,0.9); text-decoration: underline; }
+.study-guide-resonates.study-guide.prose a:hover { text-decoration: none; color: rgb(253,224,71); }
+.study-guide-resonates.study-guide.prose strong { font-weight: 600; }
+.study-guide-resonates.study-guide.prose em { font-style: italic; }
+.study-guide-resonates.study-guide.prose hr { border-color: rgba(255,255,255,0.15); margin: 1.5rem 0; }
 `
 
+/** Verse ref pill that shows passage in a HoverCard on hover only (no sidebar) */
+function PassageHoverCard({ passageRef, label }: { passageRef: string; label: string }) {
+  return (
+    <HoverCard openDelay={200} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <span
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              ;(e.currentTarget as HTMLElement).click()
+            }
+          }}
+          className="cursor-pointer border-l-2 border-amber-500/50 pl-1.5 -ml-1.5 pr-1 rounded hover:bg-white/10 font-mono text-[11px] uppercase tracking-wider text-amber-200/90 hover:text-amber-200 inline"
+        >
+          {label}
+        </span>
+      </HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="right"
+        sideOffset={8}
+        className="w-[min(24rem,calc(100vw-2rem))] max-h-[min(70vh,28rem)] overflow-y-auto border-white/10 bg-[#0a0a0a] text-white shadow-xl p-0 [&_a]:text-amber-200/90 [&_a:hover]:text-amber-200 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20 [&_.bg-card]:bg-white/5 [&_.text-destructive]:text-red-300 [&_.bg-muted]:bg-white/10 [&_.text-accent]:text-amber-200/90"
+      >
+        <div className="p-4">
+          <InlinePassage passageRef={passageRef} />
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  )
+}
+
 export function StudyGuideContent({ content }: { content: string }) {
-  const passageRefsOrdered = useMemo(() => extractPassageRefsInOrder(content), [content])
   const nextVerseIndexRef = useRef(0)
 
   const linkComponent = ({ href, children }: { href?: string; children?: React.ReactNode }) => {
@@ -63,24 +78,16 @@ export function StudyGuideContent({ content }: { content: string }) {
     if (single) refsForThisLink.push(single.raw)
 
     if (refsForThisLink.length > 0) {
-      const startIndex = nextVerseIndexRef.current
-      nextVerseIndexRef.current += refsForThisLink.length
       return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
           {refsForThisLink.map((ref, i) => (
-            <a
-              key={`${ref}-${startIndex + i}`}
-              href={`#verse-${startIndex + i}`}
-              className="inline-flex items-center rounded border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-accent no-underline hover:border-accent hover:bg-accent/20"
-            >
-              {ref}
-            </a>
+            <PassageHoverCard key={`${ref}-${i}`} passageRef={ref} label={ref} />
           ))}
         </span>
       )
     }
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:no-underline">
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-200/90 hover:text-amber-200 underline underline-offset-2">
         {children}
       </a>
     )
@@ -89,42 +96,23 @@ export function StudyGuideContent({ content }: { content: string }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: prose }} />
-      <div className="study-guide grid w-full min-w-0 grid-cols-1 gap-8 lg:grid-cols-[minmax(20rem,1fr),minmax(0,22rem)]">
-        {/* Left column: min 28rem so it never collapses to one-word-per-line; takes remaining space */}
-        <div className="min-w-0 font-mono text-sm text-foreground leading-relaxed lg:col-start-1 lg:row-start-1">
-          <ReactMarkdown
-            components={{
-              a: linkComponent,
-              h2: ({ children }) => (
-                <h2 className="border-b border-border/50 pb-2 font-semibold tracking-wide">{children}</h2>
-              ),
-              h3: ({ children }) => (
-                <h3 className="text-muted-foreground">{children}</h3>
-              ),
-              ol: ({ children }) => (
-                <ol className="space-y-2 rounded-lg border border-border/30 bg-card/20 px-4 py-3">{children}</ol>
-              ),
-            }}
-          >
-            {content}
-          </ReactMarkdown>
-        </div>
-
-        {/* Right column: Bible passages sidebar (sticky); min-w-0 so it can shrink when zoomed */}
-        <aside className="min-w-0 border-l border-border/50 bg-background/40 pl-6 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-2rem)] lg:overflow-y-auto">
-          <div className="space-y-4 py-1">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Passages</p>
-            {passageRefsOrdered.length === 0 ? (
-              <p className="font-mono text-xs text-muted-foreground">No passages in this guide.</p>
-            ) : (
-              passageRefsOrdered.map((ref, i) => (
-                <div key={`${ref}-${i}`} id={`verse-${i}`} className="scroll-mt-24">
-                  <InlinePassage passageRef={ref} />
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
+      <div className="study-guide prose font-sans text-base font-light leading-relaxed">
+        <ReactMarkdown
+          components={{
+            a: linkComponent,
+            h2: ({ children }) => (
+              <h2 className="border-b border-white/15 pb-2 font-semibold tracking-wide">{children}</h2>
+            ),
+            h3: ({ children }) => (
+              <h3 className="text-white/70">{children}</h3>
+            ),
+            ol: ({ children }) => (
+              <ol className="space-y-2 border-l-2 border-white/20 pl-5 sm:pl-6 py-2">{children}</ol>
+            ),
+          }}
+        >
+          {content}
+        </ReactMarkdown>
       </div>
     </>
   )
