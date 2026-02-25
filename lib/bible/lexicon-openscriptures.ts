@@ -1,13 +1,14 @@
 /**
- * Lazy-load full Strong's dictionaries from OpenScriptures (CC-BY-SA) via jsDelivr.
- * Used when a code is not in the local LEXICON_SAMPLE. Data: public domain (Strong 1890).
+ * Lazy-load full Strong's dictionaries from OpenScriptures (CC-BY-SA).
+ * Tries jsDelivr first, then raw GitHub as fallback. Data: public domain (Strong 1890).
  */
 
 import type { StrongsEntry } from "./lexicon-types"
 import { normalizeStrongsCode } from "./lexicon-types"
+import { lexiconLog } from "./lexicon-log"
 
-const OPEN_SCRIPTURES_BASE =
-  "https://cdn.jsdelivr.net/gh/openscriptures/strongs@master"
+const JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/openscriptures/strongs@master"
+const RAW_GITHUB_BASE = "https://raw.githubusercontent.com/openscriptures/strongs/master"
 
 /** Timeout for fetching the full dictionary (large file in serverless). */
 const FETCH_TIMEOUT_MS = 45_000
@@ -49,26 +50,63 @@ async function fetchWithTimeout(url: string): Promise<string> {
   }
 }
 
+/** Extract the JSON object from the .js file (var strongsXDictionary = {...};). */
+function extractJsonFromJs(text: string): string {
+  const trimmed = text.replace(/^\uFEFF/, "").trim()
+  const start = trimmed.indexOf("{")
+  const end = trimmed.lastIndexOf("}")
+  if (start === -1 || end === -1 || end <= start) throw new Error("No JSON object in response")
+  return trimmed.slice(start, end + 1)
+}
+
+async function fetchUrlWithFallback(path: string): Promise<string> {
+  const urls = [
+    `${JSDELIVR_BASE}/${path}`,
+    `${RAW_GITHUB_BASE}/${path}`,
+  ]
+  let lastError: Error | null = null
+  for (const url of urls) {
+    lexiconLog.fetchAttempt(url)
+    try {
+      const text = await fetchWithTimeout(url)
+      return text
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e))
+      lexiconLog.fetchFail(url, e)
+    }
+  }
+  lexiconLog.fetchAllFailed(path, lastError)
+  throw lastError ?? new Error("Failed to fetch dictionary")
+}
+
 async function fetchGreekDictionary(): Promise<Record<string, RawGreek>> {
   if (greekCache) return greekCache
-  const url = `${OPEN_SCRIPTURES_BASE}/greek/strongs-greek-dictionary.js`
-  const text = await fetchWithTimeout(url)
-  const jsonStr = text
-    .replace(/^var strongsGreekDictionary\s*=\s*/i, "")
-    .replace(/;\s*$/, "")
-  greekCache = JSON.parse(jsonStr) as Record<string, RawGreek>
-  return greekCache
+  try {
+    const text = await fetchUrlWithFallback("greek/strongs-greek-dictionary.js")
+    const jsonStr = extractJsonFromJs(text)
+    greekCache = JSON.parse(jsonStr) as Record<string, RawGreek>
+    const count = Object.keys(greekCache).length
+    lexiconLog.dictLoaded("greek", count, "OpenScriptures")
+    return greekCache
+  } catch (e) {
+    lexiconLog.parseFail("greek/strongs-greek-dictionary.js", e)
+    throw e
+  }
 }
 
 async function fetchHebrewDictionary(): Promise<Record<string, RawHebrew>> {
   if (hebrewCache) return hebrewCache
-  const url = `${OPEN_SCRIPTURES_BASE}/hebrew/strongs-hebrew-dictionary.js`
-  const text = await fetchWithTimeout(url)
-  const jsonStr = text
-    .replace(/^var strongsHebrewDictionary\s*=\s*/i, "")
-    .replace(/;\s*$/, "")
-  hebrewCache = JSON.parse(jsonStr) as Record<string, RawHebrew>
-  return hebrewCache
+  try {
+    const text = await fetchUrlWithFallback("hebrew/strongs-hebrew-dictionary.js")
+    const jsonStr = extractJsonFromJs(text)
+    hebrewCache = JSON.parse(jsonStr) as Record<string, RawHebrew>
+    const count = Object.keys(hebrewCache).length
+    lexiconLog.dictLoaded("hebrew", count, "OpenScriptures")
+    return hebrewCache
+  } catch (e) {
+    lexiconLog.parseFail("hebrew/strongs-hebrew-dictionary.js", e)
+    throw e
+  }
 }
 
 function mapGreek(code: string, raw: RawGreek): StrongsEntry {
@@ -103,22 +141,32 @@ export async function getStrongsFromOpenScriptures(
   code: string
 ): Promise<StrongsEntry | null> {
   const normalized = normalizeStrongsCode(code)
-  if (!normalized) return null
+  if (!normalized) {
+    lexiconLog.invalidCode(code)
+    return null
+  }
 
   const isGreek = normalized.startsWith("G")
   try {
     if (isGreek) {
       const dict = await fetchGreekDictionary()
       const raw = dict[normalized]
-      if (!raw) return null
+      if (!raw) {
+        lexiconLog.codeNotFound(normalized, "greek")
+        return null
+      }
       return mapGreek(normalized, raw)
     } else {
       const dict = await fetchHebrewDictionary()
       const raw = dict[normalized]
-      if (!raw) return null
+      if (!raw) {
+        lexiconLog.codeNotFound(normalized, "hebrew")
+        return null
+      }
       return mapHebrew(normalized, raw)
     }
-  } catch {
+  } catch (e) {
+    lexiconLog.lookupError(normalized, e)
     return null
   }
 }

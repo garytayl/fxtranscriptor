@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getStrongsEntry, parseStrongsCode } from "@/lib/bible/lexicon"
+import { lexiconLog } from "@/lib/bible/lexicon-log"
 
 export const runtime = "nodejs"
 /** Allow time for first request to fetch full OpenScriptures dictionary from CDN. */
@@ -23,6 +24,8 @@ export async function GET(
   if (entry) {
     return NextResponse.json(entry)
   }
+
+  lexiconLog.apiStub(code)
 
   const parsed = parseStrongsCode(code)
   const language = parsed?.language ?? "hebrew"

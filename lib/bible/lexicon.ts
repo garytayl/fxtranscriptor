@@ -6,6 +6,7 @@
 import { normalizeStrongsCode } from "./lexicon-types"
 import { LEXICON_SAMPLE } from "./lexicon-data"
 import { getStrongsFromOpenScriptures } from "./lexicon-openscriptures"
+import { lexiconLog } from "./lexicon-log"
 import type { StrongsEntry } from "./lexicon-types"
 
 export type { StrongsEntry, StrongsLanguage } from "./lexicon-types"
@@ -14,7 +15,10 @@ export { parseStrongsCode, normalizeStrongsCode } from "./lexicon-types"
 /** Get a Strong's entry by code (e.g. "G26", "H3045"). Checks local sample, then OpenScriptures. Returns null if not found. */
 export async function getStrongsEntry(code: string): Promise<StrongsEntry | null> {
   const normalized = normalizeStrongsCode(code)
-  if (!normalized) return null
+  if (!normalized) {
+    lexiconLog.invalidCode(code)
+    return null
+  }
   const local = LEXICON_SAMPLE[normalized]
   if (local) return local
   return getStrongsFromOpenScriptures(code)

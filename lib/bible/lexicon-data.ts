@@ -124,4 +124,22 @@ export const LEXICON_SAMPLE: Record<string, StrongsEntry> = {
     definition: "To return, turn back; to repent; to restore.",
     language: "hebrew",
   },
+  H1004: {
+    code: "H1004",
+    lemma: "בַּיִת",
+    transliteration: "bayith",
+    pronunciation: "bah-yith",
+    meaning: "a house",
+    definition: "A house, dwelling, building; household or family; the temple as God’s house.",
+    language: "hebrew",
+  },
+  H430: {
+    code: "H430",
+    lemma: "אֱלֹהִים",
+    transliteration: "ʾĕlōhîm",
+    pronunciation: "el-o-heem'",
+    meaning: "God, gods",
+    definition: "God, gods, divine beings; the true God or (plural) false gods; sometimes used of human judges.",
+    language: "hebrew",
+  },
 }
