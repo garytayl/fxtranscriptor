@@ -20,10 +20,11 @@ const prose = `
 .study-guide-resonates.study-guide.prose h2 { font-size: 1.125rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.5rem; letter-spacing: 0.02em; color: white; border-color: rgba(255,255,255,0.15); }
 .study-guide-resonates.study-guide.prose h3 { font-size: 1rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: rgba(255,255,255,0.7); }
 .study-guide-resonates.study-guide.prose p { margin-bottom: 0.75rem; line-height: 1.65; color: rgba(255,255,255,0.9); white-space: normal; word-spacing: normal; }
-.study-guide-resonates.study-guide.prose ul, .study-guide-resonates.study-guide.prose ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
-.study-guide-resonates.study-guide.prose ol { list-style-type: decimal; }
+.study-guide-resonates.study-guide.prose ul, .study-guide-resonates.study-guide.prose ol { margin-bottom: 1.25rem; }
+/* Numbered list: force decimal markers and space for numbers */
+.study-guide-resonates.study-guide.prose ol { list-style-type: decimal; list-style-position: outside; padding-left: 2.25rem; margin-left: 0; }
 /* Each numbered item = one question block: padding, border, extra spacing */
-.study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.25rem; padding: 0.75rem 0 0.5rem 0.75rem; line-height: 1.6; border-left: 2px solid rgba(251,191,36,0.25); background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; }
+.study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.25rem; padding: 0.75rem 0 0.5rem 0.5rem; margin-left: 0; line-height: 1.6; border-left: 2px solid rgba(251,191,36,0.25); background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; }
 .study-guide-resonates.study-guide.prose ol li:last-child { margin-bottom: 0; }
 /* First paragraph in each item = the question: bolder, brighter, easier to scan */
 .study-guide-resonates.study-guide.prose ol li > p:first-of-type { color: white; font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem; }
@@ -31,8 +32,8 @@ const prose = `
 /* Single-line list items (no inner p): treat whole line as question */
 .study-guide-resonates.study-guide.prose ol li:not(:has(> p)) { color: white; font-weight: 600; }
 .study-guide-resonates.study-guide.prose ul li { margin-bottom: 0.35rem; }
-.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; padding-left: 1.5rem; margin-top: 0.35rem; margin-bottom: 0.5rem; }
-.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.4rem; color: rgba(255,255,255,0.9); }
+.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; list-style-position: outside; padding-left: 2rem; margin-top: 0.35rem; margin-bottom: 0.5rem; margin-left: 0; }
+.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.4rem; margin-left: 0; color: rgba(255,255,255,0.9); padding-left: 0.25rem; }
 /* Sub-questions (a. b. c.) slightly bolder so they read as questions too */
 .study-guide-resonates.study-guide.prose ol li ul li > p { font-weight: 500; color: rgba(255,255,255,0.95); }
 .study-guide-resonates.study-guide.prose li::marker { color: rgba(251,191,36,0.9); font-weight: 700; }
@@ -131,7 +132,7 @@ export function StudyGuideContent({
               <h3 className="text-white/70">{children}</h3>
             ),
             ol: ({ children }) => (
-              <ol className="space-y-0 border-l border-white/15 pl-4 sm:pl-5 py-1">{children}</ol>
+              <ol className="space-y-0 border-l border-white/15 pl-8 py-2 mt-4 mb-6 list-decimal list-outside">{children}</ol>
             ),
           }}
         >

@@ -28,15 +28,22 @@ export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellP
           </article>
         </main>
 
-        {/* Sidebar — desktop only, like Resonates; scrolls independently */}
+        {/* Sidebar — desktop only; inner scroll area so content can scroll */}
         <aside
-          className="hidden lg:block fixed right-0 top-0 bottom-0 w-[22rem] border-l border-white/10 bg-[#050505] z-30 overflow-y-auto pt-[var(--navbar-offset)]"
+          className="hidden lg:flex lg:flex-col fixed right-0 top-0 w-[22rem] bottom-0 border-l border-white/10 bg-[#050505] z-30 pt-[var(--navbar-offset)]"
           aria-label="Verses"
+          style={{ height: "100dvh" }}
         >
-          <div className="p-6">
-            <p className="font-mono text-xs tracking-[0.25em] text-white/50 mb-4 uppercase">
+          <div className="shrink-0 px-6 pt-6 pb-2">
+            <p className="font-mono text-xs tracking-[0.25em] text-white/50 uppercase">
               Verses
             </p>
+          </div>
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
+            style={{ WebkitOverflowScrolling: "touch" }}
+            data-lenis-prevent
+          >
             <AnimatePresence mode="wait">
               {displayRef ? (
                 <motion.div
@@ -73,6 +80,7 @@ export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellP
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[50vh] overflow-y-auto"
+            data-lenis-prevent
           >
             <p className="font-mono text-xs tracking-[0.25em] text-white/50 mb-2 uppercase">
               Verses
