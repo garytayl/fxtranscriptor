@@ -56,10 +56,11 @@ export function getAvailableTranslations(): BibleTranslation[] {
     return translations
   }
 
-  // BSB + WEBU only: use when API_BIBLE_BSB_ID is set (WEBU ID has a known default)
+  // BSB + WEBU only: use when both IDs are set. IDs must come from YOUR key's allowed list (GET /v1/bibles).
+  // 403 = "You are not authorized to access that bible" means that ID is not on your plan — use IDs from the API response.
   const bsbId = process.env.API_BIBLE_BSB_ID
-  const webuId = process.env.API_BIBLE_WEBU_ID || "72f4e6dc683324df-02"
-  if (bsbId) {
+  const webuId = process.env.API_BIBLE_WEBU_ID
+  if (bsbId && webuId) {
     cachedTranslations = [
       { key: "bsb", label: "Berean Standard Bible", bibleId: bsbId },
       { key: "webu", label: "World English Bible (Updated)", bibleId: webuId },

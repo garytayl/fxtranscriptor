@@ -82,9 +82,11 @@ type PassageReference = {
 
 | Variable | Purpose |
 |----------|--------|
-| `API_BIBLE_BSB_ID` | Bible ID for Berean Standard Bible. Get from `GET /v1/bibles` (search for "Berean Standard Bible"). When set, only BSB and WEBU are offered. |
-| `API_BIBLE_WEBU_ID` | Optional. Default `72f4e6dc683324df-02` (World English Bible Updated). |
+| `API_BIBLE_BSB_ID` | Bible ID for Berean Standard Bible. Must be from your key’s allowed list. |
+| `API_BIBLE_WEBU_ID` | Bible ID for World English Bible (Updated). Must be from your key’s allowed list. |
 | `API_BIBLE_DEFAULT_TRANSLATION` | Optional. `bsb` or `webu`. Defaults to first (BSB). |
+
+Both IDs must be set. Get valid IDs by calling the API with your key (see **403 troubleshooting** below).
 
 **Other modes:**
 
@@ -94,6 +96,17 @@ type PassageReference = {
 | `API_BIBLE_TRANSLATION_LABEL` | Label when using a single `API_BIBLE_BIBLE_ID`. |
 | `API_BIBLE_TRANSLATIONS_JSON` | JSON array of `{ key, label?, bibleId }` (overrides BSB+WEBU if set). |
 | `API_BIBLE_TRANSLATIONS` | CSV of `key:bibleId` (e.g. `default:xxx, esv:yyy`). |
+
+### 403 Forbidden — "You are not authorized to access that bible"
+
+Your API key can only use **bibles that are on your account’s plan**. IDs from docs or other projects may not be allowed.
+
+1. List bibles your key can use:
+   ```bash
+   curl -s -H "api-key: YOUR_API_KEY" "https://api.scripture.api.bible/v1/bibles" | jq '.data[] | {id, name, abbreviation}'
+   ```
+2. Find the `id` for **Berean Standard Bible** (BSB) and **World English Bible** (or "World English Bible Updated" / WEBU). If a bible is missing, it isn’t on your plan (different tier or license).
+3. Set **only** those IDs in `API_BIBLE_BSB_ID` and `API_BIBLE_WEBU_ID`. If BSB or WEBU isn’t in the list, use two bibles that are (and optionally rename via `API_BIBLE_TRANSLATIONS_JSON`).
 
 ### Caching
 
