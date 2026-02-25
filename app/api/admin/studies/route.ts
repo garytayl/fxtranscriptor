@@ -66,16 +66,23 @@ export async function POST(req: NextRequest) {
   }
 
   if (guides && Array.isArray(guides) && guides.length > 0) {
-    const guideRows = guides.map((g: Record<string, unknown>, i: number) => ({
-      study_id: study.id,
-      slug: g.slug || `wk-${i + 1}`,
-      label: g.label || `Week ${i + 1}`,
-      notion_url: g.notion_url || "",
-      default_passage_ref: g.default_passage_ref || null,
-      content_md: g.content_md || null,
-      sort_order: i,
-    }))
-    await supabase.from("study_guides").insert(guideRows)
+    const guideRows = guides.map((g: Record<string, unknown>, i: number) => {
+      const rawSlug = typeof g.slug === "string" ? g.slug.trim() : ""
+      const rawLabel = typeof g.label === "string" ? g.label.trim() : ""
+      return {
+        study_id: study.id,
+        slug: rawSlug || `wk-${i + 1}`,
+        label: rawLabel || `Week ${i + 1}`,
+        notion_url: typeof g.notion_url === "string" ? g.notion_url.trim() || "" : "",
+        default_passage_ref: typeof g.default_passage_ref === "string" ? g.default_passage_ref.trim() || null : null,
+        content_md: typeof g.content_md === "string" ? g.content_md : null,
+        sort_order: i,
+      }
+    })
+    const { error: insertError } = await supabase.from("study_guides").insert(guideRows)
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ study })

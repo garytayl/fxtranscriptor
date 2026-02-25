@@ -56,6 +56,7 @@ export default function AdminStudiesPage() {
   const [pasteText, setPasteText] = useState("")
   const [pasteAutofillOpen, setPasteAutofillOpen] = useState(false)
   const [pasteAutofillText, setPasteAutofillText] = useState("")
+  const [hasDraft, setHasDraft] = useState(false)
 
   const loadStudies = useCallback(async () => {
     setLoading(true)
@@ -72,6 +73,14 @@ export default function AdminStudiesPage() {
   }, [])
 
   useEffect(() => { loadStudies() }, [loadStudies])
+
+  useEffect(() => {
+    try {
+      setHasDraft(!!sessionStorage.getItem("admin_study_draft"))
+    } catch {
+      setHasDraft(false)
+    }
+  }, [isEditing])
 
   const newStudy = (): Study => ({
     id: "",
@@ -94,30 +103,30 @@ export default function AdminStudiesPage() {
       return
     }
 
-    const slug = editStudy.slug || slugify(editStudy.title)
+    const slug = (editStudy.slug || slugify(editStudy.title)).trim() || slugify(editStudy.title)
     const payload = {
-      title: editStudy.title,
+      title: editStudy.title.trim(),
       slug,
-      notion_url: editStudy.notion_url,
-      summary: editStudy.summary,
-      podcast_url: editStudy.podcast_url || null,
-      vault_url: editStudy.vault_url || null,
-      tags: editStudy.tags,
-      year: editStudy.year,
-      is_current: editStudy.is_current,
+      notion_url: (editStudy.notion_url || "").trim(),
+      summary: (editStudy.summary || "").trim(),
+      podcast_url: editStudy.podcast_url?.trim() || null,
+      vault_url: editStudy.vault_url?.trim() || null,
+      tags: Array.isArray(editStudy.tags) ? editStudy.tags.map((t) => String(t).trim()).filter(Boolean) : [],
+      year: editStudy.year ?? null,
+      is_current: !!editStudy.is_current,
       guides: editStudy.study_guides.map((g, i) => ({
-        slug: g.slug || `wk-${i + 1}`,
-        label: g.label || `Week ${i + 1}`,
-        notion_url: g.notion_url,
-        default_passage_ref: g.default_passage_ref || null,
-        content_md: g.content_md || null,
+        slug: (g.slug || "").trim() || `wk-${i + 1}`,
+        label: (g.label || "").trim() || `Week ${i + 1}`,
+        notion_url: (g.notion_url || "").trim() || "",
+        default_passage_ref: g.default_passage_ref?.trim() || null,
+        content_md: g.content_md ?? null,
       })),
     }
 
     setSaving(true)
     try {
-      const isNew = !editStudy.id
-      const url = isNew ? "/api/admin/studies" : `/api/admin/studies/${editStudy.id}`
+      const isNew = !editStudy.id || editStudy.id.length < 10
+      const url = isNew ? "/api/admin/studies" : `/api/admin/studies/${String(editStudy.id).trim()}`
       const method = isNew ? "POST" : "PATCH"
       const res = await fetch(url, {
         method,
@@ -125,16 +134,37 @@ export default function AdminStudiesPage() {
         credentials: "include",
         body: JSON.stringify(payload),
       })
+      let data: { error?: string } = {}
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error(res.ok ? "Invalid response" : `Save failed (${res.status})`)
+      }
       if (!res.ok) {
-        const data = await res.json()
         throw new Error(data.error || "Save failed")
       }
       toast.success(isNew ? "Study created" : "Study updated")
+      try {
+        sessionStorage.removeItem("admin_study_draft")
+      } catch {
+        /* ignore */
+      }
       setEditStudy(null)
       setShowNew(false)
       loadStudies()
     } catch (err) {
-      toast.error("Save failed", { description: err instanceof Error ? err.message : "Unknown error" })
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      try {
+        sessionStorage.setItem("admin_study_draft", JSON.stringify(editStudy))
+      } catch {
+        /* ignore */
+      }
+      toast.error("Save failed", {
+        description: msg.includes("expected pattern")
+          ? "Server or URL error. Your form data is still here (and backed up). Try again or use Restore draft if the form cleared."
+          : msg,
+      })
+      // Do not clear editStudy so user doesn't lose their work
     } finally {
       setSaving(false)
     }
@@ -227,6 +257,34 @@ export default function AdminStudiesPage() {
 
   const isEditing = !!editStudy
 
+  const restoreDraft = () => {
+    try {
+      const raw = sessionStorage.getItem("admin_study_draft")
+      if (!raw) return
+      const draft = JSON.parse(raw) as Study
+      if (draft && Array.isArray(draft.study_guides)) {
+        setEditStudy({
+          ...draft,
+          podcast_url: draft.podcast_url ?? "",
+          vault_url: draft.vault_url ?? "",
+          study_guides: draft.study_guides.map((g) => ({
+            ...g,
+            notion_url: g.notion_url ?? "",
+            default_passage_ref: g.default_passage_ref ?? "",
+            content_md: g.content_md ?? "",
+          })),
+        })
+        setShowNew(!draft.id)
+        setExpandedGuide(null)
+        sessionStorage.removeItem("admin_study_draft")
+        setHasDraft(false)
+        toast.success("Draft restored")
+      }
+    } catch {
+      toast.error("Could not restore draft")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -237,7 +295,16 @@ export default function AdminStudiesPage() {
           </p>
         </div>
         {!isEditing && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {hasDraft && (
+              <Button
+                variant="secondary"
+                onClick={restoreDraft}
+                className="gap-2 font-mono text-xs uppercase tracking-widest"
+              >
+                Restore draft
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => { setPasteAutofillOpen(true); setPasteAutofillText("") }}
