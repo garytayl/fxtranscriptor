@@ -101,12 +101,13 @@ Both IDs must be set. Get valid IDs by calling the API with your key (see **403 
 
 Your API key can only use **bibles that are on your account’s plan**. IDs from docs or other projects may not be allowed.
 
-1. List bibles your key can use:
+1. List bibles your key can use — in the app, open **GET /api/bible/bibles** (e.g. `http://localhost:3000/api/bible/bibles`) or run:
    ```bash
    curl -s -H "api-key: YOUR_API_KEY" "https://api.scripture.api.bible/v1/bibles" | jq '.data[] | {id, name, abbreviation}'
    ```
 2. Find the `id` for **Berean Standard Bible** (BSB) and **World English Bible** (or "World English Bible Updated" / WEBU). If a bible is missing, it isn’t on your plan (different tier or license).
-3. Set **only** those IDs in `API_BIBLE_BSB_ID` and `API_BIBLE_WEBU_ID`. If BSB or WEBU isn’t in the list, use two bibles that are (and optionally rename via `API_BIBLE_TRANSLATIONS_JSON`).
+3. Copy those **exact** `id` values into `.env` as `API_BIBLE_BSB_ID` and `API_BIBLE_WEBU_ID`. Restart the dev server after changing `.env`.
+4. If you still get 403, ensure `API_BIBLE_TRANSLATIONS_JSON` and `API_BIBLE_TRANSLATIONS` are **not** set (so the app uses BSB+WEBU from env).
 
 ### Caching
 
