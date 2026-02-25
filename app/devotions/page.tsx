@@ -2,7 +2,7 @@ import { DevotionsClient } from "./devotions-client"
 
 export const metadata = {
   title: "Devotions",
-  description: "Private devotions and reflections. Stored on your device only — export a backup anytime.",
+  description: "One passage a day. Sit with Scripture—prayer and reflection stored on your device only.",
 }
 
 export default function DevotionsPage() {

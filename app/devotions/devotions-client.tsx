@@ -1,98 +1,165 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
+import { motion, useReducedMotion } from "framer-motion"
 import {
-  getDevotionsFromStorage,
-  saveDevotionsToStorage,
-  createEntry,
-  type DevotionEntry,
-  type DevotionsData,
-} from "@/lib/devotions-storage"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Download, Upload, Plus, Trash2, Edit2, FileText } from "lucide-react"
+  LogOut,
+  Copy,
+  Check,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  Download,
+  Upload,
+  BookOpen,
+} from "lucide-react"
+import { getPassageEntry, savePassageEntry } from "@/lib/devotions-storage"
+import { getPassageRefForDate } from "@/lib/devotions-passages"
+import { getReaderUrlFromReference } from "@/lib/bible/reference"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 
-function sortByNewest(entries: DevotionEntry[]) {
-  return [...entries].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
+const REFLECTION_PROMPTS = [
+  "What line or phrase is staying with you?",
+  "Where did you see yourself in this passage?",
+  "One thing you want to carry from this into your day.",
+  "What is this passage saying back to you?",
+  "What do you want to remember from this?",
+  "A word or image that fits how this lands.",
+  "What are you sitting with after reading?",
+]
+
+type PassageData = {
+  reference: string
+  verses: { number: number; text: string }[]
+  chapterReference?: string
 }
 
-export function DevotionsClient() {
-  const [data, setData] = useState<DevotionsData | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [isAdding, setIsAdding] = useState(false)
-  const [draftTitle, setDraftTitle] = useState("")
-  const [draftBody, setDraftBody] = useState("")
+function getReflectionPrompt(passageRef: string): string {
+  const slug = passageRef.toLowerCase().replace(/\s/g, "").replace(/:/g, "")
+  let hash = 0
+  for (let i = 0; i < slug.length; i++) hash = (hash << 5) - hash + slug.charCodeAt(i)
+  const i = Math.abs(hash) % REFLECTION_PROMPTS.length
+  return REFLECTION_PROMPTS[i] ?? REFLECTION_PROMPTS[0]
+}
 
-  const load = useCallback(() => {
-    setData(getDevotionsFromStorage())
-  }, [])
+const SAVE_DEBOUNCE_MS = 400
+
+export function DevotionsClient() {
+  const todayRef = getPassageRefForDate(new Date())
+  const [passage, setPassage] = useState<PassageData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [readingMode, setReadingMode] = useState(false)
+  const [prayer, setPrayer] = useState("")
+  const [reflection, setReflection] = useState("")
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reduced = useReducedMotion()
+
+  const passageRef = passage?.reference ?? todayRef
 
   useEffect(() => {
-    load()
-  }, [load])
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetch(`/api/bible/passage?ref=${encodeURIComponent(todayRef)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Could not load passage.")
+        return res.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (data.error) throw new Error(data.error)
+        setPassage({
+          reference: data.reference,
+          verses: data.verses ?? [],
+          chapterReference: data.chapterReference,
+        })
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Something went wrong.")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [todayRef])
 
-  const persist = useCallback((next: DevotionsData) => {
-    saveDevotionsToStorage(next)
-    setData(next)
+  useEffect(() => {
+    const entry = getPassageEntry(passageRef)
+    setPrayer(entry.prayer)
+    setReflection(entry.reflection)
+  }, [passageRef])
+
+  const scheduleSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null
+      savePassageEntry(passageRef, { prayer, reflection })
+    }, SAVE_DEBOUNCE_MS)
+  }, [passageRef, prayer, reflection])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    }
   }, [])
 
-  const handleAdd = () => {
-    const title = draftTitle.trim() || "Untitled"
-    const body = draftBody.trim()
-    const entry = createEntry({ title, body })
-    const next: DevotionsData = {
-      version: 1,
-      entries: [entry, ...(data?.entries ?? [])],
-    }
-    persist(next)
-    setDraftTitle("")
-    setDraftBody("")
-    setIsAdding(false)
-    toast.success("Saved", { description: "Devotion saved to this device." })
+  const handlePrayerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrayer(e.target.value)
+    scheduleSave()
   }
 
-  const handleUpdate = (id: string, updates: { title?: string; body?: string }) => {
-    if (!data) return
-    const next: DevotionsData = {
-      ...data,
-      entries: data.entries.map((e) =>
-        e.id === id ? { ...e, ...updates } : e,
-      ),
-    }
-    persist(next)
-    setEditingId(null)
-    toast.success("Updated", { description: "Changes saved locally." })
+  const handleReflectionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setReflection(e.target.value)
+    scheduleSave()
   }
 
-  const handleDelete = (id: string) => {
-    if (!data) return
-    if (typeof window !== "undefined" && !window.confirm("Delete this devotion? This can't be undone.")) return
-    const next: DevotionsData = {
-      ...data,
-      entries: data.entries.filter((e) => e.id !== id),
-    }
-    persist(next)
-    setEditingId(null)
-    toast.success("Deleted", { description: "Removed from this device." })
-  }
-
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify(data ?? { version: 1, entries: [] }, null, 2)], {
-      type: "application/json",
+  const copyPassage = useCallback(() => {
+    if (!passage?.verses?.length) return
+    const text = passage.verses
+      .map((v) => `${v.number}. ${v.text}`)
+      .join("\n")
+    navigator.clipboard?.writeText(`${passage.reference}\n\n${text}`).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success("Copied to clipboard")
     })
+  }, [passage])
+
+  const handleExport = useCallback(() => {
+    const keys: string[] = []
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i)
+      if (key?.startsWith("fx_devotions_v1")) keys.push(key)
+    }
+    const data: Record<string, string> = {}
+    keys.forEach((k) => {
+      const v = window.localStorage.getItem(k)
+      if (v) data[k] = v
+    })
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `fx-devotions-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `fx-devotions-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success("Backup downloaded", { description: "Save the file somewhere safe to restore later." })
-  }
+    setMoreOpen(false)
+    toast.success("Backup downloaded")
+  }, [])
 
-  const handleImport = () => {
+  const handleImport = useCallback(() => {
     const input = document.createElement("input")
     input.type = "file"
     input.accept = "application/json"
@@ -102,188 +169,270 @@ export function DevotionsClient() {
       const reader = new FileReader()
       reader.onload = () => {
         try {
-          const parsed = JSON.parse(reader.result as string) as DevotionsData
-          if (parsed?.version === 1 && Array.isArray(parsed.entries)) {
-            persist(parsed)
-            toast.success("Restored", { description: "Backup imported. Your devotions are updated." })
-          } else {
-            toast.error("Invalid file", { description: "Not a valid devotions backup." })
-          }
+          const data = JSON.parse(reader.result as string) as Record<string, string>
+          if (typeof data !== "object") throw new Error("Invalid format")
+          let count = 0
+          Object.entries(data).forEach(([k, v]) => {
+            if (k.startsWith("fx_devotions_v1") && typeof v === "string") {
+              window.localStorage.setItem(k, v)
+              count++
+            }
+          })
+          setMoreOpen(false)
+          setPrayer(getPassageEntry(passageRef).prayer)
+          setReflection(getPassageEntry(passageRef).reflection)
+          toast.success(`Restored ${count} entries`)
         } catch {
-          toast.error("Invalid file", { description: "Could not read the file." })
+          toast.error("Invalid backup file")
         }
       }
       reader.readAsText(file)
     }
     input.click()
-  }
+  }, [passageRef])
 
-  if (data === null) {
+  if (loading) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center">
-        <p className="font-mono text-sm text-muted-foreground">Loading…</p>
+      <div className="fixed inset-0 z-[60] flex flex-col bg-[#050505] text-white overflow-hidden">
+        <div className="flex-1 flex items-center justify-center px-4">
+          <p className="font-mono text-xs tracking-[0.2em] text-white/50 uppercase">
+            Opening the Word…
+          </p>
+        </div>
       </div>
     )
   }
 
-  const entries = sortByNewest(data.entries)
-
-  return (
-    <main className="relative min-h-screen">
-      <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-      <div className="relative z-10 pt-[var(--navbar-offset)] pb-24 px-4 sm:px-6 md:px-12">
-        <header className="max-w-3xl mb-8 sm:mb-12 md:mb-16">
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-[60] flex flex-col bg-[#050505] text-white overflow-hidden">
+        <header className="flex items-center justify-between px-4 py-4 sm:px-6 md:px-12 min-h-[52px]">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent transition-colors mb-4 sm:mb-6 min-h-[44px] sm:min-h-0"
+            className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
           >
-            ← Back to home
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
+            Leave
           </Link>
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent mb-2">Devotions</p>
-          <h1 className="font-[var(--font-bebas)] text-3xl sm:text-4xl md:text-6xl tracking-tight">
-            Your devotions
-          </h1>
-          <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-xl">
-            Private notes and reflections. Stored only on this device — no sign-in. Export a backup anytime so nothing gets lost.
-          </p>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
-              <Download className="size-3.5" />
-              Export backup
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleImport} className="gap-1.5">
-              <Upload className="size-3.5" />
-              Restore from file
-            </Button>
-          </div>
         </header>
-
-        <section className="max-w-3xl space-y-6">
-          {!isAdding ? (
-            <Button variant="outline" onClick={() => setIsAdding(true)} className="gap-2">
-              <Plus className="size-4" />
-              New devotion
-            </Button>
-          ) : (
-            <Card className="border-border bg-card/50">
-              <CardHeader className="pb-2">
-                <Input
-                  placeholder="Title (optional)"
-                  value={draftTitle}
-                  onChange={(e) => setDraftTitle(e.target.value)}
-                  className="font-medium"
-                />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <textarea
-                  placeholder="Write your reflection…"
-                  value={draftBody}
-                  onChange={(e) => setDraftBody(e.target.value)}
-                  rows={6}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleAdd}>
-                    Save
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setIsAdding(false); setDraftTitle(""); setDraftBody(""); }}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {entries.length === 0 && !isAdding ? (
-            <div className="border border-dashed border-border rounded-lg p-8 text-center">
-              <FileText className="size-10 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="font-mono text-sm text-muted-foreground">No devotions yet. Add one above.</p>
-            </div>
-          ) : (
-            <ul className="space-y-4">
-              {entries.map((entry) => (
-                <li key={entry.id}>
-                  {editingId === entry.id ? (
-                    <DevotionEditCard
-                      entry={entry}
-                      onSave={(title, body) => handleUpdate(entry.id, { title, body })}
-                      onCancel={() => setEditingId(null)}
-                    />
-                  ) : (
-                    <Card className="border-border bg-card/50 overflow-hidden">
-                      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-                        <div className="min-w-0">
-                          <h2 className="font-semibold truncate">{entry.title || "Untitled"}</h2>
-                          <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
-                            {new Date(entry.createdAt).toLocaleDateString(undefined, {
-                              dateStyle: "medium",
-                            })}
-                          </p>
-                        </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon-sm" onClick={() => setEditingId(entry.id)} aria-label="Edit">
-                            <Edit2 className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => handleDelete(entry.id)}
-                            aria-label="Delete"
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <p className="font-mono text-sm text-muted-foreground whitespace-pre-wrap">{entry.body || "—"}</p>
-                      </CardContent>
-                    </Card>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <div className="flex-1 flex items-center justify-center px-4">
+          <p className="font-sans text-sm text-white/70 text-center max-w-md">{error}</p>
+        </div>
       </div>
-    </main>
-  )
-}
+    )
+  }
 
-function DevotionEditCard({
-  entry,
-  onSave,
-  onCancel,
-}: {
-  entry: DevotionEntry
-  onSave: (title: string, body: string) => void
-  onCancel: () => void
-}) {
-  const [title, setTitle] = useState(entry.title)
-  const [body, setBody] = useState(entry.body)
+  const stagger = reduced ? 0.02 : 0.06
 
   return (
-    <Card className="border-border bg-card/50">
-      <CardHeader className="pb-2">
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="font-medium" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={6}
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#050505] text-white overflow-hidden">
+      {/* Subtle atmosphere behind scripture */}
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+        <div
+          className="absolute left-1/2 top-[18%] -translate-x-1/2 w-[min(100%,40rem)] h-[45vh] rounded-full blur-3xl"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 80% at 50% 30%, rgba(255,255,255,0.06), transparent 70%)",
+          }}
         />
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => onSave(title.trim() || "Untitled", body.trim())}>
-            Save
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
+      </div>
+
+      {/* Minimal top bar */}
+      <header className="relative z-20 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:py-4 sm:px-6 md:px-12 border-b border-white/5">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
+          aria-label="Leave devotions"
+        >
+          <LogOut className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden sm:inline">Leave</span>
+        </Link>
+        <span className="font-mono text-[10px] tracking-[0.2em] text-white/40">
+          {passage?.reference ?? todayRef}
+        </span>
+        <div className="flex items-center gap-1">
+          {passage?.verses?.length ? (
+            <button
+              type="button"
+              onClick={copyPassage}
+              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px] p-2 -m-2 rounded"
+              aria-label="Copy passage"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">Copy</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setReadingMode((m) => !m)}
+            className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
+            aria-label={readingMode ? "Show prayer and reflection" : "Reading mode — hide forms"}
+          >
+            {readingMode ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Show response</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Reading only</span>
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center font-mono text-[10px] text-white/40 hover:text-white/70 rounded"
+            aria-label="Backup and more"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
         </div>
-      </CardContent>
-    </Card>
+      </header>
+
+      {/* Scrollable content */}
+      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="px-4 py-6 pb-32 sm:px-6 md:px-12 max-w-2xl mx-auto">
+          {passage?.verses?.length ? (
+            <>
+              <motion.div
+                className="mb-10"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  visible: {
+                    transition: {
+                      staggerChildren: stagger,
+                      delayChildren: reduced ? 0 : 0.12,
+                    },
+                  },
+                }}
+              >
+                {passage.verses.map((v, i) => (
+                  <motion.p
+                    key={v.number}
+                    variants={{
+                      hidden: { opacity: 0, y: 12 },
+                      visible: {
+                        opacity: 1,
+                        y: 0,
+                        transition: {
+                          duration: reduced ? 0.15 : 0.4,
+                          ease: [0.25, 0.46, 0.45, 0.94],
+                        },
+                      },
+                    }}
+                    className={`font-sans text-foreground/92 leading-[1.85] mb-5 text-[1.05rem] sm:text-[1.12rem] font-light ${
+                      i === 0
+                        ? "first-letter:text-2xl first-letter:sm:text-3xl first-letter:font-normal first-letter:mr-0.5 first-letter:float-left"
+                        : ""
+                    }`}
+                  >
+                    <span className="font-mono text-white/45 text-sm align-top mr-2 tabular-nums">
+                      {v.number}.
+                    </span>
+                    {v.text}
+                  </motion.p>
+                ))}
+              </motion.div>
+
+              <Link
+                href={getReaderUrlFromReference(passage.reference) ?? "/bible"}
+                className="inline-flex items-center gap-2 font-mono text-[10px] tracking-wider text-white/45 hover:text-white/70 mb-8 min-h-[44px]"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Open in Scripture
+              </Link>
+            </>
+          ) : (
+            <p className="font-sans text-sm text-white/60">No verses for this passage.</p>
+          )}
+
+          {/* Response — prayer + reflection; hidden in reading mode */}
+          {!readingMode && passage?.verses?.length ? (
+            <motion.section
+              className="space-y-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: reduced ? 0 : 0.3 }}
+            >
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+                <p className="font-mono text-[10px] tracking-wider text-white/45 mb-3">
+                  After reading
+                </p>
+                <div className="space-y-5">
+                  <div>
+                    <label
+                      htmlFor="devotions-prayer"
+                      className="block font-sans text-sm font-light text-white/80 mb-1.5"
+                    >
+                      A prayer in your own words
+                    </label>
+                    <textarea
+                      id="devotions-prayer"
+                      value={prayer}
+                      onChange={handlePrayerChange}
+                      onBlur={scheduleSave}
+                      placeholder="Whatever you want to say—or leave blank"
+                      rows={3}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="devotions-reflection"
+                      className="block font-sans text-sm font-light text-white/80 mb-1.5"
+                    >
+                      {getReflectionPrompt(passageRef)}
+                    </label>
+                    <textarea
+                      id="devotions-reflection"
+                      value={reflection}
+                      onChange={handleReflectionChange}
+                      onBlur={scheduleSave}
+                      placeholder="Just a line or two—or nothing"
+                      rows={3}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+          ) : null}
+        </div>
+      </div>
+
+      <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
+        <DialogContent className="border-white/10 bg-[#0a0a0a] text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-sans text-lg font-light text-white">
+              Backup
+            </DialogTitle>
+          </DialogHeader>
+          <p className="font-mono text-[10px] tracking-wider text-white/50 mb-4">
+            Your prayers and reflections are stored only on this device. Export a backup so nothing gets lost.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleExport}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-white/80 hover:text-white py-3 px-4 rounded-lg border border-white/15 hover:bg-white/5 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export backup
+            </button>
+            <button
+              type="button"
+              onClick={handleImport}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-white/80 hover:text-white py-3 px-4 rounded-lg border border-white/15 hover:bg-white/5 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Restore from file
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
