@@ -60,7 +60,7 @@ export function AdminLoginClient() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-6">
+    <div className="min-h-screen bg-background flex items-center justify-center px-6 pt-[var(--navbar-offset)]">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Admin Sign In</CardTitle>
