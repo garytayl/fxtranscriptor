@@ -62,7 +62,7 @@ export default async function StudyGuidePage({ params }: Props) {
         </header>
 
         {content ? (
-          <article className="w-full min-w-0 max-w-6xl study-guide prose overflow-x-hidden">
+          <article className="w-full min-w-0 study-guide prose overflow-x-hidden">
             <StudyGuideContent content={content} />
           </article>
         ) : (

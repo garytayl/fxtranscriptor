@@ -89,8 +89,8 @@ export function StudyGuideContent({ content }: { content: string }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: prose }} />
-      <div className="study-guide grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-[minmax(20rem,1fr),minmax(0,24rem)]">
-        {/* Left column: questions and content (verse links show as ref pills that link to right column) */}
+      <div className="study-guide grid w-full min-w-0 grid-cols-1 gap-8 lg:grid-cols-[1fr,minmax(0,22rem)]">
+        {/* Left column: questions (takes remaining space so it's not squeezed) */}
         <div className="min-w-0 font-mono text-sm text-foreground leading-relaxed lg:col-start-1 lg:row-start-1">
           <ReactMarkdown
             components={{
