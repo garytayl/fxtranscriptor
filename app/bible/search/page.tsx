@@ -11,13 +11,13 @@ import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bibl
 export const dynamic = "force-dynamic"
 
 type SearchPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     refs?: string | string[]
     t?: string | string[]
     bookSlug?: string | string[]
     chapterNumber?: string | string[]
     verseRange?: string | string[]
-  }
+  }>
 }
 
 function toArray(value?: string | string[]) {
@@ -28,8 +28,9 @@ function toArray(value?: string | string[]) {
 }
 
 export default async function BibleSearchPage({ searchParams }: SearchPageProps) {
-  const refsParam = Array.isArray(searchParams.refs) ? searchParams.refs[0] : searchParams.refs
-  const translationParam = Array.isArray(searchParams.t) ? searchParams.t[0] : searchParams.t
+  const resolvedSearchParams = await searchParams
+  const refsParam = Array.isArray(resolvedSearchParams.refs) ? resolvedSearchParams.refs[0] : resolvedSearchParams.refs
+  const translationParam = Array.isArray(resolvedSearchParams.t) ? resolvedSearchParams.t[0] : resolvedSearchParams.t
   const translations = await getResolvedTranslations()
   const translation = await getResolvedTranslationByKey(translationParam)
   const activeKey = translation?.key ?? translationParam ?? null
@@ -43,9 +44,9 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
   }
 
   const hasRefs = Boolean(refsParam?.trim())
-  const builderBookSlugs = toArray(searchParams.bookSlug).filter(Boolean)
-  const builderChapters = toArray(searchParams.chapterNumber).filter(Boolean)
-  const builderVerses = toArray(searchParams.verseRange)
+  const builderBookSlugs = toArray(resolvedSearchParams.bookSlug).filter(Boolean)
+  const builderChapters = toArray(resolvedSearchParams.chapterNumber).filter(Boolean)
+  const builderVerses = toArray(resolvedSearchParams.verseRange)
   let effectiveRefs = refsParam ?? ""
 
   if (!hasRefs && builderBookSlugs.length > 0 && builderChapters.length > 0) {
@@ -107,18 +108,18 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 pb-16 pt-[var(--navbar-offset)]">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 sm:gap-8 px-4 pb-16 pt-[var(--navbar-offset)]">
         <header className="space-y-3">
           <Link
             href={`/bible${activeKey ? `?t=${activeKey}` : ""}`}
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
           >
             <ArrowLeft className="size-3" />
             Back to Bible
           </Link>
           <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Scripture Reader</p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Scripture Search</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">Scripture Search</h1>
+          <p className="max-w-2xl text-xs sm:text-sm text-muted-foreground">
             Search by reference or build a list of passages to display together.
           </p>
           <Suspense
@@ -161,24 +162,24 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
         )}
 
         {results.length > 0 && (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {results.map((result, index) => (
-              <section key={`${result.passage.raw}-${index}`} className="rounded-lg border border-border bg-card/60 p-6">
-                <header className="space-y-2">
-                  <h2 className="text-lg font-semibold text-foreground">
+              <section key={`${result.passage.raw}-${index}`} className="rounded-lg border border-border bg-card/60 p-4 sm:p-6">
+                <header className="space-y-1.5 sm:space-y-2">
+                  <h2 className="text-base sm:text-lg font-semibold text-foreground">
                     {result.passage.raw}
                   </h2>
                   {result.reference && (
-                    <p className="text-sm text-muted-foreground">{result.reference}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{result.reference}</p>
                   )}
                 </header>
                 {result.error ? (
-                  <p className="mt-4 text-sm text-destructive">{result.error}</p>
+                  <p className="mt-3 sm:mt-4 text-sm text-destructive">{result.error}</p>
                 ) : result.verses && result.verses.length > 0 ? (
-                  <ol className="mt-4 space-y-3 text-base leading-relaxed">
+                  <ol className="mt-3 sm:mt-4 space-y-1.5 sm:space-y-3 text-[0.9375rem] sm:text-base leading-[1.75] sm:leading-relaxed">
                     {result.verses.map((verse) => (
-                      <li key={verse.number} className="rounded-md px-3 py-2 text-foreground">
-                        <span className="mr-2 align-super text-xs font-semibold text-muted-foreground">
+                      <li key={verse.number} className="rounded-md px-2 sm:px-3 py-1 sm:py-2 text-foreground">
+                        <span className="mr-1.5 sm:mr-2 align-super text-[10px] sm:text-xs font-bold text-muted-foreground">
                           {verse.number}
                         </span>
                         <span>{verse.text}</span>
@@ -186,7 +187,7 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
                     ))}
                   </ol>
                 ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">No verses available for this passage.</p>
+                  <p className="mt-3 sm:mt-4 text-sm text-muted-foreground">No verses available for this passage.</p>
                 )}
               </section>
             ))}
