@@ -40,6 +40,9 @@ const prose = `
 .study-guide.prose ol { list-style-type: decimal; }
 .study-guide.prose ol li { margin-bottom: 0.6rem; padding-left: 0.25rem; line-height: 1.5; }
 .study-guide.prose ul li { margin-bottom: 0.35rem; }
+/* Indented sub-questions under numbered items: show as a., b., c. */
+.study-guide.prose ol li ul { list-style-type: lower-alpha; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; }
+.study-guide.prose ol li ul li { margin-bottom: 0.4rem; }
 .study-guide.prose li::marker { color: var(--color-accent); font-weight: 600; }
 .study-guide.prose a { color: var(--color-accent); text-decoration: underline; }
 .study-guide.prose a:hover { text-decoration: none; }
