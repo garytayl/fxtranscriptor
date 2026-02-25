@@ -13,9 +13,12 @@ type WordStudyProps = {
   entry?: StrongsEntry | null
   /** Class name for the trigger button. */
   className?: string
+  /** Called when the word is clicked (e.g. to show in a sidebar). */
+  onSelect?: (code: string) => void
 }
 
-function EntryContent({ entry }: { entry: StrongsEntry }) {
+/** Shared display for a Strong's entry (used in tooltip and sidebar). */
+export function WordStudyEntryContent({ entry }: { entry: StrongsEntry }) {
   const isGreek = entry.language === "greek"
   return (
     <div className="space-y-2 text-left">
@@ -50,7 +53,7 @@ function EntryContent({ entry }: { entry: StrongsEntry }) {
   )
 }
 
-export function WordStudy({ code, children, entry: entryProp, className }: WordStudyProps) {
+export function WordStudy({ code, children, entry: entryProp, className, onSelect }: WordStudyProps) {
   const [entry, setEntry] = useState<StrongsEntry | null>(entryProp ?? null)
   const [loading, setLoading] = useState(!entryProp)
 
@@ -85,6 +88,7 @@ export function WordStudy({ code, children, entry: entryProp, className }: WordS
         <HoverCardTrigger asChild>
           <button
             type="button"
+            onClick={() => onSelect?.(code)}
             className={`cursor-help border-b border-dashed border-amber-500/50 font-medium text-amber-200/90 hover:border-amber-500/80 hover:text-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 rounded-sm ${className ?? ""}`}
             aria-label={`Word study: ${entry.transliteration ?? entry.lemma} (${entry.code})`}
           >
@@ -97,7 +101,7 @@ export function WordStudy({ code, children, entry: entryProp, className }: WordS
           sideOffset={6}
           className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
         >
-          <EntryContent entry={entry} />
+          <WordStudyEntryContent entry={entry} />
         </HoverCardContent>
       </HoverCard>
     )
