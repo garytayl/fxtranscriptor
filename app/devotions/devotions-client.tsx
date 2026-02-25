@@ -59,7 +59,7 @@ const slide = {
 }
 
 export function DevotionsClient() {
-  const [step, setStep] = useState<Step>("book")
+  const [step, setStep] = useState<Step>("testament")
   const [dir, setDir] = useState(0) // 1 = forward, -1 = back
   const [passage, setPassage] = useState<PassageData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -183,6 +183,13 @@ export function DevotionsClient() {
     setError(null)
   }, [])
 
+  const handleTestamentPick = useCallback((t: "old" | "new") => {
+    setSelectedTestament(t)
+    setSelectedBook(null)
+    setDir(1)
+    setStep("book")
+  }, [])
+
   const handleBookPick = useCallback((book: BibleBook) => {
     setSelectedBook(book)
     setDir(1)
@@ -271,7 +278,7 @@ export function DevotionsClient() {
               <LogOut className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Leave</span>
             </Link>
-          ) : step === "book" ? (
+          ) : step === "testament" ? (
             <Link
               href="/"
               className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
@@ -293,6 +300,7 @@ export function DevotionsClient() {
           )}
         </div>
         <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 truncate max-w-[45vw] text-center">
+          {step === "testament" && "Where?"}
           {step === "book" && "What book?"}
           {step === "chapter" && "Which chapter?"}
           {step === "verses" && (selectedBook ? `${selectedBook.name} ${selectedChapter}` : "Read")}
@@ -315,58 +323,97 @@ export function DevotionsClient() {
       </header>
 
       <div
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-behavior-y-auto touch-pan-y"
-        style={{ WebkitOverflowScrolling: "touch" }}
+        className="flex-1 min-h-0 flex flex-col overflow-hidden"
       >
-        <AnimatePresence mode="wait" custom={dir}>
-          {/* Step 1: What book? */}
-          {step === "book" && (
-            <motion.div
-              key="book"
-              custom={dir}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              variants={slide}
-              transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="h-full flex flex-col px-4 py-6 sm:px-6 md:px-12"
-            >
-              <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-6 sm:mb-8">
-                What book?
-              </p>
-              {booksLoading ? (
-                <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
-              ) : (
-                <ul className="space-y-0">
-                  {books.map((b, i) => (
-                    <li key={b.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleBookPick(b)}
-                        className="w-full flex items-center justify-between py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px]"
-                      >
-                        <span>{b.name}</span>
-                        <ChevronRight className="w-5 h-5 text-white/40 shrink-0" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </motion.div>
-          )}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-behavior-y-auto touch-pan-y"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <AnimatePresence mode="wait" custom={dir}>
+            {/* Step 1: Old or New Testament? */}
+            {step === "testament" && (
+              <motion.div
+                key="testament"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="px-4 py-6 sm:px-6 md:px-12 min-h-0"
+              >
+                <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-8 sm:mb-10">
+                  Old Testament or New Testament?
+                </p>
+                <div className="flex flex-col gap-4 max-w-md">
+                  <button
+                    type="button"
+                    onClick={() => handleTestamentPick("old")}
+                    disabled={booksLoading}
+                    className="w-full min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
+                  >
+                    Old Testament
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTestamentPick("new")}
+                    disabled={booksLoading}
+                    className="w-full min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
+                  >
+                    New Testament
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
-          {/* Step 2: Which chapter? */}
-          {step === "chapter" && selectedBook && (
-            <motion.div
-              key="chapter"
-              custom={dir}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              variants={slide}
-              transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="h-full flex flex-col px-4 py-6 sm:px-6 md:px-12"
-            >
+            {/* Step 2: What book? */}
+            {step === "book" && (
+              <motion.div
+                key="book"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="px-4 py-6 sm:px-6 md:px-12 pb-12 min-h-0"
+              >
+                <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-6 sm:mb-8">
+                  What book?
+                </p>
+                {booksLoading ? (
+                  <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
+                ) : (
+                  <ul className="space-y-0">
+                    {books.map((b) => (
+                      <li key={b.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleBookPick(b)}
+                          className="w-full flex items-center justify-between py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px]"
+                        >
+                          <span>{b.name}</span>
+                          <ChevronRight className="w-5 h-5 text-white/40 shrink-0" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </motion.div>
+            )}
+
+            {/* Step 3: Which chapter? */}
+            {step === "chapter" && selectedBook && (
+              <motion.div
+                key="chapter"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="px-4 py-6 sm:px-6 md:px-12 pb-12 min-h-0"
+              >
               <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
                 Which chapter?
               </p>
@@ -402,7 +449,7 @@ export function DevotionsClient() {
               exit="exit"
               variants={slide}
               transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="h-full flex flex-col px-4 py-6 sm:px-6 md:px-12 max-w-lg"
+              className="px-4 py-6 sm:px-6 md:px-12 max-w-lg pb-12 min-h-0"
             >
               <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
                 Read
