@@ -14,41 +14,41 @@ function getLinkText(children: React.ReactNode): string {
   return ""
 }
 
-/** Resonates-style prose: single column, font-sans body, border-white/15, amber accent */
+/** Resonates-style prose: mobile-first with generous spacing */
 const prose = `
-.study-guide-resonates.study-guide.prose h1 { font-size: 1.25rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.625rem; color: white; }
-.study-guide-resonates.study-guide.prose h2 { font-size: 1.0625rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; letter-spacing: 0.02em; color: white; border-color: rgba(255,255,255,0.15); }
-.study-guide-resonates.study-guide.prose h3 { font-size: 0.9375rem; font-weight: 600; margin-top: 1.125rem; margin-bottom: 0.5rem; color: rgba(255,255,255,0.7); }
-.study-guide-resonates.study-guide.prose p { margin-bottom: 0.75rem; line-height: 1.7; color: rgba(255,255,255,0.9); white-space: normal; word-spacing: normal; }
-.study-guide-resonates.study-guide.prose ul, .study-guide-resonates.study-guide.prose ol { margin-bottom: 1.25rem; }
-/* Numbered list: force decimal markers */
+.study-guide-resonates.study-guide.prose h1 { font-size: 1.25rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 0.75rem; color: white; }
+.study-guide-resonates.study-guide.prose h2 { font-size: 1.0625rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 0.75rem; letter-spacing: 0.02em; color: white; border-color: rgba(255,255,255,0.15); }
+.study-guide-resonates.study-guide.prose h3 { font-size: 0.9375rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.625rem; color: rgba(255,255,255,0.7); }
+.study-guide-resonates.study-guide.prose p { margin-bottom: 1rem; line-height: 1.75; color: rgba(255,255,255,0.9); white-space: normal; word-spacing: normal; }
+.study-guide-resonates.study-guide.prose ul, .study-guide-resonates.study-guide.prose ol { margin-bottom: 1.5rem; }
+/* Numbered list */
 .study-guide-resonates.study-guide.prose ol { list-style-type: decimal; list-style-position: outside; padding-left: 1.5rem; margin-left: 0; }
-/* Each numbered item = one question block */
-.study-guide-resonates.study-guide.prose ol li { margin-bottom: 1rem; padding: 0.625rem 0 0.375rem 0.5rem; margin-left: 0; line-height: 1.65; border-left: 2px solid rgba(251,191,36,0.25); background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; }
+/* Each numbered item = one question block with breathing room */
+.study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.5rem; padding: 0.875rem 0.75rem 0.625rem 0.75rem; margin-left: 0; line-height: 1.7; border-left: 2px solid rgba(251,191,36,0.25); background: rgba(255,255,255,0.03); border-radius: 0 8px 8px 0; }
 .study-guide-resonates.study-guide.prose ol li:last-child { margin-bottom: 0; }
-.study-guide-resonates.study-guide.prose ol li > p:first-of-type { color: white; font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.5rem; }
-.study-guide-resonates.study-guide.prose ol li > p:not(:first-of-type) { color: rgba(255,255,255,0.85); font-weight: 400; margin-bottom: 0.5rem; }
+.study-guide-resonates.study-guide.prose ol li > p:first-of-type { color: white; font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.625rem; }
+.study-guide-resonates.study-guide.prose ol li > p:not(:first-of-type) { color: rgba(255,255,255,0.8); font-weight: 400; margin-bottom: 0.625rem; }
 .study-guide-resonates.study-guide.prose ol li:not(:has(> p)) { color: white; font-weight: 600; }
-.study-guide-resonates.study-guide.prose ul li { margin-bottom: 0.35rem; }
-.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; list-style-position: outside; padding-left: 1.5rem; margin-top: 0.35rem; margin-bottom: 0.5rem; margin-left: 0; }
-.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.4rem; margin-left: 0; color: rgba(255,255,255,0.9); padding-left: 0.25rem; }
+.study-guide-resonates.study-guide.prose ul li { margin-bottom: 0.5rem; }
+.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; list-style-position: outside; padding-left: 1.25rem; margin-top: 0.625rem; margin-bottom: 0.625rem; margin-left: 0; }
+.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.5rem; margin-left: 0; color: rgba(255,255,255,0.9); padding-left: 0.25rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
 .study-guide-resonates.study-guide.prose ol li ul li > p { font-weight: 500; color: rgba(255,255,255,0.95); }
 .study-guide-resonates.study-guide.prose li::marker { color: rgba(251,191,36,0.9); font-weight: 700; }
 .study-guide-resonates.study-guide.prose a { color: rgba(251,191,36,0.9); text-decoration: underline; }
 .study-guide-resonates.study-guide.prose a:hover { text-decoration: none; color: rgb(253,224,71); }
-.study-guide-resonates.study-guide.prose strong { font-weight: 600; }
+.study-guide-resonates.study-guide.prose strong { font-weight: 600; display: block; margin-top: 1.75rem; margin-bottom: 0.375rem; }
 .study-guide-resonates.study-guide.prose em { font-style: italic; }
-.study-guide-resonates.study-guide.prose hr { border-color: rgba(255,255,255,0.15); margin: 1.25rem 0; }
-/* Desktop: larger type and spacing */
+.study-guide-resonates.study-guide.prose hr { border-color: rgba(255,255,255,0.15); margin: 2rem 0; }
+/* Desktop: larger type */
 @media (min-width: 640px) {
-  .study-guide-resonates.study-guide.prose h1 { font-size: 1.5rem; margin-top: 2rem; margin-bottom: 0.75rem; }
-  .study-guide-resonates.study-guide.prose h2 { font-size: 1.125rem; margin-top: 1.75rem; }
-  .study-guide-resonates.study-guide.prose h3 { font-size: 1rem; margin-top: 1.25rem; }
+  .study-guide-resonates.study-guide.prose h1 { font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: 0.75rem; }
+  .study-guide-resonates.study-guide.prose h2 { font-size: 1.125rem; margin-top: 2.5rem; }
+  .study-guide-resonates.study-guide.prose h3 { font-size: 1rem; margin-top: 2rem; }
   .study-guide-resonates.study-guide.prose ol { padding-left: 2.25rem; }
-  .study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.25rem; padding: 0.75rem 0 0.5rem 0.5rem; }
+  .study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.75rem; padding: 1rem 1rem 0.75rem 0.875rem; }
   .study-guide-resonates.study-guide.prose ol li > p:first-of-type { font-size: 1rem; }
   .study-guide-resonates.study-guide.prose ol li ul { padding-left: 2rem; }
-  .study-guide-resonates.study-guide.prose hr { margin: 1.5rem 0; }
+  .study-guide-resonates.study-guide.prose hr { margin: 2rem 0; }
 }
 `
 
@@ -104,7 +104,7 @@ export function StudyGuideContent({
 
     if (refsForThisLink.length > 0 && onSelectPassage) {
       return (
-        <span className="inline-flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex flex-wrap items-center gap-2 my-1">
           {refsForThisLink.map((ref, i) => (
             <VersePill key={`${ref}-${i}`} passageRef={ref} label={ref} onSelect={onSelectPassage} />
           ))}
@@ -113,7 +113,7 @@ export function StudyGuideContent({
     }
     if (refsForThisLink.length > 0) {
       return (
-        <span className="inline-flex flex-wrap items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-amber-200/90">
+        <span className="inline-flex flex-wrap items-center gap-2 my-1 font-mono text-[11px] uppercase tracking-wider text-amber-200/90">
           {refsForThisLink.map((ref, i) => (
             <span key={`${ref}-${i}`}>{ref}</span>
           ))}
@@ -130,7 +130,7 @@ export function StudyGuideContent({
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: prose }} />
-      <div className="study-guide prose font-sans text-[0.9375rem] sm:text-base font-light leading-relaxed">
+      <div className="study-guide prose font-sans text-[0.9375rem] sm:text-base font-light leading-[1.75] sm:leading-relaxed">
         <ReactMarkdown
           components={{
             a: linkComponent,
@@ -141,7 +141,7 @@ export function StudyGuideContent({
               <h3 className="text-white/70">{children}</h3>
             ),
             ol: ({ children }) => (
-              <ol className="space-y-0 border-l border-white/15 pl-5 sm:pl-8 py-2 mt-3 sm:mt-4 mb-5 sm:mb-6 list-decimal list-outside">{children}</ol>
+              <ol className="border-l border-white/15 pl-5 sm:pl-8 py-3 mt-4 mb-6 sm:mb-8 list-decimal list-outside">{children}</ol>
             ),
           }}
         >
