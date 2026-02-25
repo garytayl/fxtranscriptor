@@ -52,7 +52,7 @@ const prose = `
 }
 `
 
-/** Verse ref pill: hover = preview in HoverCard (desktop), tap = pin to side panel (mobile) */
+/** Verse ref pill: hover = preview in HoverCard (desktop), tap = open bottom sheet (mobile) */
 function VersePill({
   passageRef,
   label,
@@ -68,8 +68,9 @@ function VersePill({
         <button
           type="button"
           onClick={() => onSelect(passageRef)}
-          className="cursor-pointer border-l-2 border-amber-500/50 pl-1.5 -ml-1.5 pr-1 py-0.5 rounded hover:bg-white/10 active:bg-white/15 font-mono text-[11px] uppercase tracking-wider text-amber-200/90 hover:text-amber-200 inline text-left min-h-[32px] sm:min-h-0"
+          className="cursor-pointer inline-flex items-center gap-1 border border-amber-500/30 bg-amber-500/5 active:bg-amber-500/15 pl-2 pr-2.5 py-1 rounded-md font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-amber-200/90 hover:text-amber-200 hover:border-amber-500/50 hover:bg-amber-500/10 text-left transition-colors min-h-[36px] sm:min-h-0 active:scale-[0.97]"
         >
+          <span className="w-1 h-3.5 rounded-full bg-amber-500/60 shrink-0" />
           {label}
         </button>
       </HoverCardTrigger>
