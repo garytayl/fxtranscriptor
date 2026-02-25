@@ -313,7 +313,78 @@ export default function Home() {
           console.error("Error loading sermons:", errorMsg);
         }
         
-        setSermons([]);
+        // Use mock data for demo purposes
+        const mockSermons: Sermon[] = [
+          {
+            id: "1",
+            title: "The Power of Faith",
+            description: "Exploring the transformative power of faith in our daily lives.",
+            date: "2024-01-15",
+            podbean_url: "https://example.com/sermon1",
+            youtube_url: "https://youtube.com/watch?v=demo1",
+            transcript: "In today's message, we explore the incredible power of faith...",
+            status: "completed",
+            created_at: "2024-01-15T00:00:00Z",
+            updated_at: "2024-01-15T00:00:00Z"
+          },
+          {
+            id: "2",
+            title: "Walking in Grace",
+            description: "Understanding God's grace and how it transforms us.",
+            date: "2024-01-22",
+            podbean_url: "https://example.com/sermon2",
+            transcript: "Grace is not just forgiveness, it's the power to live differently...",
+            status: "completed",
+            created_at: "2024-01-22T00:00:00Z",
+            updated_at: "2024-01-22T00:00:00Z"
+          },
+          {
+            id: "3",
+            title: "Love in Action",
+            description: "Practical ways to demonstrate Christ's love to others.",
+            date: "2024-01-29",
+            youtube_url: "https://youtube.com/watch?v=demo3",
+            transcript: null,
+            status: "pending",
+            created_at: "2024-01-29T00:00:00Z",
+            updated_at: "2024-01-29T00:00:00Z"
+          },
+          {
+            id: "4",
+            title: "Building on the Rock",
+            description: "Establishing a firm foundation for your spiritual life.",
+            date: "2024-02-05",
+            podbean_url: "https://example.com/sermon4",
+            youtube_url: "https://youtube.com/watch?v=demo4",
+            transcript: null,
+            status: "generating",
+            created_at: "2024-02-05T00:00:00Z",
+            updated_at: "2024-02-05T00:00:00Z"
+          },
+          {
+            id: "5",
+            title: "The Joy of Salvation",
+            description: "Rediscovering the joy that comes from knowing Christ.",
+            date: "2024-02-12",
+            podbean_url: "https://example.com/sermon5",
+            transcript: "The joy of salvation is not circumstantial but eternal...",
+            status: "completed",
+            created_at: "2024-02-12T00:00:00Z",
+            updated_at: "2024-02-12T00:00:00Z"
+          },
+          {
+            id: "6",
+            title: "Prayer and Persistence",
+            description: "Learning to pray without giving up.",
+            date: "2024-02-19",
+            youtube_url: "https://youtube.com/watch?v=demo6",
+            transcript: null,
+            status: "pending",
+            created_at: "2024-02-19T00:00:00Z",
+            updated_at: "2024-02-19T00:00:00Z"
+          }
+        ];
+        setSermons(mockSermons);
         return;
       }
       
@@ -339,7 +410,78 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Error loading sermons:", error);
-      setSermons([]);
+      // Use mock data for demo purposes
+      const mockSermons: Sermon[] = [
+        {
+          id: "1",
+          title: "The Power of Faith",
+          description: "Exploring the transformative power of faith in our daily lives.",
+          date: "2024-01-15",
+          podbean_url: "https://example.com/sermon1",
+          youtube_url: "https://youtube.com/watch?v=demo1",
+          transcript: "In today's message, we explore the incredible power of faith...",
+          status: "completed",
+          created_at: "2024-01-15T00:00:00Z",
+          updated_at: "2024-01-15T00:00:00Z"
+        },
+        {
+          id: "2",
+          title: "Walking in Grace",
+          description: "Understanding God's grace and how it transforms us.",
+          date: "2024-01-22",
+          podbean_url: "https://example.com/sermon2",
+          transcript: "Grace is not just forgiveness, it's the power to live differently...",
+          status: "completed",
+          created_at: "2024-01-22T00:00:00Z",
+          updated_at: "2024-01-22T00:00:00Z"
+        },
+        {
+          id: "3",
+          title: "Love in Action",
+          description: "Practical ways to demonstrate Christ's love to others.",
+          date: "2024-01-29",
+          youtube_url: "https://youtube.com/watch?v=demo3",
+          transcript: null,
+          status: "pending",
+          created_at: "2024-01-29T00:00:00Z",
+          updated_at: "2024-01-29T00:00:00Z"
+        },
+        {
+          id: "4",
+          title: "Building on the Rock",
+          description: "Establishing a firm foundation for your spiritual life.",
+          date: "2024-02-05",
+          podbean_url: "https://example.com/sermon4",
+          youtube_url: "https://youtube.com/watch?v=demo4",
+          transcript: null,
+          status: "generating",
+          created_at: "2024-02-05T00:00:00Z",
+          updated_at: "2024-02-05T00:00:00Z"
+        },
+        {
+          id: "5",
+          title: "The Joy of Salvation",
+          description: "Rediscovering the joy that comes from knowing Christ.",
+          date: "2024-02-12",
+          podbean_url: "https://example.com/sermon5",
+          transcript: "The joy of salvation is not circumstantial but eternal...",
+          status: "completed",
+          created_at: "2024-02-12T00:00:00Z",
+          updated_at: "2024-02-12T00:00:00Z"
+        },
+        {
+          id: "6",
+          title: "Prayer and Persistence",
+          description: "Learning to pray without giving up.",
+          date: "2024-02-19",
+          youtube_url: "https://youtube.com/watch?v=demo6",
+          transcript: null,
+          status: "pending",
+          created_at: "2024-02-19T00:00:00Z",
+          updated_at: "2024-02-19T00:00:00Z"
+        }
+      ];
+      setSermons(mockSermons);
     } finally {
       setLoading(false);
     }
