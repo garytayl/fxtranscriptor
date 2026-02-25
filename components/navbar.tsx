@@ -107,45 +107,48 @@ export function Navbar() {
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-40 bg-background/95 backdrop-blur-lg md:hidden"
           >
-            <nav className="flex flex-col items-center justify-center h-full gap-8 pt-[env(safe-area-inset-top)]">
-              {routeLinks.map((link, index) => (
-                <motion.div
-                  key={link.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  {link.href.startsWith("/#") ? (
-                    <a
-                      href={link.href}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={`block py-3 px-4 text-3xl sm:text-4xl font-[var(--font-bebas)] tracking-tight min-h-[48px] flex items-center justify-center ${pathname === "/" ? "text-foreground" : "text-muted-foreground"}`}
-                    >
-                      {link.label}
-                    </a>
-                  ) : (
-                    <Link
-                      href={link.href}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={`block py-3 px-4 text-3xl sm:text-4xl font-[var(--font-bebas)] tracking-tight min-h-[48px] flex items-center justify-center ${isActive(link.href) ? "text-foreground" : "text-muted-foreground"}`}
-                    >
-                      {link.label}
-                    </Link>
-                  )}
-                </motion.div>
-              ))}
+            <nav className="flex flex-col items-center justify-center h-full gap-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] px-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:gap-x-10 sm:gap-y-4 max-w-[280px] sm:max-w-sm">
+                {routeLinks.map((link, index) => (
+                  <motion.div
+                    key={link.href}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 16 }}
+                    transition={{ delay: index * 0.06 }}
+                    className="min-h-[44px] flex items-center justify-center"
+                  >
+                    {link.href.startsWith("/#") ? (
+                      <a
+                        href={link.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className={`block py-2 px-3 text-xl sm:text-2xl font-[var(--font-bebas)] tracking-tight text-center ${pathname === "/" ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className={`block py-2 px-3 text-xl sm:text-2xl font-[var(--font-bebas)] tracking-tight text-center ${isActive(link.href) ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {link.label}
+                      </Link>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="flex items-center gap-3 mt-8"
+                transition={{ delay: 0.35 }}
+                className="flex items-center gap-3 mt-4"
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
                 </span>
-                <span className="font-mono text-xs tracking-wider text-muted-foreground">SERMON TRANSCRIPTS</span>
+                <span className="font-mono text-[10px] sm:text-xs tracking-wider text-muted-foreground">SERMON TRANSCRIPTS</span>
               </motion.div>
             </nav>
           </motion.div>
