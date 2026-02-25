@@ -1,4 +1,7 @@
+import React from "react"
 import ReactMarkdown from "react-markdown"
+import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
+import { InlinePassage } from "./inline-passage"
 
 const prose = `
 .study-guide.prose h1 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; }
@@ -14,6 +17,14 @@ const prose = `
 .study-guide.prose hr { border-color: var(--color-border); margin: 1.5rem 0; }
 `
 
+function getLinkText(children: React.ReactNode): string {
+  if (typeof children === "string") return children.trim()
+  if (Array.isArray(children)) return children.map(getLinkText).join("").trim()
+  const el = children as React.ReactElement<{ children?: React.ReactNode }> | undefined
+  if (el?.props?.children != null) return getLinkText(el.props.children)
+  return ""
+}
+
 export function StudyGuideContent({ content }: { content: string }) {
   return (
     <>
@@ -21,11 +32,28 @@ export function StudyGuideContent({ content }: { content: string }) {
       <div className="font-mono text-sm text-foreground leading-relaxed">
         <ReactMarkdown
           components={{
-            a: ({ href, children }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:no-underline">
-                {children}
-              </a>
-            ),
+            a: ({ href, children }) => {
+              const text = getLinkText(children)
+              const list = text.includes(",") ? parsePassageList(text) : null
+              if (list && list.length > 0) {
+                return (
+                  <>
+                    {list.map((p, i) => (
+                      <InlinePassage key={`${p.raw}-${i}`} ref={p.raw} />
+                    ))}
+                  </>
+                )
+              }
+              const single = parsePassageReference(text)
+              if (single) {
+                return <InlinePassage ref={single.raw} />
+              }
+              return (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:no-underline">
+                  {children}
+                </a>
+              )
+            },
           }}
         >
           {content}
