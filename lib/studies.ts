@@ -11,7 +11,8 @@
  *    - title: full title
  *    - notionUrl: main study page on Notion (the overview page people open first)
  *    - summary: 1–2 sentences
- *    - guideLinks: array of { label: "Wk 1: ...", url: "https://..." } for each week
+ *    - guideLinks: array of { label: "Wk 1: ...", url: "https://...", slug: "wk-1" } for each week.
+ *      If slug is set, add content/studies/{studySlug}/{slug}.md to host the guide on the site; otherwise the link goes to Notion.
  *    - podcastUrl (optional): Podbean series link
  *    - vaultUrl (optional): re:group vault link
  *    - tags (optional): e.g. ["Romans", "2026"]

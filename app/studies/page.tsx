@@ -71,24 +71,28 @@ export default function StudiesPage() {
                     Study guides
                   </h3>
                   <ul className="grid gap-3 sm:grid-cols-2">
-                    {current.guideLinks.map((guide, i) => (
-                      <li key={guide.url}>
-                        <a
-                          href={guide.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group flex items-center gap-3 border border-border bg-background/50 hover:border-accent/50 rounded-lg px-4 py-3 font-mono text-sm transition-colors"
-                        >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
-                            {i + 1}
-                          </span>
-                          <span className="flex-1 min-w-0 truncate group-hover:text-accent transition-colors">
-                            {guide.label}
-                          </span>
-                          <ExternalLink className="size-3 shrink-0 text-muted-foreground group-hover:text-accent" />
-                        </a>
-                      </li>
-                    ))}
+                    {current.guideLinks.map((guide, i) => {
+                      const href = guide.slug ? `/studies/${current.slug}/${guide.slug}` : guide.url
+                      const isLocal = !!guide.slug
+                      const Wrapper = isLocal ? Link : "a"
+                      return (
+                        <li key={guide.url}>
+                          <Wrapper
+                            href={href}
+                            {...(!isLocal && { target: "_blank", rel: "noopener noreferrer" })}
+                            className="group flex items-center gap-3 border border-border bg-background/50 hover:border-accent/50 rounded-lg px-4 py-3 font-mono text-sm transition-colors"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+                              {i + 1}
+                            </span>
+                            <span className="flex-1 min-w-0 truncate group-hover:text-accent transition-colors">
+                              {guide.label}
+                            </span>
+                            <ExternalLink className="size-3 shrink-0 text-muted-foreground group-hover:text-accent" />
+                          </Wrapper>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
 

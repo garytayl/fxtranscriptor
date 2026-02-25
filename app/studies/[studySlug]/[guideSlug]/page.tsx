@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { getStudyBySlug, getGuideContent } from "@/lib/studies"
+import { getStudyBySlug } from "@/lib/studies"
 import { getGuideContent as readGuideContent } from "@/lib/studies-content"
 import { StudyGuideContent } from "./study-guide-content"
 import { ArrowLeft, ExternalLink } from "lucide-react"
