@@ -75,36 +75,37 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
     <main className="min-h-screen bg-background text-foreground">
       {highlightRange && <ScrollToVerse verseNumber={highlightRange.start} />}
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)]">
-        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/90 px-4 pt-3 sm:pt-4 backdrop-blur">
-          <div className="flex items-start justify-between gap-3 sm:gap-6 pb-3 sm:pb-4">
-            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/95 px-4 pt-3 sm:pt-4 backdrop-blur-md">
+          {/* Row 1: Back link + chapter title */}
+          <div className="flex items-center justify-between gap-3 pb-1 sm:pb-2">
+            <div className="min-w-0">
               <Link
                 href={`/bible/${book.slug}${query}`}
-                className="inline-flex items-center gap-2 text-[11px] sm:text-xs uppercase tracking-[0.25em] sm:tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[36px] sm:min-h-0"
+                className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-accent"
               >
-                <ArrowLeft className="size-3" />
-                <span className="hidden sm:inline">{book.name} chapters</span>
-                <span className="sm:hidden">{book.name}</span>
+                <ArrowLeft className="size-3 shrink-0" />
+                {book.name}
               </Link>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight">
-                {book.name} {chapterNumber}
-              </h1>
             </div>
-            <div className="flex flex-col gap-2 sm:gap-4 sm:flex-row sm:items-end shrink-0">
-              <Suspense
-                fallback={
-                  <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>
-                }
-              >
-                <TranslationSettings translations={translations} currentKey={activeKey} />
-              </Suspense>
-              <ChapterJump
-                bookSlug={book.slug}
-                chapters={chapters}
-                currentChapter={chapterNumber}
-                translationKey={activeKey}
-              />
-            </div>
+            <Suspense
+              fallback={
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">...</div>
+              }
+            >
+              <TranslationSettings translations={translations} currentKey={activeKey} />
+            </Suspense>
+          </div>
+          {/* Row 2: Title + chapter jump */}
+          <div className="flex items-end justify-between gap-3 pb-3 sm:pb-4">
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-semibold tracking-tight leading-tight">
+              {book.name} {chapterNumber}
+            </h1>
+            <ChapterJump
+              bookSlug={book.slug}
+              chapters={chapters}
+              currentChapter={chapterNumber}
+              translationKey={activeKey}
+            />
           </div>
         </div>
 

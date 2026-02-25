@@ -78,7 +78,7 @@ export default async function BibleIndexPage({
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 sm:gap-10 px-4 pb-16 pt-[var(--navbar-offset)]">
-        <header className="space-y-3">
+        <header className="space-y-2 sm:space-y-3">
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
@@ -86,22 +86,24 @@ export default async function BibleIndexPage({
             <ArrowLeft className="size-3" />
             Back to home
           </Link>
-          <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Scripture Reader</p>
+          <p className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-muted-foreground">Scripture Reader</p>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">Bible</h1>
-          <p className="max-w-2xl text-xs sm:text-sm text-muted-foreground">
+          <p className="max-w-2xl text-xs sm:text-sm text-muted-foreground leading-relaxed">
             Ad-free, privacy-first Bible reading. Choose a book to begin.
           </p>
-          <Suspense
-            fallback={<div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Translation: ...</div>}
-          >
-            <TranslationSettings translations={translations} currentKey={activeKey} />
-          </Suspense>
-          <Link
-            href={`/bible/search${activeKey ? `?t=${activeKey}` : ""}`}
-            className="inline-flex items-center text-xs uppercase tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
-          >
-            Search scripture -&gt;
-          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <Suspense
+              fallback={<div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground">Translation: ...</div>}
+            >
+              <TranslationSettings translations={translations} currentKey={activeKey} />
+            </Suspense>
+            <Link
+              href={`/bible/search${activeKey ? `?t=${activeKey}` : ""}`}
+              className="inline-flex items-center text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] text-muted-foreground hover:text-accent min-h-[44px] sm:min-h-0"
+            >
+              Search scripture →
+            </Link>
+          </div>
         </header>
 
         {errorMessage ? (
