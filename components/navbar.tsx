@@ -10,6 +10,7 @@ const routeLinks = [
   { label: "Sermons", href: "/#sermons" },
   { label: "Studies", href: "/studies" },
   { label: "Scripture", href: "/bible" },
+  { label: "Devotions", href: "/devotions" },
   { label: "Admin", href: "/admin/login" },
 ]
 
@@ -22,6 +23,7 @@ export function Navbar() {
     if (href.startsWith("/bible")) return pathname.startsWith("/bible")
     if (href.startsWith("/admin")) return pathname.startsWith("/admin")
     if (href.startsWith("/studies")) return pathname.startsWith("/studies")
+    if (href.startsWith("/devotions")) return pathname.startsWith("/devotions")
     return pathname === href
   }
 
