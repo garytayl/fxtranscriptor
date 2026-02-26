@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Plus_Jakarta_Sans, JetBrains_Mono, Bebas_Neue } from "next/font/google"
+import { Plus_Jakarta_Sans, JetBrains_Mono, Syne, Bebas_Neue } from "next/font/google"
 import { SmoothScroll } from "@/components/smooth-scroll"
 import { Toaster } from "@/components/ui/toast"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -18,11 +18,12 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
-const bebasNeue = Bebas_Neue({
-  weight: "400",
+const syne = Syne({
+  weight: ["400", "500", "600", "700", "800"],
   subsets: ["latin"],
   variable: "--font-display",
 })
+const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas" })
 
 export const metadata: Metadata = {
   title: {
@@ -58,7 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark bg-background">
       <body
-        className={`${plusJakartaSans.variable} ${bebasNeue.variable} ${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden min-h-[100dvh]`}
+        className={`${plusJakartaSans.variable} ${syne.variable} ${jetbrainsMono.variable} ${bebasNeue.variable} font-sans antialiased overflow-x-hidden min-h-[100dvh]`}
       >
         <ErrorBoundary>
           <AnalyticsProvider>

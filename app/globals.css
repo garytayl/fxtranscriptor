@@ -42,6 +42,7 @@
   --font-sans: var(--font-sans), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, monospace;
   --font-display: var(--font-display), ui-sans-serif, sans-serif;
+  --font-hero: var(--font-bebas), ui-sans-serif, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
