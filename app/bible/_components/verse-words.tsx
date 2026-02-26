@@ -1,6 +1,8 @@
 "use client"
 
-import { WordStudy } from "@/components/word-study"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { WordStudyEntryContent } from "@/components/word-study"
+import { useLexiconCache } from "@/app/bible/_components/lexicon-cache-context"
 
 type VerseWordsProps = {
   verseNumber: number
@@ -10,12 +12,62 @@ type VerseWordsProps = {
   className?: string
   /** When true, words with Strong's get hover styling. */
   highlightStrongs?: boolean
-  /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
+  /** Called when a word with Strong's is clicked (e.g. to show in sidebar). Definition is fetched on click only. */
   onSelectStrongs?: (code: string) => void
 }
 
+const buttonClasses =
+  "cursor-pointer border-b border-dashed border-amber-500/50 font-medium text-amber-200/90 hover:border-amber-500/80 hover:text-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 rounded-sm"
+
 /**
- * Splits verse text into words and renders each word; words with a Strong's code get a WordStudy hover.
+ * Clickable word with Strong's code. Definition loads in sidebar on click. If already in cache, hover shows definition.
+ */
+function StrongsClickableWord({
+  code,
+  children,
+  className,
+  onSelect,
+}: {
+  code: string
+  children: React.ReactNode
+  className?: string
+  onSelect?: (code: string) => void
+}) {
+  const { getCached } = useLexiconCache()
+  const cached = getCached(code)
+
+  const trigger = (
+    <button
+      type="button"
+      onClick={() => onSelect?.(code)}
+      className={className ? `${buttonClasses} ${className}` : buttonClasses}
+      aria-label={`Word study: ${code}`}
+    >
+      {children}
+    </button>
+  )
+
+  if (cached) {
+    return (
+      <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+        <HoverCardContent
+          align="start"
+          side="top"
+          sideOffset={6}
+          className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
+        >
+          <WordStudyEntryContent entry={cached} />
+        </HoverCardContent>
+      </HoverCard>
+    )
+  }
+
+  return trigger
+}
+
+/**
+ * Splits verse text into words and renders each word; words with a Strong's code are clickable (definition loads in sidebar on click, no hover fetch).
  */
 export function VerseWords({
   verseNumber,
@@ -43,7 +95,7 @@ export function VerseWords({
         const code = strongs[t.index]
         if (code) {
           return (
-            <WordStudy
+            <StrongsClickableWord
               key={i}
               code={code}
               onSelect={onSelectStrongs}
@@ -54,7 +106,7 @@ export function VerseWords({
               }
             >
               {t.value}
-            </WordStudy>
+            </StrongsClickableWord>
           )
         }
         return <span key={i}>{t.value}</span>

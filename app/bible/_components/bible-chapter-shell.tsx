@@ -11,6 +11,7 @@ import { ScrollToVerse } from "@/app/bible/_components/scroll-to-verse"
 import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { ChapterWordStudy } from "@/app/bible/_components/chapter-word-study"
 import { ChapterVerseList } from "@/app/bible/_components/chapter-verse-list"
+import { LexiconCacheProvider } from "@/app/bible/_components/lexicon-cache-context"
 import { WordStudySidebarPanel } from "@/app/bible/_components/word-study-sidebar"
 import type { VerseRange } from "@/lib/bible/reference"
 import type { BibleTranslation } from "@/lib/bible/translations"
@@ -22,9 +23,11 @@ type ChapterOption = { id: string; number: number }
 
 function MobileWordStudySheet({
   code,
+  hasStrongsForChapter,
   onDismiss,
 }: {
   code: string
+  hasStrongsForChapter: boolean
   onDismiss: () => void
 }) {
   const sheetY = useMotionValue(0)
@@ -97,7 +100,10 @@ function MobileWordStudySheet({
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <WordStudySidebarPanel code={code} />
+          <WordStudySidebarPanel
+            code={code}
+            hasStrongsForChapter={hasStrongsForChapter}
+          />
         </div>
         <div className="shrink-0 flex items-center justify-center gap-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
           <ChevronDown className="size-3 text-white/25" />
@@ -162,6 +168,9 @@ export function BibleChapterShell({
   const [selectedStrongsCode, setSelectedStrongsCode] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
+  const hasStrongsForChapter =
+    Object.values(strongsByVerse).some((codes) => codes.length > 0)
+
   const onSelectStrongs = useCallback((code: string) => {
     setSelectedStrongsCode(code)
     setSheetOpen(true)
@@ -171,8 +180,9 @@ export function BibleChapterShell({
   const onReopenSheet = useCallback(() => setSheetOpen(true), [])
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      {highlightRange && <ScrollToVerse verseNumber={highlightRange.start} />}
+    <LexiconCacheProvider>
+      <main className="min-h-screen bg-background text-foreground">
+        {highlightRange && <ScrollToVerse verseNumber={highlightRange.start} />}
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:flex-row lg:gap-12 lg:items-start">
         <div className="min-w-0 flex-1 flex flex-col gap-4 sm:gap-6">
           <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/95 px-4 pt-3 sm:pt-4 backdrop-blur-md">
@@ -274,7 +284,10 @@ export function BibleChapterShell({
             style={{ WebkitOverflowScrolling: "touch" }}
             data-lenis-prevent
           >
-            <WordStudySidebarPanel code={selectedStrongsCode} />
+            <WordStudySidebarPanel
+              code={selectedStrongsCode}
+              hasStrongsForChapter={hasStrongsForChapter}
+            />
           </div>
         </aside>
       </div>
@@ -285,6 +298,7 @@ export function BibleChapterShell({
           <MobileWordStudySheet
             key={selectedStrongsCode}
             code={selectedStrongsCode}
+            hasStrongsForChapter={hasStrongsForChapter}
             onDismiss={onDismissSheet}
           />
         )}
@@ -296,6 +310,7 @@ export function BibleChapterShell({
           <MobileWordStudyPill code={selectedStrongsCode} onTap={onReopenSheet} />
         )}
       </AnimatePresence>
-    </main>
+      </main>
+    </LexiconCacheProvider>
   )
 }
