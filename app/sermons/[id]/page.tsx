@@ -16,6 +16,8 @@ import { AudioUrlDialog } from "@/components/audio-url-dialog";
 import { SermonMetadata } from "@/components/sermon-metadata";
 import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/lib/extractMetadata";
 import { SermonNarrativeView } from "@/components/sermon-narrative-view";
+import { SermonVerseSidebar } from "@/components/sermon-verse-sidebar";
+import { extractVerseReferencesFromText } from "@/lib/bible/verse-extract";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
 interface TranscriptionProgress {
@@ -40,6 +42,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [unifiedSummary, setUnifiedSummary] = useState<UnifiedSummarySection[] | null>(null);
   const [generatingSections, setGeneratingSections] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [quickReadMode, setQuickReadMode] = useState(true);
 
   // Session for role-aware UI
   useEffect(() => {
@@ -477,7 +480,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return <Badge variant={config.variant}>{config.label}</Badge>;
   }, []);
 
-  // Aggregate and organize verses from chunk summaries or from unified sections
+  // Aggregate and organize verses: chunk/unified summaries + transcript scan (catch refs AI missed)
   const organizedVerses = useMemo(() => {
     type VerseLike = { book: string; chapter: number; verse_start: number; verse_end: number | null; full_reference: string };
     const allVerses: VerseLike[] = [];
@@ -485,16 +488,26 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       summaries.forEach((summary) => {
         if (summary.verses?.length) allVerses.push(...summary.verses);
       });
-    } else if (unifiedSummary && unifiedSummary.length > 0) {
+    }
+    if (unifiedSummary && unifiedSummary.length > 0) {
       unifiedSummary.forEach((section) => {
         if (section.verses?.length) allVerses.push(...section.verses);
       });
     }
-    if (allVerses.length === 0) return { mainChapter: null, supportingVerses: [] };
+    const fromTranscript = extractVerseReferencesFromText(sermon?.transcript ?? undefined);
+    allVerses.push(...fromTranscript);
+    const seenRef = new Set<string>();
+    const deduped = allVerses.filter((v) => {
+      if (seenRef.has(v.full_reference)) return false;
+      seenRef.add(v.full_reference);
+      return true;
+    });
+    if (deduped.length === 0) return { mainChapter: null, supportingVerses: [] };
+    const allVersesDeduped = deduped;
 
     // Group by book and chapter
     const chapterMap = new Map<string, VerseLike[]>();
-    allVerses.forEach((verse) => {
+    allVersesDeduped.forEach((verse) => {
       const key = `${verse.book} ${verse.chapter}`;
       if (!chapterMap.has(key)) {
         chapterMap.set(key, []);
@@ -504,7 +517,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
     // First, find the main book (the book with the most verses total)
     const bookMap = new Map<string, VerseLike[]>();
-    allVerses.forEach((verse) => {
+    allVersesDeduped.forEach((verse) => {
       if (!bookMap.has(verse.book)) {
         bookMap.set(verse.book, []);
       }
@@ -579,7 +592,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       mainChapter: mainChapterKey ? { key: mainChapterKey, verses: uniqueMainChapter } : null,
       supportingVerses: uniqueSupporting,
     };
-  }, [summaries, unifiedSummary]);
+  }, [summaries, unifiedSummary, sermon?.transcript]);
 
   if (loading) {
     return (
@@ -691,6 +704,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="min-w-0 flex-1">
         {/* Description / Summary */}
         {sermon.description && (
           <div className="mb-12 max-w-3xl">
@@ -1269,6 +1284,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             <SermonNarrativeView
               sections={unifiedSummary}
               loading={false}
+              quickReadMode={quickReadMode}
+              onQuickReadToggle={setQuickReadMode}
             />
           ) : (
             <div className="text-center py-12">
@@ -1286,6 +1303,14 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   Structure sermon
                 </Button>
               )}
+            </div>
+          )}
+        </div>
+          </div>
+
+          {(organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0) && (
+            <div className="hidden md:block flex-shrink-0 w-64 lg:w-72">
+              <SermonVerseSidebar organizedVerses={organizedVerses} />
             </div>
           )}
         </div>

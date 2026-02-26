@@ -90,9 +90,9 @@ export function VerseSidePanel({
     <aside
       ref={panelRef}
       data-verse-sidebar
-      className="sticky top-24 w-full z-20"
+      className="w-full z-20"
     >
-      <div className="bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg p-4 shadow-lg flex flex-col h-[calc(100vh-6rem)]">
+      <div className="bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg p-4 shadow-lg flex flex-col">
         <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border/30">
           <BookOpen className="size-4 text-accent" />
           <h3 className="font-mono text-xs uppercase tracking-widest text-foreground">
@@ -103,8 +103,7 @@ export function VerseSidePanel({
           </Badge>
         </div>
 
-        {/* Only the list scrolls (panel stays fixed) */}
-        <div className="space-y-3 overflow-y-auto overscroll-contain pr-1 scrollbar-thin scrollbar-thumb-accent/20 scrollbar-track-transparent">
+        <div className="space-y-3 pr-1">
           {versesBySection.map((sectionGroup) => (
             <div key={sectionGroup.sectionIndex} className="space-y-2">
               <h4 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground px-2">
