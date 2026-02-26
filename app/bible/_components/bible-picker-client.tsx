@@ -194,7 +194,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 box-border flex flex-col md:justify-center"
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 box-border"
               >
                 <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <div className="mb-6 flex items-center justify-between gap-4 [&_.text-muted-foreground]:text-white/60 [&_button]:text-white/70 [&_button:hover]:text-white/90">
@@ -235,7 +235,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 pb-12 box-border"
               >
                 <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-6 sm:mb-8">
@@ -272,7 +272,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 pb-12 box-border"
               >
                 <div className="w-full max-w-2xl md:max-w-3xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
@@ -310,7 +310,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 pb-12 box-border"
               >
                 <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
