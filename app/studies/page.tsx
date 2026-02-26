@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { getCurrentStudyAsync, getAllStudiesAsync } from "@/lib/studies"
+import { REGROUPS_SPRING_2026, OTHER_GROUPS } from "@/lib/small-groups"
 import { ExternalLink, Headphones, BookOpen, FileText, ChevronRight } from "lucide-react"
 
 export const revalidate = 3600
@@ -32,6 +33,60 @@ export default async function StudiesPage() {
             Small group and personal study guides from fxchurch. Hosted on Notion — open any link to read or print.
           </p>
         </header>
+
+        {/* Small group intro */}
+        <section className="max-w-3xl mb-8 sm:mb-10">
+          <h2 className="font-display text-xl sm:text-2xl tracking-tight text-foreground mb-2">
+            What small group are you a part of?
+          </h2>
+          <p className="font-mono text-xs sm:text-sm text-muted-foreground mb-4">
+            The study guides below are from Mat&apos;s re:group (Shockney&apos;s). Find your group here:
+          </p>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="border border-border bg-card/30 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-border bg-muted/30">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-accent">re:groups</span>
+                <span className="font-mono text-[10px] text-muted-foreground ml-2">Spring 2026</span>
+              </div>
+              <ul className="divide-y divide-border">
+                {REGROUPS_SPRING_2026.map((g) => (
+                  <li key={g.name} className="px-4 py-3">
+                    <p className="font-semibold text-sm text-foreground">{g.name}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground mt-0.5">{g.schedule}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">Contact: {g.contact}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">Location: {g.location}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="border border-border bg-card/30 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-border bg-muted/30">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-accent">Other groups</span>
+              </div>
+              <ul className="divide-y divide-border">
+                {OTHER_GROUPS.map((g) => (
+                  <li key={g.name} className="px-4 py-3">
+                    <p className="font-semibold text-sm text-foreground">{g.name}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground mt-0.5">{g.schedule}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">Contact: {g.contact}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">Location: {g.location}</p>
+                    {g.link ? (
+                      <a
+                        href={g.link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-1 font-mono text-[11px] text-accent hover:underline"
+                      >
+                        {g.link.label}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
 
         {current ? (
           <section className="max-w-3xl space-y-8 sm:space-y-10">
