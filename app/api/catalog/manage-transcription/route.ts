@@ -36,9 +36,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!action || typeof action !== "string" || !["cancel", "delete-chunks", "delete-transcript"].includes(action)) {
+    if (!action || typeof action !== "string" || !["cancel", "delete-chunks", "delete-transcript", "force-retry"].includes(action)) {
       return NextResponse.json(
-        { error: "Missing or invalid action. Must be 'cancel', 'delete-chunks', or 'delete-transcript'" },
+        { error: "Missing or invalid action. Must be 'cancel', 'delete-chunks', 'delete-transcript', or 'force-retry'" },
         { status: 400 }
       );
     }
@@ -122,6 +122,21 @@ export async function POST(request: NextRequest) {
         progress_json: null,
       };
       console.log(`[ManageTranscription] Deleting transcript for sermon ${sermonId}`);
+    } else if (action === "force-retry") {
+      // Worker was killed or stuck; clear queue claim so this sermon can be re-queued. Keep progress_json so worker can resume.
+      const { error: queueDeleteError } = await supabaseClient
+        .from("transcription_queue")
+        .delete()
+        .eq("sermon_id", sermonId);
+      if (queueDeleteError) {
+        console.warn("[ManageTranscription] Could not remove queue item (may not exist):", queueDeleteError.message);
+      }
+      updateData = {
+        status: "pending",
+        error_message: null,
+        progress_json: sermon.progress_json ?? null, // keep completedChunks so worker can resume
+      };
+      console.log(`[ManageTranscription] Force-retry for sermon ${sermonId} (queue cleared, progress preserved)`);
     }
 
     // Update sermon

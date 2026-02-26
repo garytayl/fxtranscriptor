@@ -813,6 +813,39 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     >
                       Check status
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest border-amber-500/50 hover:border-amber-500 hover:text-amber-500"
+                      onClick={async () => {
+                        const t = toast.loading("Resetting…");
+                        try {
+                          const r = await fetch("/api/catalog/manage-transcription", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ sermonId: sermon.id, action: "force-retry" }),
+                          });
+                          const d = await r.json().catch(() => ({}));
+                          toast.dismiss(t);
+                          if (d.success && d.sermon) {
+                            setSermon(d.sermon);
+                            setGenerating(false);
+                            setProgress(null);
+                            toast.success("Reset for retry", {
+                              description: "Progress kept. Click Retry Generate to resume from the last chunk.",
+                              duration: 6000,
+                            });
+                          } else {
+                            toast.error("Reset failed", { description: d.error || "Could not reset" });
+                          }
+                        } catch (e) {
+                          toast.dismiss(t);
+                          toast.error("Reset failed", { description: e instanceof Error ? e.message : String(e) });
+                        }
+                      }}
+                    >
+                      Stuck? Reset and retry
+                    </Button>
                   </div>
                 )}
                 {/* Cancel and Delete buttons - admin only */}
