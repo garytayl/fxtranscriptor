@@ -91,6 +91,13 @@ function generateSeriesId(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/** Treat "None", "N/A", empty, etc. as no series so sermons go to ungrouped */
+function isEmptySeriesName(name: string | null | undefined): boolean {
+  if (name == null) return true;
+  const s = name.trim().toLowerCase();
+  return s === '' || s === 'none' || s === 'n/a' || s === 'na' || s === 'unsorted' || s === 'other';
+}
+
 /**
  * Group sermons by series
  * Only uses playlist-based series mapping - no title extraction
@@ -137,7 +144,8 @@ export function groupSermonsBySeries(
     const playlistSeriesName = playlistSeriesMap?.get(sermon.id);
     const extractedSeriesName = sermon.series; // From transcript metadata
     
-    const seriesName = overrideSeriesName || playlistSeriesName || extractedSeriesName;
+    const rawSeriesName = overrideSeriesName || playlistSeriesName || extractedSeriesName;
+    const seriesName = rawSeriesName && !isEmptySeriesName(rawSeriesName) ? rawSeriesName : null;
 
     if (seriesName) {
       const seriesId = generateSeriesId(seriesName);
