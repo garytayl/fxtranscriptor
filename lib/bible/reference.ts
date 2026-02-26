@@ -197,6 +197,31 @@ const BOOK_ABBREVIATIONS: Record<string, string> = {
   revelation: "Revelation",
 }
 
+/**
+ * Resolve a sermon series name to its primary Bible book, if recognizable.
+ * e.g. "John: πιστεύω" → "John", "Isaiah: The Holy One of Israel" → "Isaiah", "2 Chronicles" → "2 Chronicles".
+ * Used to align the main chapter / verses with the book the series is teaching through.
+ */
+export function getBookFromSeriesName(seriesName: string | null | undefined): string | null {
+  if (seriesName == null || !seriesName.trim()) return null
+  const segment = seriesName
+    .split(/[\s]*[:\-—|,][\s]*/)[0]
+    ?.trim()
+  if (!segment) return null
+  const key = segment.toLowerCase().replace(/\s+/g, " ").trim()
+  const byAbbrev = BOOK_ABBREVIATIONS[key]
+  if (byAbbrev) return byAbbrev
+  const keyNoSpace = key.replace(/\s/g, "")
+  const byAbbrevNoSpace = BOOK_ABBREVIATIONS[keyNoSpace]
+  if (byAbbrevNoSpace) return byAbbrevNoSpace
+  const firstWord = segment.split(/\s+/)[0]?.toLowerCase()
+  if (firstWord) {
+    const byFirst = BOOK_ABBREVIATIONS[firstWord]
+    if (byFirst) return byFirst
+  }
+  return null
+}
+
 export function normalizeBookName(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) {

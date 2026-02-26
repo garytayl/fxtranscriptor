@@ -18,6 +18,7 @@ import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/l
 import { SermonNarrativeView } from "@/components/sermon-narrative-view";
 import { SermonVerseSidebar } from "@/components/sermon-verse-sidebar";
 import { extractVerseReferencesFromText } from "@/lib/bible/verse-extract";
+import { getBookFromSeriesName, normalizeBookName } from "@/lib/bible/reference";
 import { decodeHtmlEntities, formatRelativeTime } from "@/lib/utils";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
@@ -546,7 +547,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       chapterMap.get(key)!.push(verse);
     });
 
-    // First, find the main book (the book with the most verses total)
+    // First, find the main book. Prefer the book aligned with the sermon's series when present.
     const bookMap = new Map<string, VerseLike[]>();
     allVersesDeduped.forEach((verse) => {
       if (!bookMap.has(verse.book)) {
@@ -555,14 +556,28 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       bookMap.get(verse.book)!.push(verse);
     });
 
+    const seriesBook = getBookFromSeriesName(sermon?.series_override ?? sermon?.series ?? undefined);
     let mainBook: string | null = null;
     let maxBookVerses = 0;
-    bookMap.forEach((verses, book) => {
-      if (verses.length > maxBookVerses) {
-        maxBookVerses = verses.length;
-        mainBook = book;
+
+    if (seriesBook) {
+      const seriesNorm = normalizeBookName(seriesBook);
+      for (const [book] of bookMap) {
+        if (normalizeBookName(book) === seriesNorm) {
+          mainBook = book;
+          maxBookVerses = bookMap.get(book)!.length;
+          break;
+        }
       }
-    });
+    }
+    if (!mainBook) {
+      bookMap.forEach((verses, book) => {
+        if (verses.length > maxBookVerses) {
+          maxBookVerses = verses.length;
+          mainBook = book;
+        }
+      });
+    }
 
     // Then, within the main book, find the chapter with the most verses
     let mainChapterKey: string | null = null;
@@ -623,7 +638,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       mainChapter: mainChapterKey ? { key: mainChapterKey, verses: uniqueMainChapter } : null,
       supportingVerses: uniqueSupporting,
     };
-  }, [summaries, unifiedSummary, sermon?.transcript]);
+  }, [summaries, unifiedSummary, sermon?.transcript, sermon?.series, sermon?.series_override]);
 
   if (loading) {
     return (
