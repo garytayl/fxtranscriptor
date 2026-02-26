@@ -33,6 +33,14 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
 
     lenisRef.current = lenis
 
+    /** Let browser handle zoom (Ctrl/Cmd + wheel). Stop propagation so Lenis does not preventDefault. */
+    const allowZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.stopPropagation()
+      }
+    }
+    window.addEventListener("wheel", allowZoom, { capture: true })
+
     function raf(time: number) {
       lenis.raf(time)
       ScrollTrigger.update()
@@ -47,6 +55,7 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
     window.addEventListener("resize", handleResize)
 
     return () => {
+      window.removeEventListener("wheel", allowZoom, { capture: true })
       lenis.destroy()
       window.removeEventListener("resize", handleResize)
     }
