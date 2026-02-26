@@ -429,6 +429,11 @@ app.post('/transcribe', async (req, res) => {
       })
       .eq('id', sermonId);
 
+    // Return 200 immediately so the app (processor) doesn't timeout waiting. Work runs in background.
+    res.status(200).json({ success: true, message: 'Transcription started' });
+
+    (async function runTranscriptionInBackground() {
+      try {
     // Helper function to check if transcription was cancelled
     const checkCancelled = async () => {
       const { data: sermon } = await supabase
@@ -493,7 +498,7 @@ app.post('/transcribe', async (req, res) => {
             await fs.rmdir(tempDir).catch(() => {});
           } catch (err) {}
         }
-        return res.status(200).json({ success: false, cancelled: true, message: 'Transcription cancelled' });
+        return;
       }
       
       // Get file size
@@ -588,7 +593,7 @@ app.post('/transcribe', async (req, res) => {
               await fs.rmdir(tempDir).catch(() => {});
             } catch (err) {}
           }
-          return res.status(200).json({ success: false, cancelled: true, message: 'Transcription cancelled', completedChunks: Object.keys(completedChunks).length });
+          return;
         }
         
         // Skip if already successfully completed
@@ -655,7 +660,7 @@ app.post('/transcribe', async (req, res) => {
                 await fs.rmdir(tempDir).catch(() => {});
               } catch (err) {}
             }
-            return res.status(200).json({ success: false, cancelled: true, message: 'Transcription cancelled', completedChunks: Object.keys(completedChunks).length });
+            return;
           }
           
           // Save this chunk immediately so we don't lose progress
@@ -866,16 +871,10 @@ app.post('/transcribe', async (req, res) => {
 
     console.log(`[Worker] ✅ Transcription complete for sermon ${sermonId} (${transcript.length} chars)`);
 
-    res.json({
-      success: true,
-      transcript: transcript,
-      sermonId: sermonId,
-    });
-
-  } catch (error) {
+    } catch (error) {
     console.error('[Worker] Transcription error:', error);
     
-    // Update database with error
+    // Update database with error (response already sent, so no res.json here)
     if (supabase && req.body.sermonId) {
       await supabase
         .from('sermons')
@@ -903,11 +902,17 @@ app.post('/transcribe', async (req, res) => {
         console.warn(`[Worker] ⚠️  Failed to mark queue item as failed (non-critical):`, queueError.message);
       }
     }
-
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Unknown error',
-    });
+      }
+    })();
+  } catch (error) {
+    // Validation/setup error before we sent 200 - can still respond
+    console.error('[Worker] Transcription setup error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Unknown error',
+      });
+    }
   }
 });
 
