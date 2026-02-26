@@ -18,6 +18,7 @@ import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/l
 import { SermonNarrativeView } from "@/components/sermon-narrative-view";
 import { SermonVerseSidebar } from "@/components/sermon-verse-sidebar";
 import { extractVerseReferencesFromText } from "@/lib/bible/verse-extract";
+import { formatRelativeTime } from "@/lib/utils";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
 interface TranscriptionProgress {
@@ -779,19 +780,38 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex-1">
                 <h3 className="font-mono text-sm uppercase tracking-widest mb-2">Transcription Progress</h3>
                 {(() => {
-                  const dbMsg = sermon.progress_json?.message;
+                  const pj = sermon.progress_json;
+                  const dbMsg = pj?.message;
                   const localMsg = progress?.message;
                   const displayMsg = dbMsg || localMsg;
+                  const stepLabel = pj?.step ? (pj.step.charAt(0).toUpperCase() + pj.step.slice(1)) : null;
                   if (displayMsg) {
                     return (
-                      <p className="text-sm text-muted-foreground font-mono">
-                        {displayMsg}
-                        {sermon.progress_json?.current != null && sermon.progress_json?.total != null && (
-                          <span className="ml-2 text-xs text-muted-foreground/70">
-                            ({sermon.progress_json.current}/{sermon.progress_json.total})
-                          </span>
+                      <>
+                        {stepLabel && (
+                          <p className="text-xs font-mono text-muted-foreground/80 uppercase tracking-wider mb-1">
+                            {stepLabel}
+                          </p>
                         )}
-                      </p>
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {displayMsg}
+                          {pj?.current != null && pj?.total != null && (
+                            <span className="ml-2 text-xs text-muted-foreground/70">
+                              ({pj.current}/{pj.total})
+                            </span>
+                          )}
+                        </p>
+                        {pj?.updatedAt && (
+                          <p className="text-xs text-muted-foreground/70 mt-1 font-mono">
+                            Last updated {formatRelativeTime(pj.updatedAt)}
+                          </p>
+                        )}
+                        {pj?.latestChunkPreview && (
+                          <p className="text-xs text-muted-foreground/80 mt-2 font-mono italic border-l-2 border-border/50 pl-2">
+                            Latest: «{pj.latestChunkPreview}»
+                          </p>
+                        )}
+                      </>
                     );
                   }
                   if (sermon.status === "generating") {

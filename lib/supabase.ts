@@ -50,6 +50,8 @@ export interface Sermon {
     details?: string[];
     completedChunks?: Record<number, string>; // Chunk index -> transcript text
     failedChunks?: Record<number, string>; // Chunk index -> error message
+    updatedAt?: string; // ISO timestamp for "last updated" display
+    latestChunkPreview?: string; // First ~120 chars of most recently completed chunk
   } | null;
   unified_summary_json?: unknown[] | null;
   unified_summary_generated_at?: string | null;

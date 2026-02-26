@@ -16,6 +16,7 @@ import dynamic from "next/dynamic";
 import { SermonCard } from "@/components/sermon-card";
 import { SermonSkeleton } from "@/components/sermon-skeleton";
 import { Sermon } from "@/lib/supabase";
+import { formatRelativeTime } from "@/lib/utils";
 import { SermonMetadata } from "@/components/sermon-metadata";
 
 // Lazy load heavy components
@@ -1486,7 +1487,12 @@ export default function SermonsPage() {
                     <div className="mb-4 p-4 border border-border/30 rounded-lg bg-card/50">
                       <div className="flex items-start gap-3">
                         <Loader2 className="size-4 animate-spin text-accent mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 text-left">
+                          {selectedSermon.progress_json.step && (
+                            <p className="text-xs font-mono text-muted-foreground/80 uppercase tracking-wider mb-1">
+                              {selectedSermon.progress_json.step.charAt(0).toUpperCase() + selectedSermon.progress_json.step.slice(1)}
+                            </p>
+                          )}
                           <p className="text-sm font-mono text-muted-foreground">
                             {selectedSermon.progress_json.message}
                             {selectedSermon.progress_json.current && selectedSermon.progress_json.total && (
@@ -1495,6 +1501,16 @@ export default function SermonsPage() {
                               </span>
                             )}
                           </p>
+                          {selectedSermon.progress_json.updatedAt && (
+                            <p className="text-xs text-muted-foreground/70 mt-1 font-mono">
+                              Last updated {formatRelativeTime(selectedSermon.progress_json.updatedAt)}
+                            </p>
+                          )}
+                          {selectedSermon.progress_json.latestChunkPreview && (
+                            <p className="text-xs text-muted-foreground/80 mt-2 font-mono italic border-l-2 border-border/50 pl-2">
+                              Latest: «{selectedSermon.progress_json.latestChunkPreview}»
+                            </p>
+                          )}
                           {selectedSermon.progress_json.completedChunks && 
                            Object.keys(selectedSermon.progress_json.completedChunks).length > 0 && (
                             <div className="mt-2 pt-2 border-t border-border/30">

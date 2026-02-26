@@ -420,12 +420,15 @@ app.post('/transcribe', async (req, res) => {
 
     console.log(`[Worker] Transcription request for sermon ${sermonId}`);
 
+    // Helper: add updatedAt to every progress payload for "last updated" display
+    const withUpdatedAt = (obj) => ({ ...obj, updatedAt: new Date().toISOString() });
+
     // Update status to generating
     await supabase
       .from('sermons')
       .update({ 
         status: 'generating',
-        progress_json: { step: 'downloading', message: 'Downloading audio file...' }
+        progress_json: withUpdatedAt({ step: 'downloading', message: 'Downloading audio file...' })
       })
       .eq('id', sermonId);
 
@@ -529,7 +532,7 @@ app.post('/transcribe', async (req, res) => {
       await supabase
         .from('sermons')
         .update({ 
-          progress_json: { step: 'chunking', message: 'Chunking audio into 10-minute segments...' }
+          progress_json: withUpdatedAt({ step: 'chunking', message: 'Chunking audio into 10-minute segments...' })
         })
         .eq('id', sermonId);
 
@@ -607,20 +610,49 @@ app.post('/transcribe', async (req, res) => {
           console.log(`[Worker] Retrying failed chunk ${i + 1}/${chunks.length}...`);
         }
 
+        const previewFromCompleted = (() => {
+          const lastIdx = Math.max(-1, ...Object.keys(completedChunks).map(Number));
+          return lastIdx >= 0 && completedChunks[lastIdx]
+            ? (completedChunks[lastIdx].slice(0, 120).trim() + (completedChunks[lastIdx].length > 120 ? '…' : ''))
+            : undefined;
+        })();
         await supabase
           .from('sermons')
           .update({ 
-            progress_json: { 
+            progress_json: withUpdatedAt({ 
               step: 'transcribing',
               current: i + 1,
               total: chunks.length,
-              message: `Transcribing chunk ${i + 1} of ${chunks.length}...`,
-              completedChunks: completedChunks, // Preserve existing chunks
-            }
+              message: `Sending chunk ${i + 1} of ${chunks.length} to Whisper AI...`,
+              completedChunks: completedChunks,
+              latestChunkPreview: previewFromCompleted,
+            })
           })
           .eq('id', sermonId);
 
         console.log(`[Worker] Transcribing chunk ${i + 1}/${chunks.length}...`);
+
+        // Heartbeat: update progress every 20s during long Whisper API call so UI shows "in progress"
+        const HEARTBEAT_MS = 20000;
+        let heartbeatTimer = setInterval(async () => {
+          const lastIdx = Math.max(-1, ...Object.keys(completedChunks).map(Number));
+          const preview = lastIdx >= 0 && completedChunks[lastIdx]
+            ? (completedChunks[lastIdx].slice(0, 120).trim() + (completedChunks[lastIdx].length > 120 ? '…' : ''))
+            : undefined;
+          await supabase
+            .from('sermons')
+            .update({
+              progress_json: withUpdatedAt({
+                step: 'transcribing',
+                current: i + 1,
+                total: chunks.length,
+                message: `Transcribing chunk ${i + 1} of ${chunks.length}... (Whisper API in progress)`,
+                completedChunks: completedChunks,
+                latestChunkPreview: preview,
+              })
+            })
+            .eq('id', sermonId);
+        }, HEARTBEAT_MS);
         
         // Add delay between chunks to avoid rate limiting (except for first chunk)
         // Hugging Face free tier can be slow, so we add delays to avoid overwhelming it
@@ -632,6 +664,8 @@ app.post('/transcribe', async (req, res) => {
         
         try {
           const chunkTranscript = await transcribeAudio(chunks[i]);
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
           
           // Check if cancelled after transcription
           if (await checkCancelled()) {
@@ -641,13 +675,13 @@ app.post('/transcribe', async (req, res) => {
             await supabase
               .from('sermons')
               .update({ 
-                progress_json: { 
+                progress_json: withUpdatedAt({ 
                   step: 'cancelled',
                   current: i + 1,
                   total: chunks.length,
                   message: `Transcription cancelled. ${Object.keys(completedChunks).length} chunks completed.`,
                   completedChunks: completedChunks,
-                }
+                })
               })
               .eq('id', sermonId);
             // Cleanup temp files
@@ -665,35 +699,39 @@ app.post('/transcribe', async (req, res) => {
           
           // Save this chunk immediately so we don't lose progress
           completedChunks[i] = chunkTranscript;
+          const latestChunkPreview = (chunkTranscript.slice(0, 120).trim() + (chunkTranscript.length > 120 ? '…' : '')) || undefined;
           await supabase
             .from('sermons')
             .update({ 
-              progress_json: { 
+              progress_json: withUpdatedAt({ 
                 step: 'transcribing',
                 current: i + 1,
                 total: chunks.length,
                 message: `Chunk ${i + 1}/${chunks.length} completed. ${chunks.length - (i + 1)} remaining...`,
                 completedChunks: completedChunks,
-              }
+                latestChunkPreview,
+              })
             })
             .eq('id', sermonId);
           
           console.log(`[Worker] ✅ Chunk ${i + 1}/${chunks.length} saved (${chunkTranscript.length} chars)`);
         } catch (error) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
           console.error(`[Worker] ❌ Chunk ${i + 1}/${chunks.length} failed:`, error.message);
           
           // Save error but continue with next chunk
           await supabase
             .from('sermons')
             .update({ 
-              progress_json: { 
+              progress_json: withUpdatedAt({ 
                 step: 'transcribing',
                 current: i + 1,
                 total: chunks.length,
                 message: `Chunk ${i + 1}/${chunks.length} failed: ${error.message}. Continuing with remaining chunks...`,
                 completedChunks: completedChunks,
                 failedChunks: { ...(existingProgress.failedChunks || {}), [i]: error.message },
-              }
+              })
             })
             .eq('id', sermonId);
         }
@@ -727,11 +765,11 @@ app.post('/transcribe', async (req, res) => {
       await supabase
         .from('sermons')
         .update({ 
-          progress_json: { 
+          progress_json: withUpdatedAt({ 
             step: 'combining',
             message: `Combining ${validTranscripts.length}/${chunks.length} completed chunks...`,
             completedChunks: completedChunks,
-          }
+          })
         })
         .eq('id', sermonId);
 
@@ -754,7 +792,7 @@ app.post('/transcribe', async (req, res) => {
       await supabase
         .from('sermons')
         .update({ 
-          progress_json: { step: 'transcribing', message: 'Transcribing audio with Whisper AI...' }
+          progress_json: withUpdatedAt({ step: 'transcribing', message: 'Transcribing audio with Whisper AI...' })
         })
         .eq('id', sermonId);
 
@@ -837,7 +875,7 @@ app.post('/transcribe', async (req, res) => {
     await supabase
       .from('sermons')
       .update({ 
-        progress_json: { step: 'saving', message: 'Saving transcript to database...' }
+        progress_json: withUpdatedAt({ step: 'saving', message: 'Saving transcript to database...' })
       })
       .eq('id', sermonId);
 
