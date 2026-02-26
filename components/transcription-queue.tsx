@@ -31,7 +31,12 @@ interface QueueData {
   all: QueueItem[];
 }
 
-export function TranscriptionQueue() {
+interface TranscriptionQueueProps {
+  /** Show Reset queue button (e.g. for admins only). Default true for backwards compatibility. */
+  showResetButton?: boolean;
+}
+
+export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueueProps) {
   const [queue, setQueue] = useState<QueueData | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<Set<string>>(new Set());
@@ -249,16 +254,18 @@ export function TranscriptionQueue() {
               {queue.processing ? "1 processing" : "0 processing"} • {queue.queued.length} queued
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReset}
-            disabled={resetting}
-            className="gap-1 font-mono text-xs uppercase tracking-widest"
-          >
-            {resetting ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
-            Reset queue
-          </Button>
+          {showResetButton && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              disabled={resetting}
+              className="gap-1 font-mono text-xs uppercase tracking-widest"
+            >
+              {resetting ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
+              Reset queue
+            </Button>
+          )}
         </div>
 
         {/* Currently Processing */}

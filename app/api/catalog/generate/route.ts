@@ -200,11 +200,12 @@ export async function POST(request: NextRequest) {
           });
         }, 100);
 
+        const pos = queueResult.queueItem?.displayPosition ?? queueResult.queueItem?.position;
         return NextResponse.json({
           success: true,
-          message: queueResult.queueItem?.position === 1 
+          message: pos === 1
             ? "Transcription started. This may take several minutes."
-            : `Added to queue (position ${queueResult.queueItem?.position || 'unknown'}). The page will auto-refresh to show progress.`,
+            : `Added to queue (position ${pos} in line). The page will auto-refresh to show progress.`,
           sermon: updatedSermon || sermon,
           queueItem: queueResult.queueItem,
         });

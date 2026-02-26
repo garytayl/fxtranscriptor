@@ -896,12 +896,10 @@ export default function SermonsPage() {
               </div>
             </div>
 
-            {/* Transcription queue (admin): see what's in the queue and reset if buggy */}
-            {isAdmin && (
-              <div className="px-4 sm:px-6 md:px-12 pb-6">
-                <TranscriptionQueue />
-              </div>
-            )}
+            {/* Transcription queue: visible to all so users see their item; Reset queue is admin-only */}
+            <div className="px-4 sm:px-6 md:px-12 pb-6">
+              <TranscriptionQueue showResetButton={isAdmin} />
+            </div>
 
             {/* Loading State */}
             {loading ? (

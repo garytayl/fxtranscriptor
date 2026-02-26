@@ -183,15 +183,24 @@ export async function addSermonToQueue(sermonId: string): Promise<AddToQueueResu
     
     console.log(`[Queue] Successfully added to queue:`, queueItem);
 
-    // Update sermon status
+    // Display position: 1-based among active items (queued + processing) so user sees "position 1" not "position 4"
+    const { data: activeItems } = await supabase
+      .from("transcription_queue")
+      .select("id, position")
+      .in("status", ["queued", "processing"])
+      .order("position", { ascending: true });
+    const activeIndex = activeItems?.findIndex((r) => r.id === queueItem.id) ?? -1;
+    const displayPosition = activeIndex >= 0 ? activeIndex + 1 : position;
+
+    // Update sermon status (use display position in message so it matches queue card)
     await supabase
       .from("sermons")
       .update({
         status: "generating",
         progress_json: {
           step: "queued",
-          message: `Queued for transcription (position ${position} in queue)...`,
-          position: position,
+          message: `Queued for transcription (position ${displayPosition} in queue)...`,
+          position: displayPosition,
         },
       })
       .eq("id", sermonId);
@@ -199,7 +208,7 @@ export async function addSermonToQueue(sermonId: string): Promise<AddToQueueResu
     return {
       success: true,
       message: "Added to transcription queue",
-      queueItem: queueItem,
+      queueItem: { ...queueItem, displayPosition },
     };
   } catch (error) {
     console.error("[Queue] Unexpected error:", error);
