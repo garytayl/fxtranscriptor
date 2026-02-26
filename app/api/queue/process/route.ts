@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Stale threshold: if something has been "processing" longer than this, treat as failed so queue can advance
-    const STALE_PROCESSING_MS = 2 * 60 * 60 * 1000; // 2 hours
+    // (e.g. worker was killed by Railway; 15 min is enough for a normal job to finish or report progress)
+    const STALE_PROCESSING_MS = 15 * 60 * 1000; // 15 minutes
 
     // Check if there's already a processing item
     const { data: processingItem } = await supabaseClient

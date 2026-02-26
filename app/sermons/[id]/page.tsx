@@ -751,6 +751,62 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                     )}
                   </div>
                 )}
+                {/* Trigger processor + Status (when stuck) - admin only */}
+                {isAdmin && sermon.status === "generating" && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest"
+                      onClick={async () => {
+                        const t = toast.loading("Triggering processor...");
+                        try {
+                          const r = await fetch("/api/queue/processor", { method: "POST", credentials: "include" });
+                          const d = await r.json().catch(() => ({}));
+                          toast.dismiss(t);
+                          if (d.error) {
+                            toast.error("Processor error", { description: d.error + (d.details ? ` — ${d.details}` : ""), duration: 8000 });
+                          } else if (d.processed) {
+                            toast.success("Processor ran", { description: "Worker was called. Check progress in a minute." });
+                            loadSermon(sermon.id);
+                          } else {
+                            toast.info("Processor ran", { description: d.message || "No action taken (e.g. already processing or empty queue)." });
+                            loadSermon(sermon.id);
+                          }
+                        } catch (e) {
+                          toast.dismiss(t);
+                          toast.error("Request failed", { description: e instanceof Error ? e.message : String(e), duration: 6000 });
+                        }
+                      }}
+                    >
+                      Trigger processor now
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest text-muted-foreground"
+                      onClick={async () => {
+                        const t = toast.loading("Checking status...");
+                        try {
+                          const r = await fetch("/api/queue/status", { credentials: "include" });
+                          const d = await r.json().catch(() => ({}));
+                          toast.dismiss(t);
+                          const parts = [
+                            d.workerConfigured ? "Worker URL: set" : "Worker URL: not set",
+                            d.workerReachable === true ? "Reachable: yes" : d.workerReachable === false ? `Reachable: no${d.workerError ? ` (${d.workerError})` : ""}` : "",
+                            d.queue ? `Queue: ${d.queue.queuedCount} queued${d.queue.processingSermonId ? ", 1 processing" : ""}` : "",
+                          ].filter(Boolean);
+                          toast.info("Queue status", { description: parts.join(" · ") || "Unknown", duration: 6000 });
+                        } catch (e) {
+                          toast.dismiss(t);
+                          toast.error("Status check failed", { description: e instanceof Error ? e.message : String(e) });
+                        }
+                      }}
+                    >
+                      Check status
+                    </Button>
+                  </div>
+                )}
                 {/* Cancel and Delete buttons - admin only */}
                 {isAdmin && (
                 <div className="flex gap-2 mt-4">
