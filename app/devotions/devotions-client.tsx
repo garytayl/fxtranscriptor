@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion, useMotionValue, useTransform, useDragControls, type PanInfo } from "framer-motion"
 import {
   LogOut,
   MoreHorizontal,
@@ -11,6 +11,9 @@ import {
   BookOpen,
   ArrowLeft,
   ChevronRight,
+  PenLine,
+  X,
+  ChevronDown,
 } from "lucide-react"
 import { getPassageEntry, savePassageEntry } from "@/lib/devotions-storage"
 import { getReaderUrlFromReference } from "@/lib/bible/reference"
@@ -22,6 +25,8 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 
+const JOURNAL_SHEET_DISMISS_THRESHOLD = 60
+
 const REFLECTION_PROMPTS = [
   "What line or phrase is staying with you?",
   "Where did you see yourself in this passage?",
@@ -32,6 +37,181 @@ const REFLECTION_PROMPTS = [
   "What are you sitting with after reading?",
 ]
 
+function getReflectionPrompt(passageRef: string): string {
+  const slug = passageRef.toLowerCase().replace(/\s/g, "").replace(/:/g, "")
+  let hash = 0
+  for (let i = 0; i < slug.length; i++) hash = (hash << 5) - hash + slug.charCodeAt(i)
+  const i = Math.abs(hash) % REFLECTION_PROMPTS.length
+  return REFLECTION_PROMPTS[i] ?? REFLECTION_PROMPTS[0]
+}
+
+type JournalPanelProps = {
+  passageRef: string
+  prayer: string
+  reflection: string
+  onPrayerChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onReflectionChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onBlur: () => void
+}
+
+function JournalPanel({
+  passageRef,
+  prayer,
+  reflection,
+  onPrayerChange,
+  onReflectionChange,
+  onBlur,
+}: JournalPanelProps) {
+  const prompt = getReflectionPrompt(passageRef)
+  return (
+    <div className="space-y-5">
+      <div>
+        <label
+          htmlFor="devotions-prayer"
+          className="block font-sans text-sm font-light text-white/80 mb-1.5"
+        >
+          A prayer in your own words
+        </label>
+        <textarea
+          id="devotions-prayer"
+          value={prayer}
+          onChange={onPrayerChange}
+          onBlur={onBlur}
+          placeholder="Whatever you want to say—or leave blank"
+          rows={3}
+          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
+        />
+      </div>
+      <div>
+        <label
+          htmlFor="devotions-reflection"
+          className="block font-sans text-sm font-light text-white/80 mb-1.5"
+        >
+          {prompt}
+        </label>
+        <textarea
+          id="devotions-reflection"
+          value={reflection}
+          onChange={onReflectionChange}
+          onBlur={onBlur}
+          placeholder="Just a line or two—or nothing"
+          rows={3}
+          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
+        />
+      </div>
+    </div>
+  )
+}
+
+function MobileJournalSheet({
+  onDismiss,
+  children,
+}: {
+  onDismiss: () => void
+  children: React.ReactNode
+}) {
+  const sheetY = useMotionValue(0)
+  const backdropOpacity = useTransform(sheetY, [0, 300], [1, 0])
+  const dragControls = useDragControls()
+
+  const handleDragEnd = useCallback(
+    (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      if (info.offset.y > JOURNAL_SHEET_DISMISS_THRESHOLD || info.velocity.y > 300) {
+        onDismiss()
+      }
+    },
+    [onDismiss],
+  )
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        style={{ opacity: backdropOpacity }}
+        className="lg:hidden fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px]"
+        onClick={onDismiss}
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 30, stiffness: 350 }}
+        style={{ y: sheetY }}
+        drag="y"
+        dragControls={dragControls}
+        dragListener={false}
+        dragConstraints={{ top: 0 }}
+        dragElastic={{ top: 0.05, bottom: 0.8 }}
+        onDragEnd={handleDragEnd}
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-[71] bg-[#0a0a0a] border-t border-white/10 rounded-t-[20px] max-h-[75vh] flex flex-col shadow-[0_-4px_40px_rgba(0,0,0,0.5)]"
+        data-lenis-prevent
+      >
+        <div
+          className="shrink-0 flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
+          style={{ touchAction: "none" }}
+          onPointerDown={(e) => dragControls.start(e)}
+        >
+          <div className="w-14 h-1.5 rounded-full bg-white/30 active:bg-white/50 transition-colors" />
+        </div>
+        <div
+          className="shrink-0 px-5 pb-3 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
+          style={{ touchAction: "none" }}
+          onPointerDown={(e) => dragControls.start(e)}
+        >
+          <p className="font-mono text-[11px] tracking-[0.2em] text-white/70 uppercase">
+            Journal
+          </p>
+          <div onPointerDown={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/8 active:bg-white/15 transition-colors"
+              aria-label="Close journal"
+            >
+              <X className="size-3.5 text-white/60" />
+            </button>
+          </div>
+        </div>
+        <div className="mx-5 h-px bg-white/8" />
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          {children}
+        </div>
+        <div className="shrink-0 flex items-center justify-center gap-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
+          <ChevronDown className="size-3 text-white/25" />
+          <span className="font-mono text-[9px] tracking-widest text-white/25 uppercase">
+            Drag down to close
+          </span>
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
+function MobileJournalPill({ onTap }: { onTap: () => void }) {
+  return (
+    <motion.button
+      initial={{ y: 20, opacity: 0, scale: 0.9 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 20, opacity: 0, scale: 0.9 }}
+      transition={{ type: "spring", damping: 20, stiffness: 300 }}
+      type="button"
+      onClick={onTap}
+      className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[65] flex items-center gap-2 bg-[#1a1a1a] border border-white/15 rounded-full pl-3.5 pr-4 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
+    >
+      <PenLine className="w-4 h-4 text-white/80" />
+      <span className="font-mono text-[11px] tracking-wider text-white/90 uppercase whitespace-nowrap">
+        Journal
+      </span>
+    </motion.button>
+  )
+}
+
 type PassageData = {
   reference: string
   verses: { number: number; text: string }[]
@@ -41,14 +221,6 @@ type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
 type Step = "testament" | "book" | "chapter" | "verses" | "reading"
-
-function getReflectionPrompt(passageRef: string): string {
-  const slug = passageRef.toLowerCase().replace(/\s/g, "").replace(/:/g, "")
-  let hash = 0
-  for (let i = 0; i < slug.length; i++) hash = (hash << 5) - hash + slug.charCodeAt(i)
-  const i = Math.abs(hash) % REFLECTION_PROMPTS.length
-  return REFLECTION_PROMPTS[i] ?? REFLECTION_PROMPTS[0]
-}
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -67,6 +239,7 @@ export function DevotionsClient() {
   const [prayer, setPrayer] = useState("")
   const [reflection, setReflection] = useState("")
   const [moreOpen, setMoreOpen] = useState(false)
+  const [journalSheetOpen, setJournalSheetOpen] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [oldTestament, setOldTestament] = useState<BibleBook[]>([])
@@ -124,6 +297,10 @@ export function DevotionsClient() {
     setPrayer(entry.prayer)
     setReflection(entry.reflection)
   }, [passageRef])
+
+  useEffect(() => {
+    if (step !== "reading") setJournalSheetOpen(false)
+  }, [step])
 
   const scheduleSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -306,16 +483,27 @@ export function DevotionsClient() {
           {step === "verses" && (selectedBook ? `${selectedBook.name} ${selectedChapter}` : "Read")}
           {step === "reading" && (passage?.reference ?? "Devotions")}
         </span>
-        <div className="min-w-[80px] flex justify-end">
+        <div className="min-w-[80px] flex justify-end gap-1">
           {step === "reading" ? (
-            <button
-              type="button"
-              onClick={() => setMoreOpen(true)}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-white/40 hover:text-white/70 rounded"
-              aria-label="Menu"
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setJournalSheetOpen(true)}
+                className="lg:hidden min-h-[44px] px-3 flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/50 hover:text-white/80 rounded"
+                aria-label="Open journal"
+              >
+                <PenLine className="w-4 h-4" />
+                Journal
+              </button>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(true)}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-white/40 hover:text-white/70 rounded"
+                aria-label="Menu"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            </>
           ) : (
             <span />
           )}
@@ -496,7 +684,7 @@ export function DevotionsClient() {
             </motion.div>
           )}
 
-          {/* Step 5: Reading */}
+          {/* Step 5: Reading — passage + sidebar (desktop) or passage + bottom sheet (mobile) */}
           {step === "reading" && passage && (
             <motion.div
               key="reading"
@@ -506,99 +694,107 @@ export function DevotionsClient() {
               exit="exit"
               variants={slide}
               transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="w-full min-h-full px-4 py-6 pb-24 sm:px-6 md:px-12 box-border"
+              className="w-full min-h-full flex flex-col lg:flex-row lg:overflow-hidden"
             >
-              <div className="w-full max-w-2xl mx-auto">
-              <motion.div
-                className="mb-8"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  visible: {
-                    transition: {
-                      staggerChildren: stagger,
-                      delayChildren: reduced ? 0 : 0.12,
-                    },
-                  },
-                }}
-              >
-                {passage.verses.map((v, i) => (
-                  <motion.p
-                    key={v.number}
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 pb-24 sm:px-6 md:px-12 lg:pb-6 box-border">
+                <div className="w-full max-w-2xl mx-auto lg:max-w-none">
+                  <motion.div
+                    className="mb-8"
+                    initial="hidden"
+                    animate="visible"
                     variants={{
-                      hidden: { opacity: 0, y: 12 },
                       visible: {
-                        opacity: 1,
-                        y: 0,
                         transition: {
-                          duration: reduced ? 0.15 : 0.4,
-                          ease: [0.25, 0.46, 0.45, 0.94],
+                          staggerChildren: stagger,
+                          delayChildren: reduced ? 0 : 0.12,
                         },
                       },
                     }}
-                    className={`font-sans text-foreground/92 leading-[1.85] mb-5 text-[1.05rem] sm:text-[1.12rem] font-light ${
-                      i === 0
-                        ? "first-letter:text-2xl first-letter:sm:text-3xl first-letter:font-normal first-letter:mr-0.5 first-letter:float-left"
-                        : ""
-                    }`}
                   >
-                    <span className="font-mono text-white/45 text-sm align-top mr-2 tabular-nums">
-                      {v.number}.
-                    </span>
-                    {v.text}
-                  </motion.p>
-                ))}
-              </motion.div>
+                    {passage.verses.map((v, i) => (
+                      <motion.p
+                        key={v.number}
+                        variants={{
+                          hidden: { opacity: 0, y: 12 },
+                          visible: {
+                            opacity: 1,
+                            y: 0,
+                            transition: {
+                              duration: reduced ? 0.15 : 0.4,
+                              ease: [0.25, 0.46, 0.45, 0.94],
+                            },
+                          },
+                        }}
+                        className={`font-sans text-foreground/92 leading-[1.85] mb-5 text-[1.05rem] sm:text-[1.12rem] font-light ${
+                          i === 0
+                            ? "first-letter:text-2xl first-letter:sm:text-3xl first-letter:font-normal first-letter:mr-0.5 first-letter:float-left"
+                            : ""
+                        }`}
+                      >
+                        <span className="font-mono text-white/45 text-sm align-top mr-2 tabular-nums">
+                          {v.number}.
+                        </span>
+                        {v.text}
+                      </motion.p>
+                    ))}
+                  </motion.div>
+                </div>
+              </div>
 
-              <section className="space-y-6">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-                  <p className="font-mono text-[10px] tracking-wider text-white/45 mb-3">
+              {/* Desktop: right sidebar for journal (same pattern as scripture reader) */}
+              <aside
+                className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] border-l border-white/10 bg-[#050505] z-10"
+                aria-label="Journal"
+              >
+                <div className="shrink-0 px-6 pt-6 pb-2">
+                  <p className="font-mono text-[10px] tracking-[0.2em] text-white/45 uppercase">
                     After reading
                   </p>
-                  <div className="space-y-5">
-                    <div>
-                      <label
-                        htmlFor="devotions-prayer"
-                        className="block font-sans text-sm font-light text-white/80 mb-1.5"
-                      >
-                        A prayer in your own words
-                      </label>
-                      <textarea
-                        id="devotions-prayer"
-                        value={prayer}
-                        onChange={handlePrayerChange}
-                        onBlur={scheduleSave}
-                        placeholder="Whatever you want to say—or leave blank"
-                        rows={3}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="devotions-reflection"
-                        className="block font-sans text-sm font-light text-white/80 mb-1.5"
-                      >
-                        {getReflectionPrompt(passageRef)}
-                      </label>
-                      <textarea
-                        id="devotions-reflection"
-                        value={reflection}
-                        onChange={handleReflectionChange}
-                        onBlur={scheduleSave}
-                        placeholder="Just a line or two—or nothing"
-                        rows={3}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
-                      />
-                    </div>
-                  </div>
                 </div>
-              </section>
-              </div>
+                <div
+                  className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  <JournalPanel
+                    passageRef={passageRef}
+                    prayer={prayer}
+                    reflection={reflection}
+                    onPrayerChange={handlePrayerChange}
+                    onReflectionChange={handleReflectionChange}
+                    onBlur={scheduleSave}
+                  />
+                </div>
+              </aside>
             </motion.div>
           )}
         </AnimatePresence>
         </div>
       </div>
+
+      {/* Mobile: bottom sheet for journal */}
+      <AnimatePresence>
+        {step === "reading" && journalSheetOpen && (
+          <MobileJournalSheet onDismiss={() => setJournalSheetOpen(false)}>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-1">
+              <JournalPanel
+                passageRef={passageRef}
+                prayer={prayer}
+                reflection={reflection}
+                onPrayerChange={handlePrayerChange}
+                onReflectionChange={handleReflectionChange}
+                onBlur={scheduleSave}
+              />
+            </div>
+          </MobileJournalSheet>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile: floating pill to open journal when sheet is closed */}
+      <AnimatePresence>
+        {step === "reading" && !journalSheetOpen && (
+          <MobileJournalPill onTap={() => setJournalSheetOpen(true)} />
+        )}
+      </AnimatePresence>
 
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent className="border-white/10 bg-[#0a0a0a] text-white max-w-sm">
