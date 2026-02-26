@@ -1187,6 +1187,18 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-mono text-sm uppercase tracking-widest">Sermon Summary</h2>
               <div className="flex items-center gap-2">
+                {isAdmin && unifiedSummary && unifiedSummary.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs font-mono uppercase tracking-widest"
+                    onClick={() => sermon.id && structureSermon(sermon.id)}
+                    disabled={generatingSections}
+                  >
+                    <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
+                    Regenerate structure
+                  </Button>
+                )}
                 {isAdmin && (
                   <div className="relative" ref={optionsMenuRef}>
                     <Button
@@ -1210,7 +1222,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                           disabled={generatingSections}
                         >
                           <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
-                          Structure sermon
+                          {unifiedSummary?.length ? "Regenerate structure" : "Structure sermon"}
                         </Button>
                         <Button
                           variant="ghost"
