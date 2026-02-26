@@ -14,6 +14,9 @@ fxarchives is a Next.js 16 (App Router) sermon transcript archive app. See `READ
 
 The app connects to a cloud-hosted Supabase instance (credentials hardcoded as fallbacks in `lib/supabase.ts`). No local database setup needed for basic dev work.
 
+### Git
+- **Always commit and push** after making code changes in this repo. Do not leave edits uncommitted or unpushed.
+
 ### Key commands
 - **Dev server**: `npm run dev`
 - **Lint**: `npm run lint` (ESLint v8 with `next/core-web-vitals` via `.eslintrc.json`)
