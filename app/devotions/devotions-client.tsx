@@ -526,29 +526,29 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-lg mx-auto">
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-8 sm:mb-10">
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-8 sm:mb-10">
                     Old Testament or New Testament?
                   </p>
-                  <div className="flex flex-col gap-4">
-                  <button
-                    type="button"
-                    onClick={() => handleTestamentPick("old")}
-                    disabled={booksLoading}
-                    className="w-full min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
-                  >
-                    Old Testament
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleTestamentPick("new")}
-                    disabled={booksLoading}
-                    className="w-full min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
-                  >
-                    New Testament
-                  </button>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+                    <button
+                      type="button"
+                      onClick={() => handleTestamentPick("old")}
+                      disabled={booksLoading}
+                      className="w-full lg:flex-1 min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
+                    >
+                      Old Testament
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTestamentPick("new")}
+                      disabled={booksLoading}
+                      className="w-full lg:flex-1 min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
+                    >
+                      New Testament
+                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -564,16 +564,16 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-lg mx-auto">
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-6 sm:mb-8">
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-6 sm:mb-8">
                     What book?
                   </p>
                   {booksLoading ? (
                     <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
                   ) : (
-                    <ul className="space-y-0">
+                    <ul className="space-y-0 md:max-h-[60vh] md:overflow-y-auto md:pr-1">
                       {books.map((b) => (
                         <li key={b.id}>
                           <button
@@ -602,10 +602,10 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-2xl mx-auto">
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+                <div className="w-full max-w-2xl md:max-w-3xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
                     Which chapter?
                   </p>
                   <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
@@ -614,7 +614,7 @@ export function DevotionsClient() {
                   {chaptersLoading ? (
                     <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
                   ) : (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
                       {chapters.map((ch) => (
                         <button
                           key={ch.id}
@@ -641,45 +641,45 @@ export function DevotionsClient() {
               exit="exit"
               variants={slide}
               transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
+              className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
             >
-              <div className="w-full max-w-lg mx-auto">
-                <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+              <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
                   Read
                 </p>
                 <p className="font-mono text-[10px] tracking-wider text-white/50 mb-8">
                   {selectedBook.name} {selectedChapter}
                 </p>
                 <div className="space-y-4">
-                <button
-                  type="button"
-                  onClick={loadFullChapter}
-                  disabled={loading}
-                  className="w-full min-h-[56px] rounded-xl font-mono text-sm tracking-[0.15em] uppercase text-white/95 bg-white/10 border border-white/20 hover:bg-white/15 transition-colors disabled:opacity-50"
-                >
-                  {loading ? "Loading…" : "Full chapter"}
-                </button>
-                <p className="font-mono text-[10px] tracking-wider text-white/45 text-center">
-                  or specific verses
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={verseRange}
-                    onChange={(e) => setVerseRange(e.target.value)}
-                    placeholder="e.g. 1–5 or 3"
-                    className="flex-1 bg-white/5 border border-white/15 rounded-lg px-4 py-3 font-sans text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-white/30"
-                  />
                   <button
                     type="button"
-                    onClick={() => loadPassage()}
+                    onClick={loadFullChapter}
                     disabled={loading}
-                    className="min-h-[48px] px-6 rounded-lg font-mono text-xs tracking-wider text-white/90 border border-white/25 hover:bg-white/10 transition-colors disabled:opacity-50"
+                    className="w-full min-h-[56px] rounded-xl font-mono text-sm tracking-[0.15em] uppercase text-white/95 bg-white/10 border border-white/20 hover:bg-white/15 transition-colors disabled:opacity-50"
                   >
-                    Read
+                    {loading ? "Loading…" : "Full chapter"}
                   </button>
+                  <p className="font-mono text-[10px] tracking-wider text-white/45 text-center">
+                    or specific verses
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={verseRange}
+                      onChange={(e) => setVerseRange(e.target.value)}
+                      placeholder="e.g. 1–5 or 3"
+                      className="flex-1 bg-white/5 border border-white/15 rounded-lg px-4 py-3 font-sans text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-white/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => loadPassage()}
+                      disabled={loading}
+                      className="min-h-[48px] px-6 rounded-lg font-mono text-xs tracking-wider text-white/90 border border-white/25 hover:bg-white/10 transition-colors disabled:opacity-50"
+                    >
+                      Read
+                    </button>
+                  </div>
                 </div>
-              </div>
               </div>
             </motion.div>
           )}

@@ -194,22 +194,22 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-lg mx-auto">
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <div className="mb-6 flex items-center justify-between gap-4 [&_.text-muted-foreground]:text-white/60 [&_button]:text-white/70 [&_button:hover]:text-white/90">
                     <span className="font-mono text-[10px] tracking-wider text-white/50 uppercase">Translation</span>
                     <TranslationSettings translations={translations} currentKey={translationKey} />
                   </div>
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-8 sm:mb-10">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-8 sm:mb-10">
                     Old Testament or New Testament?
                   </p>
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
                     <button
                       type="button"
                       onClick={() => handleTestamentPick("old")}
                       disabled={booksLoading}
-                      className="w-full min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
+                      className="w-full lg:flex-1 min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
                     >
                       Old Testament
                     </button>
@@ -217,7 +217,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                       type="button"
                       onClick={() => handleTestamentPick("new")}
                       disabled={booksLoading}
-                      className="w-full min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
+                      className="w-full lg:flex-1 min-h-[64px] rounded-xl font-sans text-lg text-white/90 border border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors text-left px-6 disabled:opacity-50"
                     >
                       New Testament
                     </button>
@@ -235,16 +235,16 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-lg mx-auto">
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-6 sm:mb-8">
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-6 sm:mb-8">
                     What book?
                   </p>
                   {booksLoading ? (
                     <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
                   ) : (
-                    <ul className="space-y-0">
+                    <ul className="space-y-0 md:max-h-[60vh] md:overflow-y-auto md:pr-1">
                       {books.map((b) => (
                         <li key={b.id}>
                           <button
@@ -272,10 +272,10 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-2xl mx-auto">
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+                <div className="w-full max-w-2xl md:max-w-3xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
                     Which chapter?
                   </p>
                   <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
@@ -284,7 +284,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                   {chaptersLoading ? (
                     <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
                   ) : (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
                       {chapters.map((ch) => (
                         <button
                           key={ch.id}
@@ -310,10 +310,10 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border flex flex-col md:justify-center"
               >
-                <div className="w-full max-w-lg mx-auto">
-                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
                     Open in reader
                   </p>
                   <p className="font-mono text-[10px] tracking-wider text-white/50 mb-8">
