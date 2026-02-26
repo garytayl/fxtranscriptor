@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { HeroSection } from "@/components/hero-section";
 import { SermonSeriesSection } from "@/components/sermon-series-section";
 import dynamic from "next/dynamic";
 import { SermonCard } from "@/components/sermon-card";
@@ -791,8 +790,15 @@ export default function SermonsPage() {
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
       
       <div className="relative z-10">
-        <HeroSection />
-        
+        <header className="relative pt-[var(--navbar-offset)] pb-8 sm:pb-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
+          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl tracking-tight">
+            Sermons
+          </h1>
+          <p className="mt-2 font-mono text-sm text-muted-foreground">
+            Transcript archive · Browse by series or search
+          </p>
+        </header>
+
         {/* Series Detail View or Series List */}
         {selectedSeries ? (
           <SeriesDetailView
