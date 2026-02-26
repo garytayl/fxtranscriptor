@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, Clock, CheckCircle2, AlertCircle, Play } from "lucide-react";
+import { X, Loader2, Clock, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,7 @@ export function TranscriptionQueue() {
   const [queue, setQueue] = useState<QueueData | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<Set<string>>(new Set());
+  const [resetting, setResetting] = useState(false);
 
   const loadQueue = useCallback(async () => {
     try {
@@ -128,6 +129,39 @@ export function TranscriptionQueue() {
     [cancelling, loadQueue]
   );
 
+  const handleReset = useCallback(async () => {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      const response = await fetch("/api/queue/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Queue reset", {
+          description: "Cleared old entries and renumbered queue.",
+          duration: 3000,
+        });
+        await loadQueue();
+      } else {
+        toast.error("Reset failed", {
+          description: data.error || "Could not reset queue",
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      console.error("Error resetting queue:", error);
+      toast.error("Reset failed", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 4000,
+      });
+    } finally {
+      setResetting(false);
+    }
+  }, [resetting, loadQueue]);
+
   const getStatusBadge = (item: QueueItem) => {
     switch (item.status) {
       case "processing":
@@ -182,7 +216,13 @@ export function TranscriptionQueue() {
     );
   }
 
-  if (!queue || (queue.processing === null && queue.queued.length === 0)) {
+  const displayPosition = (item: QueueItem, queuedIndex?: number) => {
+    if (item.status === "processing") return 1;
+    if (item.status === "queued" && queuedIndex !== undefined) return (queue?.processing ? 2 : 1) + queuedIndex;
+    return item.position;
+  };
+
+  if (!queue) {
     return (
       <Card className="p-4">
         <div className="flex items-center justify-between">
@@ -200,7 +240,7 @@ export function TranscriptionQueue() {
   return (
     <Card className="p-4">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h3 className="font-mono text-sm font-semibold uppercase tracking-widest mb-1">
               Transcription Queue
@@ -209,6 +249,16 @@ export function TranscriptionQueue() {
               {queue.processing ? "1 processing" : "0 processing"} • {queue.queued.length} queued
             </p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            disabled={resetting}
+            className="gap-1 font-mono text-xs uppercase tracking-widest"
+          >
+            {resetting ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
+            Reset queue
+          </Button>
         </div>
 
         {/* Currently Processing */}
@@ -219,7 +269,7 @@ export function TranscriptionQueue() {
                 <div className="flex items-center gap-2 mb-1">
                   {getStatusBadge(queue.processing)}
                   <span className="text-xs font-mono text-muted-foreground">
-                    Position: {queue.processing.position}
+                    Position: {displayPosition(queue.processing)}
                   </span>
                 </div>
                 <p className="text-sm font-medium truncate">
@@ -261,7 +311,7 @@ export function TranscriptionQueue() {
             <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest">
               Queued ({queue.queued.length})
             </div>
-            {queue.queued.map((item) => (
+            {queue.queued.map((item, idx) => (
               <div
                 key={item.id}
                 className="border rounded-lg p-3 bg-card/50 space-y-2"
@@ -271,7 +321,7 @@ export function TranscriptionQueue() {
                     <div className="flex items-center gap-2 mb-1">
                       {getStatusBadge(item)}
                       <span className="text-xs font-mono text-muted-foreground">
-                        Position: {item.position}
+                        Position: {displayPosition(item, idx)}
                       </span>
                     </div>
                     <p className="text-sm font-medium truncate">

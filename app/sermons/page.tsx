@@ -31,6 +31,12 @@ const SeriesDetailView = dynamic(() => import("@/components/series-detail-view")
 const AudioUrlDialog = dynamic(() => import("@/components/audio-url-dialog").then(mod => ({ default: mod.AudioUrlDialog })), {
   ssr: false,
 });
+
+const TranscriptionQueue = dynamic(() => import("@/components/transcription-queue").then(mod => ({ default: mod.TranscriptionQueue })), {
+  ssr: false,
+  loading: () => <div className="rounded-lg border p-4 font-mono text-sm text-muted-foreground">Loading queue…</div>,
+});
+
 import { groupSermonsBySeries, SermonSeries } from "@/lib/extractSeries";
 import { exportToCSV, exportToJSON, downloadFile } from "@/lib/export";
 import { analytics, errorTracker } from "@/lib/analytics";
@@ -889,6 +895,13 @@ export default function SermonsPage() {
                 )}
               </div>
             </div>
+
+            {/* Transcription queue (admin): see what's in the queue and reset if buggy */}
+            {isAdmin && (
+              <div className="px-4 sm:px-6 md:px-12 pb-6">
+                <TranscriptionQueue />
+              </div>
+            )}
 
             {/* Loading State */}
             {loading ? (
