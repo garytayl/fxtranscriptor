@@ -1,6 +1,6 @@
 # YouTube Playlist Series Organization
 
-FX Archive automatically organizes sermons into series based on YouTube playlists. This provides much more accurate series organization than title-based extraction.
+fxarchives automatically organizes sermons into series based on YouTube playlists. This provides much more accurate series organization than title-based extraction.
 
 ## How It Works
 

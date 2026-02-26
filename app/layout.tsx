@@ -27,23 +27,23 @@ const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--f
 
 export const metadata: Metadata = {
   title: {
-    default: "FX Archive — Sermon Transcript Archive",
-    template: "%s | FX Archive",
+    default: "fxarchives — Sermon Transcript Archive",
+    template: "%s | fxarchives",
   },
-  description: "Sermon transcript archive for FX Church (Foot of the Cross). Automatically syncs from Podbean and YouTube with one-click transcript generation.",
-  keywords: ["sermons", "transcripts", "FX Church", "Foot of the Cross", "podcast", "audio", "transcription"],
-  authors: [{ name: "FX Church" }],
+  description: "Sermon transcript archive for fxchurch. Automatically syncs from Podbean and YouTube with one-click transcript generation.",
+  keywords: ["sermons", "transcripts", "fxchurch", "podcast", "audio", "transcription"],
+  authors: [{ name: "fxchurch" }],
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "FX Archive",
-    title: "FX Archive — Sermon Transcript Archive",
-    description: "Sermon transcript archive for FX Church. Automatically syncs from Podbean and YouTube with one-click transcript generation.",
+    siteName: "fxarchives",
+    title: "fxarchives — Sermon Transcript Archive",
+    description: "Sermon transcript archive for fxchurch. Automatically syncs from Podbean and YouTube with one-click transcript generation.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "FX Archive — Sermon Transcript Archive",
-    description: "Sermon transcript archive for FX Church. Automatically syncs from Podbean and YouTube with one-click transcript generation.",
+    title: "fxarchives — Sermon Transcript Archive",
+    description: "Sermon transcript archive for fxchurch. Automatically syncs from Podbean and YouTube with one-click transcript generation.",
   },
   robots: {
     index: true,

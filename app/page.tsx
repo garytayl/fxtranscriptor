@@ -257,7 +257,7 @@ export default function Home() {
 
   const loadPlaylistSeries = useCallback(async () => {
     try {
-      // Playlists from FX Church's sermon series
+      // Playlists from fxchurch sermon series
       // These playlists organize sermons into series automatically
       const defaultPlaylists = [
         "https://youtube.com/playlist?list=PLQwpPWOYg4MOLr9lUNMBgjCCV0ifkKMDu", // John: πιστεύω - Fall 2025 (21 videos)

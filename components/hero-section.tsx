@@ -47,14 +47,14 @@ export function HeroSection() {
       {/* Left vertical label — hidden on small mobile to avoid overlapping content */}
       <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 hidden sm:block">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground -rotate-90 origin-left block whitespace-nowrap">
-          FX ARCHIVE
+          fxarchives
         </span>
       </div>
 
       {/* Main content */}
       <div ref={contentRef} className="flex-1 w-full">
         <div className="relative">
-          <SplitFlapText text="FX ARCHIVE" speed={80} />
+          <SplitFlapText text="fxarchives" speed={80} />
         </div>
 
         <h2 className="font-display text-muted-foreground/60 text-[clamp(1rem,3vw,2rem)] mt-4 tracking-wide">
@@ -62,7 +62,7 @@ export function HeroSection() {
         </h2>
 
         <p className="mt-12 max-w-md font-mono text-sm text-muted-foreground leading-relaxed">
-          Sermon transcript archive for FX Church (Foot of the Cross). Automatically syncs from Podbean and YouTube with one-click transcript generation.
+          Sermon transcript archive for fxchurch. Automatically syncs from Podbean and YouTube with one-click transcript generation.
         </p>
 
         <div className="mt-10 sm:mt-16 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8">

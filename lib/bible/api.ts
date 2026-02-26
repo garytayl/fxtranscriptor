@@ -235,13 +235,44 @@ const BOOK_SLUG_ALIASES: Record<string, string> = {
   psalm: "psalms",
 }
 
+function levenshtein(a: string, b: string): number {
+  const an = a.length
+  const bn = b.length
+  const dp = Array.from({ length: an + 1 }, () => Array(bn + 1).fill(0))
+  for (let i = 0; i <= an; i++) dp[i][0] = i
+  for (let j = 0; j <= bn; j++) dp[0][j] = j
+  for (let i = 1; i <= an; i++) {
+    for (let j = 1; j <= bn; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+    }
+  }
+  return dp[an][bn]
+}
+
 export async function getBookBySlug(slug: string, bibleId?: string): Promise<BibleBook | null> {
   const books = await getBooksWithSlugs(bibleId)
-  const found = books.find((book) => book.slug === slug) ?? null
+  const normalizedSlug = slug.toLowerCase().trim()
+  const found = books.find((book) => book.slug === normalizedSlug) ?? null
   if (found) return found
-  const canonical = BOOK_SLUG_ALIASES[slug]
+  const canonical = BOOK_SLUG_ALIASES[normalizedSlug]
   if (canonical) return books.find((book) => book.slug === canonical) ?? null
-  return null
+
+  // Fuzzy: slug is prefix of exactly one book slug (e.g. "gen" -> "genesis"); avoid "jo" matching first of Job/John/Joshua
+  const prefixMatches = books.filter((book) => book.slug.startsWith(normalizedSlug))
+  if (prefixMatches.length === 1) return prefixMatches[0]
+
+  // Fuzzy: typo – smallest Levenshtein distance, max 2 edits
+  let best: BibleBook | null = null
+  let bestDist = 3
+  for (const book of books) {
+    const d = levenshtein(normalizedSlug, book.slug)
+    if (d < bestDist && (normalizedSlug.length <= 5 || d <= 2)) {
+      bestDist = d
+      best = book
+    }
+  }
+  return best
 }
 
 export async function getBooksByTestament(): Promise<{

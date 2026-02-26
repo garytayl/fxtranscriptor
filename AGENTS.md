@@ -3,7 +3,7 @@
 ## Cursor Cloud specific instructions
 
 ### Project overview
-FX Archive is a Next.js 16 (App Router) sermon transcript archive app. See `README.md` for full feature list and architecture.
+fxarchives is a Next.js 16 (App Router) sermon transcript archive app. See `README.md` for full feature list and architecture.
 
 ### Services
 

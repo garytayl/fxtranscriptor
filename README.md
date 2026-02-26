@@ -1,6 +1,6 @@
-# FX Archive
+# fxarchives
 
-A modern sermon transcript archive for FX Church (Foot of the Cross). Automatically syncs sermons from Podbean and YouTube, with one-click transcript generation that's shared across all users.
+A modern sermon transcript archive for fxchurch. Automatically syncs sermons from Podbean and YouTube, with one-click transcript generation that's shared across all users.
 
 ## ✨ Features
 

@@ -6,7 +6,7 @@ export const revalidate = 3600
 
 export const metadata = {
   title: "Bible Studies",
-  description: "FX Church Bible studies and small group guides. Study guides hosted on Notion.",
+  description: "fxchurch Bible studies and small group guides. Study guides hosted on Notion.",
 }
 
 export default async function StudiesPage() {
@@ -29,7 +29,7 @@ export default async function StudiesPage() {
             Study Guides
           </h1>
           <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-xl">
-            Small group and personal study guides from FX Church. Hosted on Notion — open any link to read or print.
+            Small group and personal study guides from fxchurch. Hosted on Notion — open any link to read or print.
           </p>
         </header>
 

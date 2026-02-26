@@ -37,7 +37,7 @@ export function Navbar() {
       >
         <nav className="flex items-center justify-between min-h-[3.25rem] px-4 py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6 sm:py-4 md:px-12 md:py-5">
           <Link href="/" className="group flex items-center gap-2" aria-label="Home">
-            <span className="font-mono text-xs tracking-widest text-muted-foreground">FX ARCHIVE</span>
+            <span className="font-mono text-xs tracking-widest text-muted-foreground">fxarchives</span>
             <span className="w-1.5 h-1.5 rounded-full bg-accent group-hover:scale-150 transition-transform duration-300" />
           </Link>
 

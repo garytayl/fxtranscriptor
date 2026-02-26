@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       
       if (sermon) {
         return {
-          title: `${sermon.title} | FX Archive`,
+          title: `${sermon.title} | fxarchives`,
           description: sermon.description || `Sermon transcript for ${sermon.title}`,
           openGraph: {
             title: sermon.title,
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
   
   return {
-    title: 'Sermon | FX Archive',
+    title: 'Sermon | fxarchives',
     description: 'Sermon transcript archive',
   }
 }

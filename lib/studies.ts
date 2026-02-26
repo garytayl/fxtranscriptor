@@ -1,5 +1,5 @@
 /**
- * Bible studies (Notion-hosted) for FX Archive.
+ * Bible studies (Notion-hosted) for fxarchives.
  *
  * HOW TO ADD A STUDY
  * ------------------
