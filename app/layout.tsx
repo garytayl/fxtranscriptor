@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Plus_Jakarta_Sans, JetBrains_Mono, Syne, Bebas_Neue } from "next/font/google"
 import { SmoothScroll } from "@/components/smooth-scroll"
 import { Toaster } from "@/components/ui/toast"
@@ -49,6 +49,14 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+}
+
+/** Allow native browser zoom (pinch, Ctrl/Cmd+scroll) for accessibility. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 10,
+  userScalable: true,
 }
 
 export default function RootLayout({
