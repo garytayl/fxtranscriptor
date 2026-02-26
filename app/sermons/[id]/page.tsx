@@ -1181,98 +1181,92 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
         )}
 
-        {/* Sermon sections: titles from AI, content from transcript */}
-        {(sermon.transcript || sermon.progress_json?.completedChunks) && (
-          <div className="border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-mono text-sm uppercase tracking-widest">Sermon Summary</h2>
-              <div className="flex items-center gap-2">
-                {isAdmin && unifiedSummary && unifiedSummary.length > 0 && (
+        {/* Sermon sections: titles from AI, content from transcript — three dots: Regenerate structure / Clear sections */}
+        <div className="border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-mono text-sm uppercase tracking-widest">Sermon Summary</h2>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <div className="relative" ref={optionsMenuRef}>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     className="text-xs font-mono uppercase tracking-widest"
-                    onClick={() => sermon.id && structureSermon(sermon.id)}
-                    disabled={generatingSections}
+                    onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}
                   >
-                    <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
-                    Regenerate structure
+                    <MoreVertical className="size-4" />
                   </Button>
-                )}
-                {isAdmin && (
-                  <div className="relative" ref={optionsMenuRef}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs font-mono uppercase tracking-widest"
-                      onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}
-                    >
-                      <MoreVertical className="size-4" />
-                    </Button>
-                    {optionsMenuOpen && (
-                      <div className="absolute right-0 top-full mt-2 z-10 bg-card border border-border/30 rounded-lg shadow-lg p-2 min-w-[200px]">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-xs font-mono uppercase tracking-widest"
-                          onClick={() => {
-                            setOptionsMenuOpen(false);
-                            sermon.id && structureSermon(sermon.id);
-                          }}
-                          disabled={generatingSections}
-                        >
-                          <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
-                          {unifiedSummary?.length ? "Regenerate structure" : "Structure sermon"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-xs font-mono uppercase tracking-widest"
-                          onClick={async () => {
-                            setOptionsMenuOpen(false);
-                            if (sermon.id) await clearSections(sermon.id);
-                          }}
-                        >
-                          <Trash2 className="size-3 mr-2" />
-                          Clear sections
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                  {optionsMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 z-10 bg-card border border-border/30 rounded-lg shadow-lg p-2 min-w-[200px]">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-xs font-mono uppercase tracking-widest"
+                        onClick={() => {
+                          setOptionsMenuOpen(false);
+                          sermon.id && structureSermon(sermon.id);
+                        }}
+                        disabled={generatingSections || !(sermon.transcript || sermon.progress_json?.completedChunks)}
+                        title={!(sermon.transcript || sermon.progress_json?.completedChunks) ? "Transcript or completed chunks required" : undefined}
+                      >
+                        <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
+                        {unifiedSummary && unifiedSummary.length > 0 ? "Regenerate structure" : "Structure sermon"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-xs font-mono uppercase tracking-widest"
+                        onClick={async () => {
+                          setOptionsMenuOpen(false);
+                          if (sermon.id) await clearSections(sermon.id);
+                        }}
+                        disabled={!unifiedSummary || unifiedSummary.length === 0}
+                      >
+                        <Trash2 className="size-3 mr-2" />
+                        Clear sections
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-
-            {generatingSections ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="size-6 animate-spin text-accent" />
-                <span className="ml-3 font-mono text-sm text-muted-foreground">Structuring sermon...</span>
-              </div>
-            ) : unifiedSummary && unifiedSummary.length > 0 ? (
-              <SermonNarrativeView
-                sections={unifiedSummary}
-                loading={false}
-              />
-            ) : (
-              <div className="text-center py-12">
-                <p className="font-mono text-sm text-muted-foreground mb-4">
-                  No sections yet. Structure the sermon to get section titles and transcript excerpts.
-                </p>
-                {isAdmin && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="font-mono text-xs uppercase tracking-widest"
-                    onClick={() => sermon.id && structureSermon(sermon.id)}
-                  >
-                    <RefreshCw className="size-3 mr-2" />
-                    Structure sermon
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
-        )}
+
+          {!(sermon.transcript || sermon.progress_json?.completedChunks) ? (
+            <div className="text-center py-12">
+              <p className="font-mono text-sm text-muted-foreground">
+                No transcript yet. Generate a transcript first, then use the menu above to structure the sermon.
+              </p>
+            </div>
+          ) : generatingSections ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="size-6 animate-spin text-accent" />
+              <span className="ml-3 font-mono text-sm text-muted-foreground">Structuring sermon...</span>
+            </div>
+          ) : unifiedSummary && unifiedSummary.length > 0 ? (
+            <SermonNarrativeView
+              sections={unifiedSummary}
+              loading={false}
+            />
+          ) : (
+            <div className="text-center py-12">
+              <p className="font-mono text-sm text-muted-foreground mb-4">
+                No sections yet. Use the menu above to structure the sermon (section titles and transcript excerpts).
+              </p>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-mono text-xs uppercase tracking-widest"
+                  onClick={() => sermon.id && structureSermon(sermon.id)}
+                >
+                  <RefreshCw className="size-3 mr-2" />
+                  Structure sermon
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Audio URL Dialog */}
