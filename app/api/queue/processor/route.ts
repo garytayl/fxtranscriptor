@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
     try {
       // Fire and forget - worker will process asynchronously
       // Worker will call /api/queue/complete when done
+      // 60s timeout: worker may be cold-starting or busy; it returns 200 as soon as it accepts the job
       const workerResponse = await fetch(`${cleanWorkerUrl}/transcribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -142,8 +143,7 @@ export async function POST(request: NextRequest) {
           sermonId: sermon.id,
           audioUrl: audioSource,
         }),
-        // Short timeout just to verify connection
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(60000),
       });
 
       if (!workerResponse.ok) {
@@ -162,10 +162,12 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error(`[Queue Processor] Error calling worker:`, error);
 
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      let errorMessage = error instanceof Error ? error.message : "Unknown error";
+      if (errorMessage.includes("aborted") || errorMessage.includes("timeout")) {
+        errorMessage =
+          "Worker took too long to respond (timeout). The worker may be starting up. Try Retry Generate or Trigger processor now again.";
+      }
 
-      // Mark as failed
       await supabaseClient
         .from("transcription_queue")
         .update({
