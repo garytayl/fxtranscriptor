@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/lib/hooks/useKeyboardShortcuts";
@@ -128,16 +129,27 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
 
   // Close options menu when clicking outside
   const optionsMenuRef = useRef<HTMLDivElement>(null);
+  const optionsMenuButtonRef = useRef<HTMLDivElement>(null);
+  const optionsDropdownRef = useRef<HTMLDivElement>(null);
+  const [optionsMenuPosition, setOptionsMenuPosition] = useState({ top: 0, left: 0 });
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (optionsMenuRef.current && !optionsMenuRef.current.contains(event.target as Node)) {
-        setOptionsMenuOpen(false);
-      }
+      const target = event.target as Node;
+      if (optionsMenuButtonRef.current?.contains(target) || optionsDropdownRef.current?.contains(target)) return;
+      setOptionsMenuOpen(false);
     };
     if (optionsMenuOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
+  }, [optionsMenuOpen]);
+  useLayoutEffect(() => {
+    if (!optionsMenuOpen || !optionsMenuButtonRef.current) return;
+    const rect = optionsMenuButtonRef.current.getBoundingClientRect();
+    setOptionsMenuPosition({
+      top: rect.bottom + 8,
+      left: Math.max(8, Math.min(rect.right - 200, window.innerWidth - 220)),
+    });
   }, [optionsMenuOpen]);
 
   // Keyboard shortcuts
@@ -1188,16 +1200,25 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center gap-2">
               {isAdmin && (
                 <div className="relative" ref={optionsMenuRef}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs font-mono uppercase tracking-widest"
-                    onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}
-                  >
-                    <MoreVertical className="size-4" />
-                  </Button>
-                  {optionsMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-10 bg-card border border-border/30 rounded-lg shadow-lg p-2 min-w-[200px]">
+                  <div ref={optionsMenuButtonRef}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-mono uppercase tracking-widest"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOptionsMenuOpen((prev) => !prev);
+                      }}
+                    >
+                      <MoreVertical className="size-4" />
+                    </Button>
+                  </div>
+                  {optionsMenuOpen && typeof document !== "undefined" && createPortal(
+                    <div
+                      ref={optionsDropdownRef}
+                      className="fixed z-[9999] bg-card border border-border rounded-lg shadow-xl p-2 min-w-[200px]"
+                      style={{ top: optionsMenuPosition.top, left: optionsMenuPosition.left }}
+                    >
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1225,7 +1246,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                         <Trash2 className="size-3 mr-2" />
                         Clear sections
                       </Button>
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
               )}
