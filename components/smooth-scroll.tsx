@@ -9,23 +9,30 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 gsap.registerPlugin(ScrollTrigger)
 
+/** Prefer native scroll on touch-primary devices (phones/tablets) so mobile scrolling works. */
+function isTouchPrimaryDevice() {
+  return window.matchMedia("(pointer: coarse)").matches
+}
+
 export function SmoothScroll({ children }: { children: React.ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null)
 
   useEffect(() => {
+    // Skip Lenis on touch devices — Lenis handling touch can break native scroll on mobile
+    if (isTouchPrimaryDevice()) {
+      return
+    }
+
     const lenis = new Lenis({
-      // Use lerp instead of duration for smooth follow (reduces jumpy catch-up feel)
       lerp: 0.08,
       orientation: "vertical",
       smoothWheel: true,
       wheelMultiplier: 1,
-      syncTouch: true,
-      syncTouchLerp: 0.08,
+      syncTouch: false,
     })
 
     lenisRef.current = lenis
 
-    // Connect Lenis to GSAP ScrollTrigger — run Lenis first then update so ScrollTrigger uses same scroll position
     function raf(time: number) {
       lenis.raf(time)
       ScrollTrigger.update()
@@ -34,7 +41,6 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
 
     requestAnimationFrame(raf)
 
-    // Enable ScrollTrigger refresh on window resize
     const handleResize = () => {
       ScrollTrigger.refresh()
     }
