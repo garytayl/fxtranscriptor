@@ -14,16 +14,18 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 0.8, // Reduced from 1.2 for snappier scrolling
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      // Use lerp instead of duration for smooth follow (reduces jumpy catch-up feel)
+      lerp: 0.08,
       orientation: "vertical",
       smoothWheel: true,
-      wheelMultiplier: 1, // Reduce scroll sensitivity for smoother feel
+      wheelMultiplier: 1,
+      syncTouch: true,
+      syncTouchLerp: 0.08,
     })
 
     lenisRef.current = lenis
 
-    // Connect Lenis to GSAP ScrollTrigger with requestAnimationFrame
+    // Connect Lenis to GSAP ScrollTrigger — run Lenis first then update so ScrollTrigger uses same scroll position
     function raf(time: number) {
       lenis.raf(time)
       ScrollTrigger.update()
