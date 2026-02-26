@@ -206,6 +206,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setGeneratingSections(false);
     }
+  }, []);
 
   const generateNarrative = useCallback(async (id: string) => {
     setGeneratingSections(true);
@@ -236,7 +237,6 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setGeneratingSections(false);
     }
-  }, []);
   }, []);
 
   const clearSections = useCallback(async (id: string) => {
