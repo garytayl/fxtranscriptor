@@ -183,6 +183,7 @@ export function BiblePickerClient({ translations, currentKey }: BiblePickerClien
         <div
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-behavior-y-auto touch-pan-y w-full pb-[env(safe-area-inset-bottom)]"
           style={{ WebkitOverflowScrolling: "touch" }}
+          data-lenis-prevent
         >
           <AnimatePresence mode="wait" custom={dir}>
             {step === "testament" && (
