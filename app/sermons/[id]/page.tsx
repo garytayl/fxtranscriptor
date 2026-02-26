@@ -287,9 +287,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         const data = await response.json().catch(() => ({ error: "Failed to parse response" }));
 
         if (!response.ok && response.status !== 200) {
+          toast.dismiss(toastId);
           const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
-          
-          // Update sermon status to failed
           setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: errorMsg, progress_json: null } : null);
           setGenerating(false);
           setProgress(null);
@@ -297,15 +296,23 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         }
 
         if (data.success && data.sermon) {
-          // Update sermon in local state
+          toast.dismiss(toastId);
           setSermon(data.sermon);
-          setGenerating(false);
-          setProgress(null);
+          // Keep generating state and progress if still queued/processing (don’t “close out” the UI)
+          if (data.sermon.status === "generating") {
+            setGenerating(true);
+            setProgress(data.sermon.progress_json || { step: "queued", message: "Queued for transcription..." });
+            toast.success("Queued", {
+              description: data.message || "Transcription queued. Progress will update below.",
+              duration: 4000,
+            });
+          } else {
+            setGenerating(false);
+            setProgress(null);
+          }
         } else {
-          // Handle case where transcript generation failed
+          toast.dismiss(toastId);
           const errorMsg = data.error || "Unknown error";
-          
-          // Update sermon status to failed
           setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: errorMsg, progress_json: null } : null);
           setGenerating(false);
           setProgress(null);
@@ -313,6 +320,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       })
       .catch((error) => {
         console.error("Error generating transcript:", error);
+        toast.dismiss(toastId);
         setSermon((prev) => prev ? { ...prev, status: "failed" as const, error_message: error instanceof Error ? error.message : "Unknown error occurred", progress_json: null } : null);
         setGenerating(false);
         setProgress(null);
