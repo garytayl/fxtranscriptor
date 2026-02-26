@@ -591,7 +591,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         <div className="relative z-10 pt-[var(--navbar-offset)] py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
           <div className="text-center">
             <h1 className="font-display text-4xl mb-4">Sermon Not Found</h1>
-            <Button onClick={() => router.push("/")} variant="outline" className="font-mono text-xs uppercase tracking-widest">
+            <Button onClick={() => router.push("/sermons")} variant="outline" className="font-mono text-xs uppercase tracking-widest">
               <ArrowLeft className="size-4 mr-2" />
               Back to Catalog
             </Button>
@@ -608,7 +608,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       <div className="relative z-10 pt-[var(--navbar-offset)] py-6 sm:py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
         {/* Back Button */}
         <Button
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/sermons")}
           variant="ghost"
           size="sm"
           className="mb-6 sm:mb-8 font-mono text-xs uppercase tracking-widest gap-2 hover:text-accent touch-manipulation"

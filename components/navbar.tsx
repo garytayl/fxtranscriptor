@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 
 const routeLinks = [
   { label: "Home", href: "/" },
-  { label: "Sermons", href: "/#sermons" },
+  { label: "Sermons", href: "/sermons" },
   { label: "Studies", href: "/studies" },
   { label: "Scripture", href: "/bible" },
   { label: "Devotions", href: "/devotions" },
@@ -24,6 +24,7 @@ export function Navbar() {
     if (href.startsWith("/admin")) return pathname.startsWith("/admin")
     if (href.startsWith("/studies")) return pathname.startsWith("/studies")
     if (href.startsWith("/devotions")) return pathname.startsWith("/devotions")
+    if (href.startsWith("/sermons")) return pathname.startsWith("/sermons")
     return pathname === href
   }
 
@@ -44,27 +45,15 @@ export function Navbar() {
           <ul className="hidden md:flex items-center gap-6">
             {routeLinks.map((link) => (
               <li key={link.href}>
-                {link.href.startsWith("/#") ? (
-                  <a
-                    href={link.href}
-                    className={`group relative font-mono text-xs tracking-wider transition-colors duration-300 ${
-                      pathname === "/" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {link.label.toUpperCase()}
-                    <span className="absolute -bottom-1 left-0 w-0 h-px bg-foreground group-hover:w-full transition-all duration-300" />
-                  </a>
-                ) : (
-                  <Link
-                    href={link.href}
-                    className={`group relative font-mono text-xs tracking-wider transition-colors duration-300 ${
-                      isActive(link.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {link.label.toUpperCase()}
-                    <span className="absolute -bottom-1 left-0 w-0 h-px bg-foreground group-hover:w-full transition-all duration-300" />
-                  </Link>
-                )}
+                <Link
+                  href={link.href}
+                  className={`group relative font-mono text-xs tracking-wider transition-colors duration-300 ${
+                    isActive(link.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {link.label.toUpperCase()}
+                  <span className="absolute -bottom-1 left-0 w-0 h-px bg-foreground group-hover:w-full transition-all duration-300" />
+                </Link>
               </li>
             ))}
           </ul>
@@ -118,23 +107,13 @@ export function Navbar() {
                     transition={{ delay: index * 0.06 }}
                     className="min-h-[44px] flex items-center justify-center"
                   >
-                    {link.href.startsWith("/#") ? (
-                      <a
-                        href={link.href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={`block py-2 px-3 text-xl sm:text-2xl font-display tracking-tight text-center ${pathname === "/" ? "text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {link.label}
-                      </a>
-                    ) : (
-                      <Link
-                        href={link.href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={`block py-2 px-3 text-xl sm:text-2xl font-display tracking-tight text-center ${isActive(link.href) ? "text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {link.label}
-                      </Link>
-                    )}
+                    <Link
+                      href={link.href}
+                      onClick={() => setIsMenuOpen(false)}
+                      className={`block py-2 px-3 text-xl sm:text-2xl font-display tracking-tight text-center ${isActive(link.href) ? "text-foreground" : "text-muted-foreground"}`}
+                    >
+                      {link.label}
+                    </Link>
                   </motion.div>
                 ))}
               </div>

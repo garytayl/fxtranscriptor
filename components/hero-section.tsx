@@ -11,7 +11,14 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 gsap.registerPlugin(ScrollTrigger)
 
-export function HeroSection() {
+type HeroSectionProps = {
+  /** Primary CTA href (e.g. "/sermons" on home, "#sermons" on sermons page) */
+  primaryCtaHref?: string
+  /** "Recent" / secondary link href */
+  recentHref?: string
+}
+
+export function HeroSection({ primaryCtaHref = "#sermons", recentHref = "#recent" }: HeroSectionProps = {}) {
   const sectionRef = useRef<HTMLElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -66,20 +73,39 @@ export function HeroSection() {
         </p>
 
         <div className="mt-10 sm:mt-16 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8">
-          <a
-            href="#sermons"
-            className="group inline-flex items-center gap-3 border border-foreground/20 px-5 sm:px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
-          >
-            <ScrambleTextOnHover text="View Sermons" as="span" duration={0.6} />
-            <BitmapChevron className="transition-transform duration-[400ms] ease-in-out group-hover:rotate-45" />
-          </a>
-          <div className="flex items-center gap-5 sm:gap-8">
+          {primaryCtaHref.startsWith("#") ? (
             <a
-              href="#recent"
-              className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
+              href={primaryCtaHref}
+              className="group inline-flex items-center gap-3 border border-foreground/20 px-5 sm:px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
             >
-              Recent Transcripts
+              <ScrambleTextOnHover text="View Sermons" as="span" duration={0.6} />
+              <BitmapChevron className="transition-transform duration-[400ms] ease-in-out group-hover:rotate-45" />
             </a>
+          ) : (
+            <Link
+              href={primaryCtaHref}
+              className="group inline-flex items-center gap-3 border border-foreground/20 px-5 sm:px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
+            >
+              <ScrambleTextOnHover text="View Sermons" as="span" duration={0.6} />
+              <BitmapChevron className="transition-transform duration-[400ms] ease-in-out group-hover:rotate-45" />
+            </Link>
+          )}
+          <div className="flex items-center gap-5 sm:gap-8">
+            {recentHref.startsWith("#") ? (
+              <a
+                href={recentHref}
+                className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
+              >
+                Recent Transcripts
+              </a>
+            ) : (
+              <Link
+                href={recentHref}
+                className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
+              >
+                Recent Transcripts
+              </Link>
+            )}
             <Link
               href="/bible"
               className="font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
