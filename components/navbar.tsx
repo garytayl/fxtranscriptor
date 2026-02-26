@@ -83,16 +83,16 @@ export function Navbar() {
             aria-label="Toggle menu"
           >
             <motion.span
-              animate={isMenuOpen ? { rotate: 45, y: 5 } : { rotate: 0, y: 0 }}
-              className="w-6 h-px bg-foreground origin-center"
+              animate={isMenuOpen ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
+              className="w-6 h-px bg-foreground origin-center shrink-0"
             />
             <motion.span
               animate={isMenuOpen ? { opacity: 0, x: -10 } : { opacity: 1, x: 0 }}
-              className="w-6 h-px bg-foreground"
+              className="w-6 h-px bg-foreground shrink-0"
             />
             <motion.span
-              animate={isMenuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }}
-              className="w-6 h-px bg-foreground origin-center"
+              animate={isMenuOpen ? { rotate: -45, y: -7 } : { rotate: 0, y: 0 }}
+              className="w-6 h-px bg-foreground origin-center shrink-0"
             />
           </button>
         </nav>
