@@ -69,7 +69,7 @@ CRITICAL RULES:
 3. Write in THIRD PERSON about ${speakerName} (e.g., "${speakerName} opened by asking…", "${speakerName} challenged the congregation…").
 4. Capture the EMOTIONAL TONE — if the speaker was passionate, convicted, gentle, humorous, let that come through.
 5. Don't sanitize or flatten the message. Preserve the speaker's voice and intensity.
-6. Include Bible verse references naturally in the text when the speaker references them.
+6. Include MULTIPLE Bible verse references per section. Use the format [Book Chapter:Verse] or [Book Chapter:Verse-Verse] for ranges (e.g. [John 3:16], [Romans 8:28-30]) so they display as links. Aim for at least 2–4 verses per section wherever the speaker references or alludes to Scripture — cite the passages that are read, explained, or applied.
 7. Create 3–6 sections that follow the natural arc of the sermon (opening, development, climax, application, closing).
 8. Each section should be 150-400 words — substantial enough to convey the moment but not so long it becomes a transcript.
 9. Section titles should be evocative and specific, not generic (e.g., "Running From the Call" not "Introduction").
@@ -79,9 +79,10 @@ Return valid JSON only:
   "sections": [
     {
       "title": "Evocative Section Title",
-      "content": "The narrative text for this section, with \\"direct quotes\\" from the speaker woven in naturally. Include verse references like John 3:16 inline when the speaker references them.",
+      "content": "The narrative text with \\"direct quotes\\" from the speaker. Embed verse refs in brackets, e.g. [John 3:16] and [Romans 8:28-30], so they render as links.",
       "verses": [
-        { "book": "John", "chapter": 3, "verse_start": 16, "verse_end": null, "full_reference": "John 3:16" }
+        { "book": "John", "chapter": 3, "verse_start": 16, "verse_end": null, "full_reference": "John 3:16" },
+        { "book": "Romans", "chapter": 8, "verse_start": 28, "verse_end": 30, "full_reference": "Romans 8:28-30" }
       ]
     }
   ]
@@ -102,7 +103,7 @@ ${capped}`;
         {
           role: "system",
           content:
-            'You are a gifted writer who synthesizes sermon transcripts into compelling narratives. You write in third person, use direct quotes from the speaker extensively, and capture the emotional arc. You output only valid JSON with a "sections" array.',
+            'You are a gifted writer who synthesizes sermon transcripts into compelling narratives. You write in third person, use direct quotes from the speaker extensively, and capture the emotional arc. Embed Bible verse references in brackets (e.g. [John 3:16], [Romans 8:28-30]) and include 2–4 verses per section in the verses array. Output only valid JSON with a "sections" array.',
         },
         { role: "user", content: prompt },
       ],

@@ -256,7 +256,7 @@ export function VerseRichText({
 
   // If no matches, return content as-is
   if (parts.length === 0) {
-    return <p className="font-mono text-sm text-foreground leading-relaxed whitespace-pre-wrap">{content}</p>;
+    return <p className="font-mono text-sm text-foreground leading-relaxed whitespace-pre-wrap">{QuoteSegments({ content })}</p>;
   }
 
   return (
@@ -276,8 +276,52 @@ export function VerseRichText({
             />
           );
         }
-        return <span key={index}>{part.content}</span>;
+        return <QuoteSegments key={index} content={part.content} />;
       })}
     </p>
+  );
+}
+
+/**
+ * Splits text by double-quote and renders quoted segments with distinct styling
+ * (left border + subtle background) so speaker quotes stand out in the narrative.
+ */
+function QuoteSegments({ content }: { content: string }) {
+  if (!content) return null;
+  const segments: Array<{ text: string; quoted: boolean }> = [];
+  let remaining = content;
+  let quoted = false;
+  while (remaining.length > 0) {
+    const idx = remaining.indexOf('"');
+    if (idx === -1) {
+      segments.push({ text: remaining, quoted: false });
+      break;
+    }
+    const before = remaining.slice(0, idx);
+    const after = remaining.slice(idx + 1);
+    if (before) segments.push({ text: before, quoted: false });
+    const nextQuote = after.indexOf('"');
+    if (nextQuote === -1) {
+      segments.push({ text: '"' + after, quoted: false });
+      break;
+    }
+    segments.push({ text: after.slice(0, nextQuote), quoted: true });
+    remaining = after.slice(nextQuote + 1);
+  }
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.quoted ? (
+          <span
+            key={i}
+            className="inline-block border-l-2 border-accent/50 pl-2 pr-1.5 py-0.5 my-0.5 bg-accent/10 text-foreground/95 italic rounded-r"
+          >
+            "{seg.text}"
+          </span>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        )
+      )}
+    </>
   );
 }
