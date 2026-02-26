@@ -211,3 +211,125 @@ export async function addSermonToQueue(sermonId: string): Promise<AddToQueueResu
     };
   }
 }
+
+const STALE_PROCESSING_MS = 15 * 60 * 1000; // 15 minutes
+
+export interface ProcessQueueResult {
+  success: boolean;
+  processing?: boolean;
+  alreadyProcessing?: boolean;
+  queueItem?: any;
+  sermon?: any;
+  error?: string;
+  details?: string;
+}
+
+/**
+ * Get the next queue item (or current processing item), mark as processing if queued.
+ * Used by both /api/queue/process (HTTP) and /api/queue/processor (direct call) to avoid
+ * server-to-self requests that can hit 401 under Vercel Deployment Protection.
+ */
+export async function getNextQueueItemAndMarkProcessing(): Promise<ProcessQueueResult> {
+  try {
+    const supabase = createSupabaseAdminClient();
+
+    const { data: processingItem } = await supabase
+      .from("transcription_queue")
+      .select("*")
+      .eq("status", "processing")
+      .maybeSingle();
+
+    if (processingItem) {
+      const startedAt = processingItem.started_at ? new Date(processingItem.started_at).getTime() : 0;
+      const isStale = Date.now() - startedAt > STALE_PROCESSING_MS;
+
+      if (isStale) {
+        await supabase
+          .from("transcription_queue")
+          .update({
+            status: "failed",
+            error_message: "Processing timed out (worker may have stopped or failed to report completion)",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", processingItem.id);
+        await supabase
+          .from("sermons")
+          .update({ status: "failed", error_message: "Transcription timed out" })
+          .eq("id", processingItem.sermon_id);
+      } else {
+        const { data: sermon } = await supabase
+          .from("sermons")
+          .select("*")
+          .eq("id", processingItem.sermon_id)
+          .single();
+        return {
+          success: true,
+          processing: true,
+          alreadyProcessing: true,
+          queueItem: processingItem,
+          sermon: sermon ?? undefined,
+        };
+      }
+    }
+
+    const { data: nextItem, error: fetchError } = await supabase
+      .from("transcription_queue")
+      .select("*")
+      .eq("status", "queued")
+      .order("position", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError) {
+      return { success: false, error: "Failed to fetch queue", details: fetchError.message };
+    }
+    if (!nextItem) {
+      return { success: true, processing: false, queueItem: null, sermon: null };
+    }
+
+    const { data: updatedItem, error: updateError } = await supabase
+      .from("transcription_queue")
+      .update({ status: "processing", started_at: new Date().toISOString() })
+      .eq("id", nextItem.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return { success: false, error: "Failed to update queue item", details: updateError.message };
+    }
+
+    const { data: sermon, error: sermonError } = await supabase
+      .from("sermons")
+      .select("*")
+      .eq("id", nextItem.sermon_id)
+      .single();
+
+    if (sermonError) {
+      return { success: false, error: "Failed to fetch sermon", details: sermonError.message };
+    }
+
+    await supabase
+      .from("sermons")
+      .update({
+        status: "generating",
+        progress_json: {
+          step: "processing",
+          message: "Transcription in progress...",
+          position: 1,
+        },
+      })
+      .eq("id", nextItem.sermon_id);
+
+    return {
+      success: true,
+      processing: true,
+      queueItem: updatedItem,
+      sermon: sermon ?? undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

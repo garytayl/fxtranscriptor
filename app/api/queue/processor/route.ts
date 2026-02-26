@@ -3,10 +3,12 @@
  * Processes the next item in the transcription queue
  * This should be called periodically (e.g., every 10 seconds) to process queued items
  * Only one sermon is processed at a time globally
+ * Uses getNextQueueItemAndMarkProcessing() directly to avoid server-to-self fetch (401 under Vercel Deployment Protection)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getNextQueueItemAndMarkProcessing } from "@/lib/queue";
 
 export const runtime = "nodejs";
 
@@ -22,31 +24,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the app URL - try multiple sources
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
-
-    // Get next item to process (or currently processing item)
-    const processResponse = await fetch(`${appUrl}/api/queue/process`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (!processResponse.ok) {
-      const errorData = await processResponse.json().catch(() => ({}));
+    const processData = await getNextQueueItemAndMarkProcessing();
+    if (!processData.success) {
       return NextResponse.json(
         {
-          error: "Failed to get next queue item",
-          details: errorData.error || processResponse.statusText,
+          error: processData.error || "Failed to get next queue item",
+          details: processData.details,
         },
         { status: 500 }
       );
     }
-
-    const processData = await processResponse.json();
 
     if (!processData.processing || !processData.sermon) {
       // No items to process
