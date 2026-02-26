@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SeriesMoveDialog } from "@/components/admin/series-move-dialog";
 import type { Sermon } from "@/lib/supabase";
+import { decodeHtmlEntities } from "@/lib/utils";
 
 type StatusFilter = "all" | "pending" | "generating" | "completed" | "failed";
 
@@ -241,10 +242,10 @@ export function SermonSeriesManager() {
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => toggleSelect(sermon.id)}
-                    aria-label={`Select ${sermon.title}`}
+                    aria-label={`Select ${decodeHtmlEntities(sermon.title)}`}
                   />
                 </TableCell>
-                <TableCell className="font-medium">{sermon.title}</TableCell>
+                <TableCell className="font-medium">{decodeHtmlEntities(sermon.title)}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">{effectiveSeries}</Badge>

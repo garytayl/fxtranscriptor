@@ -18,7 +18,7 @@ import { extractSummaryFromDescription, removeMetadataFromTranscript } from "@/l
 import { SermonNarrativeView } from "@/components/sermon-narrative-view";
 import { SermonVerseSidebar } from "@/components/sermon-verse-sidebar";
 import { extractVerseReferencesFromText } from "@/lib/bible/verse-extract";
-import { formatRelativeTime } from "@/lib/utils";
+import { decodeHtmlEntities, formatRelativeTime } from "@/lib/utils";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
 interface TranscriptionProgress {
@@ -89,7 +89,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       if (document.hidden) return;
       
       try {
-        const response = await fetch(`/api/catalog/${sermon.id}`);
+        const response = await fetch(`/api/catalog/${sermon.id}`, { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
           if (data.sermon) {
@@ -269,8 +269,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       
       console.log("[SermonDetail] Fetching from /api/catalog/" + id);
       const response = await fetch(`/api/catalog/${id}`, {
-        // Add cache control
-        next: { revalidate: 30 }, // Revalidate every 30 seconds
+        cache: "no-store", // Transcript and narrative only from DB — no Next.js cache
       });
       
       console.log("[SermonDetail] Response status:", response.status);
@@ -686,7 +685,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         <div className="mb-8 sm:mb-12">
           <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Sermon Detail</span>
           <h1 className="mt-4 font-display text-2xl sm:text-4xl md:text-6xl tracking-tight mb-4 sm:mb-6">
-            {sermon.title}
+            {decodeHtmlEntities(sermon.title)}
           </h1>
           
           <div className="flex flex-wrap items-center gap-4 mb-6">

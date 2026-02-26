@@ -42,10 +42,19 @@ export async function fetchPodbeanCatalog(
     for (const itemMatch of items) {
       const itemContent = itemMatch[1];
 
-      // Extract title
+      // Extract title and decode HTML entities (e.g. &amp; → &)
       const titleMatch = itemContent.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>/i) ||
                         itemContent.match(/<title[^>]*>(.*?)<\/title>/i);
-      const title = titleMatch ? titleMatch[1].trim() : '';
+      let title = titleMatch ? titleMatch[1].trim() : '';
+      if (title) {
+        title = title
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&apos;/g, "'");
+      }
 
       // Extract description
       const descMatch = itemContent.match(/<description[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/description>/i) ||

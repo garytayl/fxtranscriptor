@@ -57,10 +57,10 @@ export async function GET(
     const transcript = sermon.transcript || null;
     const transcriptLength = transcript ? transcript.length : 0;
 
-    return NextResponse.json({
-      transcript,
-      transcript_length: transcriptLength,
-    });
+    return NextResponse.json(
+      { transcript, transcript_length: transcriptLength },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch (error) {
     console.error("Error fetching transcript:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

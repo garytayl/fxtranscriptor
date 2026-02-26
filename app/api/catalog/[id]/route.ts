@@ -89,7 +89,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ sermon });
+    return NextResponse.json(
+      { sermon },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch (error) {
     console.error("Error fetching sermon:", error);
     

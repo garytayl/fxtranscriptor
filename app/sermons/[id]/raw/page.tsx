@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "@/lib/supabase";
+import { decodeHtmlEntities } from "@/lib/utils";
 import { notFound } from "next/navigation";
 
 export default async function RawTranscriptPage({
@@ -30,7 +31,7 @@ export default async function RawTranscriptPage({
   return (
     <html>
       <head>
-        <title>{sermon.title || "Transcript"}</title>
+        <title>{decodeHtmlEntities(sermon.title) || "Transcript"}</title>
         <meta charSet="utf-8" />
       </head>
       <body>

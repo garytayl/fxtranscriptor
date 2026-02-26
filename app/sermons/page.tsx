@@ -16,7 +16,7 @@ import dynamic from "next/dynamic";
 import { SermonCard } from "@/components/sermon-card";
 import { SermonSkeleton } from "@/components/sermon-skeleton";
 import { Sermon } from "@/lib/supabase";
-import { formatRelativeTime } from "@/lib/utils";
+import { decodeHtmlEntities, formatRelativeTime } from "@/lib/utils";
 import { SermonMetadata } from "@/components/sermon-metadata";
 
 // Lazy load heavy components
@@ -697,7 +697,7 @@ export default function SermonsPage() {
     
     setLoadingTranscript(true);
     try {
-      const response = await fetch(`/api/sermons/${sermonId}/transcript`);
+      const response = await fetch(`/api/sermons/${sermonId}/transcript`, { cache: "no-store" });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}`);
@@ -1113,7 +1113,7 @@ export default function SermonsPage() {
         }}>
           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="text-2xl">{selectedSermon?.title}</DialogTitle>
+              <DialogTitle className="text-2xl">{selectedSermon ? decodeHtmlEntities(selectedSermon.title) : ""}</DialogTitle>
               {/* Debug info - remove after fixing */}
               {process.env.NODE_ENV === 'development' && selectedSermon && (
                 <div className="text-xs font-mono text-muted-foreground mt-2 p-2 bg-muted rounded">

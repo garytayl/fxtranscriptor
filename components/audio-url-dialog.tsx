@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Link2, Save, Loader2, X } from "lucide-react";
 import { Sermon } from "@/lib/supabase";
+import { decodeHtmlEntities } from "@/lib/utils";
 
 interface AudioUrlDialogProps {
   sermon: Sermon | null;
@@ -69,7 +70,7 @@ export function AudioUrlDialog({ sermon, open, onOpenChange, onSave }: AudioUrlD
             {sermon.audio_url ? "Update Audio URL" : "Set Audio URL"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            {sermon.title}
+            {decodeHtmlEntities(sermon.title)}
           </DialogDescription>
         </DialogHeader>
 

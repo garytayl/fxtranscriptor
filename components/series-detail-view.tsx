@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, type ReactElement } from "react"
 import { SermonSeries } from "@/lib/extractSeries"
+import { decodeHtmlEntities } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -116,7 +117,7 @@ export function SeriesDetailView({
             {/* Sermon Title */}
             <div className="mb-4">
               <h3 className="font-display text-xl md:text-2xl tracking-tight mb-2 group-hover:text-accent transition-colors duration-300 line-clamp-2">
-                {sermon.title}
+                {decodeHtmlEntities(sermon.title)}
               </h3>
               {sermon.date && (
                 <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground mb-3">

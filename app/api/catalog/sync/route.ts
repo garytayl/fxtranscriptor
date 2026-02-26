@@ -11,6 +11,7 @@ import { fetchYouTubeCatalog } from "@/lib/fetchYouTubeCatalog";
 import { matchSermons } from "@/lib/matchSermons";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { decodeHtmlEntities } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -326,9 +327,9 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Prepare sermon data
+        // Prepare sermon data (decode HTML entities in title so we don't store &amp; etc.)
         const sermonData = {
-          title: matched.title,
+          title: decodeHtmlEntities(matched.title) || matched.title,
           date: matched.date?.toISOString() || null,
           description: matched.description || null,
           podbean_url: matched.podbeanEpisode?.url || null,

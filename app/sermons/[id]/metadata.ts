@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { decodeHtmlEntities } from '@/lib/utils'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -13,11 +14,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       const sermon = data.sermon
       
       if (sermon) {
+        const title = decodeHtmlEntities(sermon.title)
         return {
-          title: `${sermon.title} | fxarchives`,
-          description: sermon.description || `Sermon transcript for ${sermon.title}`,
+          title: `${title} | fxarchives`,
+          description: sermon.description || `Sermon transcript for ${title}`,
           openGraph: {
-            title: sermon.title,
+            title,
             description: sermon.description || `Sermon transcript`,
             type: 'article',
             publishedTime: sermon.date || undefined,

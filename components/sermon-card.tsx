@@ -5,6 +5,7 @@ import { Calendar, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Sermon } from '@/lib/supabase'
 import { format } from 'date-fns'
+import { decodeHtmlEntities } from '@/lib/utils'
 
 interface SermonCardProps {
   sermon: Sermon
@@ -20,7 +21,7 @@ export const SermonCard = memo(function SermonCard({ sermon, onClick, getStatusB
     >
       <div className="flex items-start justify-between gap-4 mb-4">
         <h3 className="font-display text-xl tracking-tight line-clamp-2 flex-1 group-hover:text-accent transition-colors">
-          {sermon.title}
+          {decodeHtmlEntities(sermon.title)}
         </h3>
         {getStatusBadge(sermon)}
       </div>
