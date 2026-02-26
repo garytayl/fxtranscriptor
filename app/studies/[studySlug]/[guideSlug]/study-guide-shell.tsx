@@ -191,7 +191,7 @@ export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellP
 
   return (
     <>
-      <div className="px-4 sm:px-8 md:px-12 pb-32 lg:pb-24 max-w-4xl mx-auto lg:max-w-none lg:flex lg:gap-12 lg:pr-[22rem]">
+      <div className="pb-32 lg:pb-24 lg:flex lg:gap-12">
         <main className="min-w-0 flex-1 lg:min-w-0">
           <article className="study-guide study-guide-resonates">
             <StudyGuideContent content={content} onSelectPassage={handleSelectPassage} />

@@ -90,7 +90,7 @@ export function SeriesDetailView({
 
         <div className="mb-8">
           <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Series Detail</span>
-          <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">{series.name}</h2>
+          <h2 className="mt-4 font-display text-5xl md:text-7xl tracking-tight">{series.name}</h2>
           <div className="mt-4 flex items-center gap-4 flex-wrap font-mono text-xs text-muted-foreground">
             <span>{series.sermonCount} {series.sermonCount === 1 ? "sermon" : "sermons"}</span>
             <span>•</span>
@@ -115,7 +115,7 @@ export function SeriesDetailView({
           >
             {/* Sermon Title */}
             <div className="mb-4">
-              <h3 className="font-[var(--font-bebas)] text-xl md:text-2xl tracking-tight mb-2 group-hover:text-accent transition-colors duration-300 line-clamp-2">
+              <h3 className="font-display text-xl md:text-2xl tracking-tight mb-2 group-hover:text-accent transition-colors duration-300 line-clamp-2">
                 {sermon.title}
               </h3>
               {sermon.date && (

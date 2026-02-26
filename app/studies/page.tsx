@@ -25,7 +25,7 @@ export default async function StudiesPage() {
             ← Back to home
           </Link>
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent mb-2">Bible Studies</p>
-          <h1 className="font-[var(--font-bebas)] text-3xl sm:text-4xl md:text-6xl tracking-tight">
+          <h1 className="font-display text-3xl sm:text-4xl md:text-6xl tracking-tight">
             Study Guides
           </h1>
           <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-xl">
@@ -46,7 +46,7 @@ export default async function StudiesPage() {
                     </span>
                   ) : null}
                 </div>
-                <h2 className="font-[var(--font-bebas)] text-2xl sm:text-3xl md:text-4xl tracking-tight text-foreground">
+                <h2 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-tight text-foreground">
                   {current.title}
                 </h2>
                 <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed">

@@ -888,7 +888,7 @@ export default function Home() {
               <div className="relative py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
                 <div className="mb-16">
                   <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Loading</span>
-                  <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERIES</h2>
+                  <h2 className="mt-4 font-display text-5xl md:text-7xl tracking-tight">SERIES</h2>
                 </div>
                 <div className="text-center text-muted-foreground font-mono text-sm">
                   Loading sermon catalog...
@@ -898,7 +898,7 @@ export default function Home() {
               <div className="relative py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
                 <div className="mb-16">
                   <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Empty</span>
-                  <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">NO SERIES</h2>
+                  <h2 className="mt-4 font-display text-5xl md:text-7xl tracking-tight">NO SERIES</h2>
                 </div>
                 <div className="text-center text-muted-foreground font-mono text-sm mb-8">
                   No sermons in catalog yet.
@@ -1008,7 +1008,7 @@ export default function Home() {
                   <section id="unsorted" className="relative py-16 sm:py-24 md:py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
                     <div className="mb-8 sm:mb-12 md:mb-16">
                       <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">02 / Unsorted</span>
-                      <h2 className="mt-4 font-[var(--font-bebas)] text-3xl sm:text-5xl md:text-7xl tracking-tight">UNSORTED SERMONS</h2>
+                      <h2 className="mt-4 font-display text-3xl sm:text-5xl md:text-7xl tracking-tight">UNSORTED SERMONS</h2>
                       <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
                         {ungrouped.length} {ungrouped.length === 1 ? "sermon" : "sermons"} • Not in any series
                       </p>

@@ -250,7 +250,7 @@ function SplitFlapChar({ char, index, animationKey, skipEntrance, speed, playCli
       initial={skipEntrance ? false : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: tileDelay, duration: 0.3, ease: "easeOut" }}
-      className="relative overflow-hidden flex items-center justify-center font-[family-name:var(--font-bebas)]"
+      className="relative overflow-hidden flex items-center justify-center font-display"
       style={{
         fontSize: "clamp(3rem, 10vw, 8rem)",
         width: "0.65em",

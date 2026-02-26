@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { IBM_Plex_Sans, IBM_Plex_Mono, Bebas_Neue } from "next/font/google"
+import { Plus_Jakarta_Sans, JetBrains_Mono, Syne } from "next/font/google"
 import { SmoothScroll } from "@/components/smooth-scroll"
 import { Toaster } from "@/components/ui/toast"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -8,17 +8,21 @@ import { AnalyticsProvider } from "@/components/analytics-provider"
 import { Navbar } from "@/components/navbar"
 import "./globals.css"
 
-const ibmPlexSans = IBM_Plex_Sans({
+const plusJakartaSans = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
-  variable: "--font-ibm-plex-sans",
+  variable: "--font-sans",
 })
-const ibmPlexMono = IBM_Plex_Mono({
+const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500"],
   subsets: ["latin"],
-  variable: "--font-ibm-plex-mono",
+  variable: "--font-mono",
 })
-const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas" })
+const syne = Syne({
+  weight: ["400", "500", "600", "700", "800"],
+  subsets: ["latin"],
+  variable: "--font-display",
+})
 
 export const metadata: Metadata = {
   title: {
@@ -54,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark bg-background">
       <body
-        className={`${ibmPlexSans.variable} ${bebasNeue.variable} ${ibmPlexMono.variable} font-sans antialiased overflow-x-hidden min-h-[100dvh]`}
+        className={`${plusJakartaSans.variable} ${syne.variable} ${jetbrainsMono.variable} font-sans antialiased overflow-x-hidden min-h-[100dvh]`}
       >
         <ErrorBoundary>
           <AnalyticsProvider>

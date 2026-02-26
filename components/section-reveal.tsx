@@ -119,7 +119,7 @@ export function SectionReveal({
       <div className="max-w-4xl lg:max-w-3xl">
         <h2
           ref={titleRef}
-          className="font-[var(--font-bebas)] text-4xl md:text-6xl lg:text-7xl tracking-tight mb-8 text-foreground"
+          className="font-display text-4xl md:text-6xl lg:text-7xl tracking-tight mb-8 text-foreground"
         >
           {section.title}
         </h2>

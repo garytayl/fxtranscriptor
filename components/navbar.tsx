@@ -122,7 +122,7 @@ export function Navbar() {
                       <a
                         href={link.href}
                         onClick={() => setIsMenuOpen(false)}
-                        className={`block py-2 px-3 text-xl sm:text-2xl font-[var(--font-bebas)] tracking-tight text-center ${pathname === "/" ? "text-foreground" : "text-muted-foreground"}`}
+                        className={`block py-2 px-3 text-xl sm:text-2xl font-display tracking-tight text-center ${pathname === "/" ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {link.label}
                       </a>
@@ -130,7 +130,7 @@ export function Navbar() {
                       <Link
                         href={link.href}
                         onClick={() => setIsMenuOpen(false)}
-                        className={`block py-2 px-3 text-xl sm:text-2xl font-[var(--font-bebas)] tracking-tight text-center ${isActive(link.href) ? "text-foreground" : "text-muted-foreground"}`}
+                        className={`block py-2 px-3 text-xl sm:text-2xl font-display tracking-tight text-center ${isActive(link.href) ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {link.label}
                       </Link>

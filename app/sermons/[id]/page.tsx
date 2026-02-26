@@ -677,7 +677,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
         <div className="relative z-10 pt-[var(--navbar-offset)] py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
           <div className="text-center">
-            <h1 className="font-[var(--font-bebas)] text-4xl mb-4">Sermon Not Found</h1>
+            <h1 className="font-display text-4xl mb-4">Sermon Not Found</h1>
             <Button onClick={() => router.push("/")} variant="outline" className="font-mono text-xs uppercase tracking-widest">
               <ArrowLeft className="size-4 mr-2" />
               Back to Catalog
@@ -707,7 +707,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         {/* Header */}
         <div className="mb-8 sm:mb-12">
           <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">Sermon Detail</span>
-          <h1 className="mt-4 font-[var(--font-bebas)] text-2xl sm:text-4xl md:text-6xl tracking-tight mb-4 sm:mb-6">
+          <h1 className="mt-4 font-display text-2xl sm:text-4xl md:text-6xl tracking-tight mb-4 sm:mb-6">
             {sermon.title}
           </h1>
           

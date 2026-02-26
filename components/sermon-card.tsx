@@ -19,7 +19,7 @@ export const SermonCard = memo(function SermonCard({ sermon, onClick, getStatusB
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-4 mb-4">
-        <h3 className="font-[var(--font-bebas)] text-xl tracking-tight line-clamp-2 flex-1 group-hover:text-accent transition-colors">
+        <h3 className="font-display text-xl tracking-tight line-clamp-2 flex-1 group-hover:text-accent transition-colors">
           {sermon.title}
         </h3>
         {getStatusBadge(sermon)}

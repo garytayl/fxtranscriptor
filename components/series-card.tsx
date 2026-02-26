@@ -85,7 +85,7 @@ export function SeriesCard({ series, index, onClick, persistHover = false }: Ser
         {/* Series title */}
         <h3
           className={cn(
-            "font-[var(--font-bebas)] text-3xl md:text-4xl tracking-tight mb-4 transition-colors duration-300",
+            "font-display text-3xl md:text-4xl tracking-tight mb-4 transition-colors duration-300",
             isActive ? "text-accent" : "text-foreground",
           )}
         >

@@ -79,7 +79,7 @@ export function SermonSeriesSection({ series, onSeriesClick }: SermonSeriesSecti
       {/* Section header */}
       <div ref={headerRef} className="mb-16">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Series</span>
-        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">SERMON SERIES</h2>
+        <h2 className="mt-4 font-display text-5xl md:text-7xl tracking-tight">SERMON SERIES</h2>
         <p className="mt-4 max-w-md font-mono text-xs text-muted-foreground leading-relaxed">
           {series.length} {series.length === 1 ? "series" : "series"} • Organized by series
         </p>
