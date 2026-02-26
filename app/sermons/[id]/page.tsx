@@ -35,10 +35,9 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
   const [audioUrlDialogOpen, setAudioUrlDialogOpen] = useState(false);
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
   const [summaries, setSummaries] = useState<(SermonChunkSummary & { verses: SermonChunkVerse[] })[]>([]);
-  const [generatingSummaries, setGeneratingSummaries] = useState(false);
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
   const [unifiedSummary, setUnifiedSummary] = useState<UnifiedSummarySection[] | null>(null);
-  const [generatingUnified, setGeneratingUnified] = useState(false);
+  const [generatingSections, setGeneratingSections] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Session for role-aware UI
@@ -162,133 +161,56 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     },
   ]);
 
-  const fetchSummaries = useCallback(async (id: string) => {
+  const structureSermon = useCallback(async (id: string) => {
+    setGeneratingSections(true);
     try {
-      const response = await fetch(`/api/sermons/${id}/summaries`);
-      if (response.ok) {
-        const data = await response.json();
-        setSummaries(data.summaries || []);
-      }
-    } catch (error) {
-      console.error("Error fetching summaries:", error);
-    }
-  }, []);
-
-  const generateSummaries = useCallback(async (id: string) => {
-    setGeneratingSummaries(true);
-    try {
-      const toastId = toast.loading("Generating AI summaries...", {
-        description: "This may take a few moments.",
+      const toastId = toast.loading("Structuring sermon...", {
+        description: "AI is identifying sections and titles. Content will be from the transcript.",
       });
-      
-      const response = await fetch(`/api/sermons/${id}/summaries/generate`, {
-        method: "POST",
-      });
-      
+      const response = await fetch(`/api/sermons/${id}/summaries/sections`, { method: "POST" });
       const data = await response.json();
       toast.dismiss(toastId);
-      
       if (response.ok && data.success) {
-        toast.success("Summaries Generated", {
-          description: `Generated ${data.generated} summaries.`,
-          duration: 3000,
-        });
-        await fetchSummaries(id);
-        // Auto-generate unified summary after chunk summaries are created
-        setTimeout(() => {
-          generateUnifiedSummary(id);
-        }, 500); // Small delay to ensure summaries are saved
-      } else {
-        toast.error("Generation Failed", {
-          description: data.error || "Failed to generate summaries",
-          duration: 6000,
-        });
-      }
-    } catch (error) {
-      console.error("Error generating summaries:", error);
-      toast.error("Generation Error", {
-        description: error instanceof Error ? error.message : "Unknown error",
-        duration: 6000,
-      });
-    } finally {
-      setGeneratingSummaries(false);
-    }
-  }, [fetchSummaries]);
-
-  const clearSummaries = useCallback(async (id: string) => {
-    try {
-      const toastId = toast.loading("Clearing summaries...");
-      
-      const response = await fetch(`/api/sermons/${id}/summaries/clear`, {
-        method: "POST",
-      });
-      
-      const data = await response.json();
-      toast.dismiss(toastId);
-      
-      if (response.ok && data.success) {
-        toast.success("Summaries Cleared", {
-          description: `Deleted ${data.deleted} summaries.`,
-          duration: 3000,
-        });
-        setSummaries([]);
-        setUnifiedSummary(null); // Clear unified summary too
-      } else {
-        toast.error("Clear Failed", {
-          description: data.error || "Failed to clear summaries",
-          duration: 6000,
-        });
-      }
-    } catch (error) {
-      console.error("Error clearing summaries:", error);
-      toast.error("Clear Error", {
-        description: error instanceof Error ? error.message : "Unknown error",
-        duration: 6000,
-      });
-    }
-  }, []);
-
-  const generateUnifiedSummary = useCallback(async (id: string) => {
-    // Don't regenerate if we already have one
-    if (unifiedSummary && unifiedSummary.length > 0) {
-      return;
-    }
-
-    setGeneratingUnified(true);
-    try {
-      const toastId = toast.loading("Generating unified summary...", {
-        description: "This may take a few moments.",
-      });
-      
-      const response = await fetch(`/api/sermons/${id}/summaries/unified`, {
-        method: "POST",
-      });
-      
-      const data = await response.json();
-      toast.dismiss(toastId);
-      
-      if (response.ok && data.success) {
-        toast.success("Unified Summary Generated", {
-          description: `Created ${data.sections.length} sections.`,
+        toast.success("Sermon structured", {
+          description: `Created ${data.generated} sections.`,
           duration: 3000,
         });
         setUnifiedSummary(data.sections);
       } else {
-        toast.error("Generation Failed", {
-          description: data.error || "Failed to generate unified summary",
+        toast.error("Structure failed", {
+          description: data.error || "Failed to structure sermon",
           duration: 6000,
         });
       }
     } catch (error) {
-      console.error("Error generating unified summary:", error);
-      toast.error("Generation Error", {
+      console.error("Error structuring sermon:", error);
+      toast.error("Error", {
         description: error instanceof Error ? error.message : "Unknown error",
         duration: 6000,
       });
     } finally {
-      setGeneratingUnified(false);
+      setGeneratingSections(false);
     }
-  }, [unifiedSummary]);
+  }, []);
+
+  const clearSections = useCallback(async (id: string) => {
+    try {
+      const toastId = toast.loading("Clearing sections...");
+      const response = await fetch(`/api/sermons/${id}/summaries/clear`, { method: "POST" });
+      const data = await response.json();
+      toast.dismiss(toastId);
+      if (response.ok && data.success) {
+        toast.success("Sections cleared", { description: "Summary sections removed.", duration: 3000 });
+        setSummaries([]);
+        setUnifiedSummary(null);
+      } else {
+        toast.error("Clear failed", { description: data.error || "Failed to clear sections", duration: 6000 });
+      }
+    } catch (error) {
+      console.error("Error clearing sections:", error);
+      toast.error("Error", { description: error instanceof Error ? error.message : "Unknown error", duration: 6000 });
+    }
+  }, []);
 
   const loadSermon = useCallback(async (id: string) => {
     try {
@@ -327,21 +249,11 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         setProgress(data.sermon.progress_json);
       }
 
-      // Load saved unified summary from DB (if present)
+      // Load saved sections (unified_summary_json) from DB
       if (Array.isArray(data.sermon.unified_summary_json) && data.sermon.unified_summary_json.length > 0) {
         setUnifiedSummary(data.sermon.unified_summary_json as UnifiedSummarySection[]);
       } else {
         setUnifiedSummary(null);
-      }
-
-      // Fetch summaries if transcript exists
-      if (data.sermon.transcript || data.sermon.progress_json?.completedChunks) {
-        fetchSummaries(id);
-        // Only auto-generate unified summary if we don't already have one saved
-        const hasSavedUnified = Array.isArray(data.sermon.unified_summary_json) && data.sermon.unified_summary_json.length > 0;
-        if (!hasSavedUnified && data.sermon.progress_json?.completedChunks && Object.keys(data.sermon.progress_json.completedChunks).length > 0) {
-          setTimeout(() => generateUnifiedSummary(id), 500);
-        }
       }
     } catch (error) {
       console.error("[SermonDetail] Error loading sermon:", error);
@@ -349,7 +261,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setLoading(false);
     }
-  }, [fetchSummaries, generateUnifiedSummary]);
+  }, []);
 
   const generateTranscript = useCallback(async () => {
     if (!sermon || generating) return;
@@ -545,22 +457,23 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return <Badge variant={config.variant}>{config.label}</Badge>;
   }, []);
 
-  // Aggregate and organize all verses from all chunks
+  // Aggregate and organize verses from chunk summaries or from unified sections
   const organizedVerses = useMemo(() => {
-    if (!summaries || summaries.length === 0) return { mainChapter: null, supportingVerses: [] };
-
-    // Collect all verses
-    const allVerses: SermonChunkVerse[] = [];
-    summaries.forEach((summary) => {
-      if (summary.verses && summary.verses.length > 0) {
-        allVerses.push(...summary.verses);
-      }
-    });
-
+    type VerseLike = { book: string; chapter: number; verse_start: number; verse_end: number | null; full_reference: string };
+    const allVerses: VerseLike[] = [];
+    if (summaries && summaries.length > 0) {
+      summaries.forEach((summary) => {
+        if (summary.verses?.length) allVerses.push(...summary.verses);
+      });
+    } else if (unifiedSummary && unifiedSummary.length > 0) {
+      unifiedSummary.forEach((section) => {
+        if (section.verses?.length) allVerses.push(...section.verses);
+      });
+    }
     if (allVerses.length === 0) return { mainChapter: null, supportingVerses: [] };
 
     // Group by book and chapter
-    const chapterMap = new Map<string, SermonChunkVerse[]>();
+    const chapterMap = new Map<string, VerseLike[]>();
     allVerses.forEach((verse) => {
       const key = `${verse.book} ${verse.chapter}`;
       if (!chapterMap.has(key)) {
@@ -570,7 +483,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     });
 
     // First, find the main book (the book with the most verses total)
-    const bookMap = new Map<string, SermonChunkVerse[]>();
+    const bookMap = new Map<string, VerseLike[]>();
     allVerses.forEach((verse) => {
       if (!bookMap.has(verse.book)) {
         bookMap.set(verse.book, []);
@@ -614,7 +527,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     const mainChapter = mainChapterKey ? chapterMap.get(mainChapterKey) || [] : [];
     
     // Get supporting verses (all others)
-    const supportingVerses: SermonChunkVerse[] = [];
+    const supportingVerses: VerseLike[] = [];
     chapterMap.forEach((verses, key) => {
       if (key !== mainChapterKey) {
         supportingVerses.push(...verses);
@@ -646,7 +559,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       mainChapter: mainChapterKey ? { key: mainChapterKey, verses: uniqueMainChapter } : null,
       supportingVerses: uniqueSupporting,
     };
-  }, [summaries]);
+  }, [summaries, unifiedSummary]);
 
   if (loading) {
     return (
@@ -1123,7 +1036,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         {/* All Scripture References Section */}
-        {summaries.length > 0 && (organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0) && (
+        {(organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0) && (
           <div className="mb-12 border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
             <h2 className="font-mono text-sm uppercase tracking-widest mb-6">All Scripture References</h2>
             
@@ -1137,7 +1050,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   <div className="flex flex-wrap gap-2">
                     {organizedVerses.mainChapter.verses.map((verse) => (
                       <Badge
-                        key={verse.id}
+                        key={verse.full_reference}
                         variant="outline"
                         className="font-mono text-xs border-accent/50 text-accent bg-accent/10 hover:bg-accent/20 hover:border-accent/70 hover:shadow-[0_0_15px_rgba(255,165,0,0.3)] transition-all"
                       >
@@ -1157,7 +1070,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                   <div className="flex flex-wrap gap-2">
                     {organizedVerses.supportingVerses.map((verse) => (
                       <Badge
-                        key={verse.id}
+                        key={verse.full_reference}
                         variant="outline"
                         className="font-mono text-xs border-accent/30 text-foreground hover:border-accent/50 hover:shadow-[0_0_10px_rgba(255,165,0,0.2)] transition-all"
                       >
@@ -1171,13 +1084,13 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
         )}
 
-        {/* Unified Summary Display */}
+        {/* Sermon sections: titles from AI, content from transcript */}
         {(sermon.transcript || sermon.progress_json?.completedChunks) && (
           <div className="border border-accent/20 rounded-lg p-6 bg-card/50 glow-border">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-mono text-sm uppercase tracking-widest">Sermon Summary</h2>
               <div className="flex items-center gap-2">
-                {isAdmin && summaries.length > 0 && (
+                {isAdmin && (
                   <div className="relative" ref={optionsMenuRef}>
                     <Button
                       variant="ghost"
@@ -1193,15 +1106,14 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                           variant="ghost"
                           size="sm"
                           className="w-full justify-start text-xs font-mono uppercase tracking-widest"
-                          onClick={async () => {
+                          onClick={() => {
                             setOptionsMenuOpen(false);
-                            if (sermon.id) {
-                              await clearSummaries(sermon.id);
-                            }
+                            sermon.id && structureSermon(sermon.id);
                           }}
+                          disabled={generatingSections}
                         >
-                          <Trash2 className="size-3 mr-2" />
-                          Clear Summaries
+                          <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
+                          Structure sermon
                         </Button>
                         <Button
                           variant="ghost"
@@ -1209,14 +1121,11 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                           className="w-full justify-start text-xs font-mono uppercase tracking-widest"
                           onClick={async () => {
                             setOptionsMenuOpen(false);
-                            if (sermon.id) {
-                              await generateSummaries(sermon.id);
-                            }
+                            if (sermon.id) await clearSections(sermon.id);
                           }}
-                          disabled={generatingSummaries}
                         >
-                          <RefreshCw className={`size-3 mr-2 ${generatingSummaries ? "animate-spin" : ""}`} />
-                          Regenerate Summaries
+                          <Trash2 className="size-3 mr-2" />
+                          Clear sections
                         </Button>
                       </div>
                     )}
@@ -1225,58 +1134,31 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               </div>
             </div>
 
-            {generatingSummaries ? (
+            {generatingSections ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="size-6 animate-spin text-accent" />
-                <span className="ml-3 font-mono text-sm text-muted-foreground">Generating summaries...</span>
-              </div>
-            ) : summaries.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="font-mono text-sm text-muted-foreground mb-4">
-                  No summaries generated yet.
-                </p>
-                {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="font-mono text-xs uppercase tracking-widest"
-                  onClick={() => sermon.id && generateSummaries(sermon.id)}
-                >
-                  <RefreshCw className="size-3 mr-2" />
-                  Generate Summaries
-                </Button>
-                )}
+                <span className="ml-3 font-mono text-sm text-muted-foreground">Structuring sermon...</span>
               </div>
             ) : unifiedSummary && unifiedSummary.length > 0 ? (
               <SermonNarrativeView
                 sections={unifiedSummary}
-                loading={generatingUnified}
+                loading={false}
               />
             ) : (
               <div className="text-center py-12">
                 <p className="font-mono text-sm text-muted-foreground mb-4">
-                  Summaries generated. Generating unified view...
+                  No sections yet. Structure the sermon to get section titles and transcript excerpts.
                 </p>
                 {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="font-mono text-xs uppercase tracking-widest"
-                  onClick={() => sermon.id && generateUnifiedSummary(sermon.id)}
-                  disabled={generatingUnified}
-                >
-                  {generatingUnified ? (
-                    <>
-                      <Loader2 className="size-3 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="size-3 mr-2" />
-                      Generate Unified Summary
-                    </>
-                  )}
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs uppercase tracking-widest"
+                    onClick={() => sermon.id && structureSermon(sermon.id)}
+                  >
+                    <RefreshCw className="size-3 mr-2" />
+                    Structure sermon
+                  </Button>
                 )}
               </div>
             )}
