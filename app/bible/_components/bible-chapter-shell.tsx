@@ -173,8 +173,9 @@ export function BibleChapterShell({
   return (
     <main className="min-h-screen bg-background text-foreground">
       {highlightRange && <ScrollToVerse verseNumber={highlightRange.start} />}
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:pr-[22rem]">
-        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/95 px-4 pt-3 sm:pt-4 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:flex-row lg:gap-12 lg:items-start">
+        <div className="min-w-0 flex-1 flex flex-col gap-4 sm:gap-6">
+          <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/95 px-4 pt-3 sm:pt-4 backdrop-blur-md">
           <div className="flex items-center justify-between gap-3 pb-1 sm:pb-2">
             <div className="min-w-0">
               <Link
@@ -256,27 +257,27 @@ export function BibleChapterShell({
             </Link>
           ) : null}
         </div>
-      </div>
+        </div>
 
-      {/* Sidebar — desktop: Greek & Hebrew word study */}
-      <aside
-        className="hidden lg:flex lg:flex-col fixed right-0 top-0 w-[22rem] bottom-0 border-l border-white/10 bg-[#050505] z-30 pt-[var(--navbar-offset)]"
-        aria-label="Greek & Hebrew"
-        style={{ height: "100dvh" }}
-      >
-        <div className="shrink-0 px-6 pt-6 pb-2">
-          <p className="font-mono text-xs tracking-[0.25em] text-white/50 uppercase">
-            Greek & Hebrew
-          </p>
-        </div>
-        <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
-          style={{ WebkitOverflowScrolling: "touch" }}
-          data-lenis-prevent
+        {/* Sidebar — desktop: Greek & Hebrew, in-flow so content never overlaps and zoom is stable */}
+        <aside
+          className="hidden lg:flex lg:flex-col lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:shrink-0 lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset))] border-l border-white/10 bg-[#050505] z-10 pt-6"
+          aria-label="Greek & Hebrew"
         >
-          <WordStudySidebarPanel code={selectedStrongsCode} />
-        </div>
-      </aside>
+          <div className="shrink-0 px-6 pb-2">
+            <p className="font-mono text-xs tracking-[0.25em] text-white/50 uppercase">
+              Greek & Hebrew
+            </p>
+          </div>
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
+            style={{ WebkitOverflowScrolling: "touch" }}
+            data-lenis-prevent
+          >
+            <WordStudySidebarPanel code={selectedStrongsCode} />
+          </div>
+        </aside>
+      </div>
 
       {/* Mobile: draggable bottom sheet for word study */}
       <AnimatePresence>

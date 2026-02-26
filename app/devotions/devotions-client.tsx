@@ -265,7 +265,7 @@ export function DevotionsClient() {
   const stagger = reduced ? 0.02 : 0.06
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col h-screen max-h-[100dvh] bg-[#050505] text-white">
+    <div className="fixed inset-0 z-[60] flex flex-col h-screen max-h-[100dvh] bg-[#050505] text-white overflow-x-hidden">
       {/* Header: back/leave + title + menu (reading only) */}
       <header className="shrink-0 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:px-6 md:px-12 border-b border-white/5">
         <div className="min-w-[80px] flex justify-start">
@@ -322,11 +322,9 @@ export function DevotionsClient() {
         </div>
       </header>
 
-      <div
-        className="flex-1 min-h-0 flex flex-col overflow-hidden"
-      >
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-behavior-y-auto touch-pan-y"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-behavior-y-auto touch-pan-y w-full pb-[env(safe-area-inset-bottom)]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           <AnimatePresence mode="wait" custom={dir}>
@@ -340,12 +338,13 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="px-4 py-6 sm:px-6 md:px-12 min-h-0"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 box-border"
               >
-                <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-8 sm:mb-10">
-                  Old Testament or New Testament?
-                </p>
-                <div className="flex flex-col gap-4 max-w-md">
+                <div className="w-full max-w-lg mx-auto">
+                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-8 sm:mb-10">
+                    Old Testament or New Testament?
+                  </p>
+                  <div className="flex flex-col gap-4">
                   <button
                     type="button"
                     onClick={() => handleTestamentPick("old")}
@@ -362,6 +361,7 @@ export function DevotionsClient() {
                   >
                     New Testament
                   </button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -376,29 +376,31 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="px-4 py-6 sm:px-6 md:px-12 pb-12 min-h-0"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
               >
-                <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-6 sm:mb-8">
-                  What book?
-                </p>
-                {booksLoading ? (
-                  <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
-                ) : (
-                  <ul className="space-y-0">
-                    {books.map((b) => (
-                      <li key={b.id}>
-                        <button
-                          type="button"
-                          onClick={() => handleBookPick(b)}
-                          className="w-full flex items-center justify-between py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px]"
-                        >
-                          <span>{b.name}</span>
-                          <ChevronRight className="w-5 h-5 text-white/40 shrink-0" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <div className="w-full max-w-lg mx-auto">
+                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-6 sm:mb-8">
+                    What book?
+                  </p>
+                  {booksLoading ? (
+                    <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
+                  ) : (
+                    <ul className="space-y-0">
+                      {books.map((b) => (
+                        <li key={b.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleBookPick(b)}
+                            className="w-full flex items-center justify-between py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px]"
+                          >
+                            <span>{b.name}</span>
+                            <ChevronRight className="w-5 h-5 text-white/40 shrink-0" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </motion.div>
             )}
 
@@ -412,34 +414,36 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="px-4 py-6 sm:px-6 md:px-12 pb-12 min-h-0"
+                className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
               >
-              <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
-                Which chapter?
-              </p>
-              <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
-                {selectedBook.name}
-              </p>
-              {chaptersLoading ? (
-                <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
-              ) : (
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 sm:gap-3">
-                  {chapters.map((ch) => (
-                    <button
-                      key={ch.id}
-                      type="button"
-                      onClick={() => handleChapterPick(ch.number)}
-                      className="min-h-[52px] sm:min-h-[56px] rounded-lg font-sans text-lg sm:text-xl text-white/90 border border-white/15 hover:bg-white/10 hover:border-white/25 hover:text-white transition-colors"
-                    >
-                      {ch.number}
-                    </button>
-                  ))}
+                <div className="w-full max-w-2xl mx-auto">
+                  <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+                    Which chapter?
+                  </p>
+                  <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
+                    {selectedBook.name}
+                  </p>
+                  {chaptersLoading ? (
+                    <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 sm:gap-3">
+                      {chapters.map((ch) => (
+                        <button
+                          key={ch.id}
+                          type="button"
+                          onClick={() => handleChapterPick(ch.number)}
+                          className="min-h-[52px] sm:min-h-[56px] rounded-lg font-sans text-lg sm:text-xl text-white/90 border border-white/15 hover:bg-white/10 hover:border-white/25 hover:text-white transition-colors"
+                        >
+                          {ch.number}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Step 3: Read full chapter or verses */}
+          {/* Step 4: Read full chapter or verses */}
           {step === "verses" && selectedBook && selectedChapter != null && (
             <motion.div
               key="verses"
@@ -449,15 +453,16 @@ export function DevotionsClient() {
               exit="exit"
               variants={slide}
               transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="px-4 py-6 sm:px-6 md:px-12 max-w-lg pb-12 min-h-0"
+              className="w-full min-h-full px-4 py-6 sm:px-6 md:px-12 pb-12 box-border"
             >
-              <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
-                Read
-              </p>
-              <p className="font-mono text-[10px] tracking-wider text-white/50 mb-8">
-                {selectedBook.name} {selectedChapter}
-              </p>
-              <div className="space-y-4">
+              <div className="w-full max-w-lg mx-auto">
+                <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+                  Read
+                </p>
+                <p className="font-mono text-[10px] tracking-wider text-white/50 mb-8">
+                  {selectedBook.name} {selectedChapter}
+                </p>
+                <div className="space-y-4">
                 <button
                   type="button"
                   onClick={loadFullChapter}
@@ -487,10 +492,11 @@ export function DevotionsClient() {
                   </button>
                 </div>
               </div>
+              </div>
             </motion.div>
           )}
 
-          {/* Step 4: Reading */}
+          {/* Step 5: Reading */}
           {step === "reading" && passage && (
             <motion.div
               key="reading"
@@ -500,8 +506,9 @@ export function DevotionsClient() {
               exit="exit"
               variants={slide}
               transition={{ duration: reduced ? 0.15 : 0.25 }}
-              className="px-4 py-6 pb-24 sm:px-6 md:px-12 max-w-2xl mx-auto"
+              className="w-full min-h-full px-4 py-6 pb-24 sm:px-6 md:px-12 box-border"
             >
+              <div className="w-full max-w-2xl mx-auto">
               <motion.div
                 className="mb-8"
                 initial="hidden"
@@ -586,6 +593,7 @@ export function DevotionsClient() {
                   </div>
                 </div>
               </section>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
