@@ -49,15 +49,33 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
 
     requestAnimationFrame(raf)
 
-    const handleResize = () => {
+    const refreshScroll = () => {
+      lenis.resize()
       ScrollTrigger.refresh()
     }
-    window.addEventListener("resize", handleResize)
+    window.addEventListener("resize", refreshScroll)
+    let viewportRefreshScheduled = false
+    const scheduleViewportRefresh = () => {
+      if (viewportRefreshScheduled) return
+      viewportRefreshScheduled = true
+      requestAnimationFrame(() => {
+        refreshScroll()
+        viewportRefreshScheduled = false
+      })
+    }
+    if (typeof window.visualViewport !== "undefined") {
+      window.visualViewport.addEventListener("resize", scheduleViewportRefresh)
+      window.visualViewport.addEventListener("scroll", scheduleViewportRefresh)
+    }
 
     return () => {
       window.removeEventListener("wheel", allowZoom, { capture: true })
       lenis.destroy()
-      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("resize", refreshScroll)
+      if (typeof window.visualViewport !== "undefined") {
+        window.visualViewport.removeEventListener("resize", scheduleViewportRefresh)
+        window.visualViewport.removeEventListener("scroll", scheduleViewportRefresh)
+      }
     }
   }, [])
 
