@@ -778,22 +778,27 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               <Loader2 className="size-5 animate-spin text-accent mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-mono text-sm uppercase tracking-widest mb-2">Transcription Progress</h3>
-                {progress?.message && (
-                  <p className="text-sm text-muted-foreground font-mono">{progress.message}</p>
-                )}
-                {sermon.progress_json?.message && (
-                  <p className="text-sm text-muted-foreground font-mono">
-                    {sermon.progress_json.message}
-                    {sermon.progress_json.current && sermon.progress_json.total && (
-                      <span className="ml-2 text-xs text-muted-foreground/70">
-                        ({sermon.progress_json.current}/{sermon.progress_json.total})
-                      </span>
-                    )}
-                  </p>
-                )}
-                {!progress?.message && !sermon.progress_json?.message && sermon.status === "generating" && (
-                  <p className="text-sm text-muted-foreground font-mono">Processing... Please wait.</p>
-                )}
+                {(() => {
+                  const dbMsg = sermon.progress_json?.message;
+                  const localMsg = progress?.message;
+                  const displayMsg = dbMsg || localMsg;
+                  if (displayMsg) {
+                    return (
+                      <p className="text-sm text-muted-foreground font-mono">
+                        {displayMsg}
+                        {sermon.progress_json?.current != null && sermon.progress_json?.total != null && (
+                          <span className="ml-2 text-xs text-muted-foreground/70">
+                            ({sermon.progress_json.current}/{sermon.progress_json.total})
+                          </span>
+                        )}
+                      </p>
+                    );
+                  }
+                  if (sermon.status === "generating") {
+                    return <p className="text-sm text-muted-foreground font-mono">Processing... Please wait.</p>;
+                  }
+                  return null;
+                })()}
                 {/* Show completed chunks if available */}
                 {sermon.progress_json?.completedChunks && 
                  Object.keys(sermon.progress_json.completedChunks).length > 0 && (
