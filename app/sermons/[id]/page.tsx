@@ -206,6 +206,37 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     } finally {
       setGeneratingSections(false);
     }
+
+  const generateNarrative = useCallback(async (id: string) => {
+    setGeneratingSections(true);
+    try {
+      const toastId = toast.loading("Generating narrative...", {
+        description: "AI is synthesizing the sermon into a story with quotes from the speaker.",
+      });
+      const response = await fetch(`/api/sermons/${id}/summaries/narrative`, { method: "POST" });
+      const data = await response.json();
+      toast.dismiss(toastId);
+      if (response.ok && data.success) {
+        toast.success("Narrative generated", {
+          description: `Created ${data.generated} sections with quotes and synthesis.`,
+          duration: 3000,
+        });
+        setUnifiedSummary(data.sections);
+      } else {
+        toast.error("Narrative generation failed", {
+          description: data.error || "Failed to generate narrative",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      toast.error("Error", {
+        description: error instanceof Error ? error.message : "Unknown error",
+        duration: 6000,
+      });
+    } finally {
+      setGeneratingSections(false);
+    }
+  }, []);
   }, []);
 
   const clearSections = useCallback(async (id: string) => {
@@ -1240,13 +1271,26 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
                         className="w-full justify-start text-xs font-mono uppercase tracking-widest"
                         onClick={() => {
                           setOptionsMenuOpen(false);
-                          sermon.id && structureSermon(sermon.id);
+                          sermon.id && generateNarrative(sermon.id);
                         }}
                         disabled={generatingSections || !(sermon.transcript || sermon.progress_json?.completedChunks)}
                         title={!(sermon.transcript || sermon.progress_json?.completedChunks) ? "Transcript or completed chunks required" : undefined}
                       >
+                        <FileText className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
+                        {unifiedSummary && unifiedSummary.length > 0 ? "Regenerate narrative" : "Generate narrative"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-xs font-mono uppercase tracking-widest"
+                        onClick={() => {
+                          setOptionsMenuOpen(false);
+                          sermon.id && structureSermon(sermon.id);
+                        }}
+                        disabled={generatingSections || !(sermon.transcript || sermon.progress_json?.completedChunks)}
+                      >
                         <RefreshCw className={`size-3 mr-2 ${generatingSections ? "animate-spin" : ""}`} />
-                        {unifiedSummary && unifiedSummary.length > 0 ? "Regenerate structure" : "Structure sermon"}
+                        Structure transcript
                       </Button>
                       <Button
                         variant="ghost"
@@ -1278,7 +1322,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           ) : generatingSections ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="size-6 animate-spin text-accent" />
-              <span className="ml-3 font-mono text-sm text-muted-foreground">Structuring sermon...</span>
+              <span className="ml-3 font-mono text-sm text-muted-foreground">Generating narrative...</span>
             </div>
           ) : unifiedSummary && unifiedSummary.length > 0 ? (
             <SermonNarrativeView
@@ -1290,18 +1334,29 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           ) : (
             <div className="text-center py-12">
               <p className="font-mono text-sm text-muted-foreground mb-4">
-                No sections yet. Use the menu above to structure the sermon (section titles and transcript excerpts).
+                No narrative yet. Generate a synthesized narrative of the sermon with direct quotes from the speaker.
               </p>
               {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="font-mono text-xs uppercase tracking-widest"
-                  onClick={() => sermon.id && structureSermon(sermon.id)}
-                >
-                  <RefreshCw className="size-3 mr-2" />
-                  Structure sermon
-                </Button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="font-mono text-xs uppercase tracking-widest"
+                    onClick={() => sermon.id && generateNarrative(sermon.id)}
+                  >
+                    <FileText className="size-3 mr-2" />
+                    Generate narrative
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="font-mono text-xs uppercase tracking-widest text-muted-foreground"
+                    onClick={() => sermon.id && structureSermon(sermon.id)}
+                  >
+                    <RefreshCw className="size-3 mr-2" />
+                    Structure transcript instead
+                  </Button>
+                </div>
               )}
             </div>
           )}
