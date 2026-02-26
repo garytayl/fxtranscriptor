@@ -63,18 +63,19 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
         viewportRefreshScheduled = false
       })
     }
-    if (typeof window.visualViewport !== "undefined") {
-      window.visualViewport.addEventListener("resize", scheduleViewportRefresh)
-      window.visualViewport.addEventListener("scroll", scheduleViewportRefresh)
+    const visualViewport = window.visualViewport ?? null
+    if (visualViewport) {
+      visualViewport.addEventListener("resize", scheduleViewportRefresh)
+      visualViewport.addEventListener("scroll", scheduleViewportRefresh)
     }
 
     return () => {
       window.removeEventListener("wheel", allowZoom, { capture: true })
       lenis.destroy()
       window.removeEventListener("resize", refreshScroll)
-      if (typeof window.visualViewport !== "undefined") {
-        window.visualViewport.removeEventListener("resize", scheduleViewportRefresh)
-        window.visualViewport.removeEventListener("scroll", scheduleViewportRefresh)
+      if (visualViewport) {
+        visualViewport.removeEventListener("resize", scheduleViewportRefresh)
+        visualViewport.removeEventListener("scroll", scheduleViewportRefresh)
       }
     }
   }, [])
