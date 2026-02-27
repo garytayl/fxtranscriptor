@@ -15,8 +15,11 @@ function isTouchPrimaryDevice() {
   return window.matchMedia("(pointer: coarse)").matches
 }
 
-/** Routes that use a full-screen overlay with their own scroll — skip Lenis so native scroll works. */
-const LENIS_SKIP_PATHNAMES = ["/bible", "/devotions"]
+/** Routes where we skip Lenis so native scroll works (zoom + pan, picker overlay scroll). */
+function shouldSkipLenis(pathname: string | null): boolean {
+  if (!pathname) return false
+  return pathname === "/bible" || pathname.startsWith("/bible/") || pathname === "/devotions" || pathname.startsWith("/devotions/")
+}
 
 export function SmoothScroll({ children }: { children: React.ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null)
@@ -27,8 +30,8 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
     if (isTouchPrimaryDevice()) {
       return
     }
-    // Skip Lenis on picker index pages (full-screen overlay with inner scroll) so "What book?" etc. can scroll
-    if (pathname && LENIS_SKIP_PATHNAMES.includes(pathname)) {
+    // Skip Lenis on Bible (reader + picker) and devotions so native scroll works and zoom+pan is usable
+    if (shouldSkipLenis(pathname ?? null)) {
       return
     }
 
@@ -81,13 +84,14 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener("wheel", allowZoom, { capture: true })
       lenis.destroy()
+      lenisRef.current = null
       window.removeEventListener("resize", refreshScroll)
       if (visualViewport) {
         visualViewport.removeEventListener("resize", scheduleViewportRefresh)
         visualViewport.removeEventListener("scroll", scheduleViewportRefresh)
       }
     }
-  }, [])
+  }, [pathname])
 
   return <>{children}</>
 }

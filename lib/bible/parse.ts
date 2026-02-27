@@ -56,7 +56,7 @@ export function parseChapterHtmlToVerses(html: string): BibleVerse[] {
 
   const matches = Array.from(html.matchAll(verseSpanRegex))
   if (matches.length === 0) {
-    const fallback = normalizeWhitespace(decodeHtmlEntities(stripHtmlTags(html)))
+    const fallback = normalizeWhitespace(stripHtmlTags(decodeHtmlEntities(html)))
     return fallback ? [{ number: 1, text: fallback }] : []
   }
 
@@ -73,7 +73,7 @@ export function parseChapterHtmlToVerses(html: string): BibleVerse[] {
     const startIndex = (match.index ?? 0) + markerHtml.length
     const endIndex = matches[index + 1]?.index ?? html.length
     const rawSegment = html.slice(startIndex, endIndex)
-    const text = normalizeWhitespace(decodeHtmlEntities(stripHtmlTags(rawSegment)))
+    const text = normalizeWhitespace(stripHtmlTags(decodeHtmlEntities(rawSegment)))
     if (!text) {
       continue
     }
