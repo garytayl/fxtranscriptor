@@ -15,6 +15,7 @@ import { LexiconCacheProvider } from "@/app/bible/_components/lexicon-cache-cont
 import { WordStudySidebarPanel } from "@/app/bible/_components/word-study-sidebar"
 import type { VerseRange } from "@/lib/bible/reference"
 import type { BibleTranslation } from "@/lib/bible/translations"
+import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 const DISMISS_THRESHOLD = 60
 
@@ -140,7 +141,8 @@ export type BibleChapterShellProps = {
   chapters: ChapterOption[]
   verses: { number: number; text: string }[]
   highlightRange: VerseRange | null
-  strongsByVerse: Record<number, string[]>
+  /** KJV word + Strong's code per verse; when present, verse text is rendered from this so codes match. */
+  strongsWordsByVerse: Record<number, StrongsWordAndCode[]>
   keyTerms: string[]
   previousChapter: ChapterOption | null
   nextChapter: ChapterOption | null
@@ -156,7 +158,7 @@ export function BibleChapterShell({
   chapters,
   verses,
   highlightRange,
-  strongsByVerse,
+  strongsWordsByVerse,
   keyTerms,
   previousChapter,
   nextChapter,
@@ -168,8 +170,9 @@ export function BibleChapterShell({
   const [selectedStrongsCode, setSelectedStrongsCode] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  const hasStrongsForChapter =
-    Object.values(strongsByVerse).some((codes) => codes.length > 0)
+  const hasStrongsForChapter = Object.values(strongsWordsByVerse).some(
+    (pairs) => pairs.length > 0,
+  )
 
   const onSelectStrongs = useCallback((code: string) => {
     setSelectedStrongsCode(code)
@@ -237,7 +240,7 @@ export function BibleChapterShell({
           <ChapterVerseList
             verses={verses}
             highlightRange={highlightRange}
-            strongsByVerse={strongsByVerse}
+            strongsWordsByVerse={strongsWordsByVerse}
             onSelectStrongs={onSelectStrongs}
           />
         )}

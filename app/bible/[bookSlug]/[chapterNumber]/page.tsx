@@ -5,7 +5,7 @@ import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { parseVerseRange } from "@/lib/bible/reference"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 import { getKeyTermsForChapter } from "@/lib/bible/chapter-key-terms"
-import { getStrongsForChapter } from "@/lib/bible/verse-strongs"
+import { getStrongsWordsForChapter } from "@/lib/bible/verse-strongs"
 
 export const revalidate = 3600
 
@@ -68,7 +68,8 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null
   const query = activeKey ? `?t=${activeKey}` : ""
   const keyTerms = getKeyTermsForChapter(book.slug, chapterNumber)
-  const strongsByVerse = verses.length > 0 ? await getStrongsForChapter(book.slug, chapterNumber) : {}
+  const strongsWordsByVerse =
+    verses.length > 0 ? await getStrongsWordsForChapter(book.slug, chapterNumber) : {}
 
   return (
     <BibleChapterShell
@@ -77,7 +78,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       chapters={chapters}
       verses={verses}
       highlightRange={highlightRange}
-      strongsByVerse={strongsByVerse}
+      strongsWordsByVerse={strongsWordsByVerse}
       keyTerms={keyTerms}
       previousChapter={previousChapter ?? null}
       nextChapter={nextChapter ?? null}

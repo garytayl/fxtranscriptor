@@ -3,12 +3,13 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { WordStudyEntryContent } from "@/components/word-study"
 import { useLexiconCache } from "@/app/bible/_components/lexicon-cache-context"
+import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 type VerseWordsProps = {
   verseNumber: number
   text: string
-  /** Strong's codes in word order (from KJV alignment). Word at index i gets strongs[i] if present. */
-  strongs?: string[]
+  /** When set, verse is rendered from these KJV word+code pairs (correct alignment). Otherwise text is shown with no Strong's. */
+  wordsWithCodes?: StrongsWordAndCode[]
   className?: string
   /** When true, words with Strong's get hover styling. */
   highlightStrongs?: boolean
@@ -67,36 +68,23 @@ function StrongsClickableWord({
 }
 
 /**
- * Splits verse text into words and renders each word; words with a Strong's code are clickable (definition loads in sidebar on click, no hover fetch).
+ * Renders verse text. When wordsWithCodes is provided (KJV word+code pairs), each word is clickable with the correct Strong's code. Otherwise shows plain text.
  */
 export function VerseWords({
   verseNumber,
   text,
-  strongs = [],
+  wordsWithCodes,
   className = "",
   highlightStrongs = true,
   onSelectStrongs,
 }: VerseWordsProps) {
-  const words = text.split(/(\s+)/)
-  const tokens: { type: "word" | "space"; value: string; index: number }[] = []
-  let wordIndex = 0
-  for (const w of words) {
-    if (/^\s+$/.test(w)) {
-      tokens.push({ type: "space", value: w, index: -1 })
-    } else if (w) {
-      tokens.push({ type: "word", value: w, index: wordIndex++ })
-    }
-  }
-
-  return (
-    <span className={className}>
-      {tokens.map((t, i) => {
-        if (t.type === "space") return <span key={i}>{t.value}</span>
-        const code = strongs[t.index]
-        if (code) {
-          return (
+  if (wordsWithCodes && wordsWithCodes.length > 0) {
+    return (
+      <span className={className}>
+        {wordsWithCodes.map(({ word, code }, i) => (
+          <span key={`${i}-${code}`}>
+            {i > 0 ? " " : null}
             <StrongsClickableWord
-              key={i}
               code={code}
               onSelect={onSelectStrongs}
               className={
@@ -105,12 +93,13 @@ export function VerseWords({
                   : undefined
               }
             >
-              {t.value}
+              {word}
             </StrongsClickableWord>
-          )
-        }
-        return <span key={i}>{t.value}</span>
-      })}
-    </span>
-  )
+          </span>
+        ))}
+      </span>
+    )
+  }
+
+  return <span className={className}>{text}</span>
 }

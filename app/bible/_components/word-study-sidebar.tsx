@@ -25,11 +25,18 @@ export function WordStudySidebarPanel({ code, hasStrongsForChapter = true }: Wor
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="font-sans text-sm text-white/40 italic"
+          className="font-sans text-sm text-white/40 italic space-y-1"
         >
-          {hasStrongsForChapter
-            ? "Click a word in the text to view the Greek or Hebrew definition."
-            : "Strong's not available for this chapter."}
+          {hasStrongsForChapter ? (
+            <>
+              Click a word in the text to view the Greek or Hebrew definition.
+              <span className="block mt-1.5 text-white/30 text-xs not-italic">
+                Verse text is shown in KJV so each word matches its Strong’s code.
+              </span>
+            </>
+          ) : (
+            "Strong's not available for this chapter."
+          )}
         </motion.p>
       ) : loading ? (
         <motion.p

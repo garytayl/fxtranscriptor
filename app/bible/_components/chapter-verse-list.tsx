@@ -3,11 +3,13 @@
 import { VerseWords } from "./verse-words"
 import { isVerseInRange } from "@/lib/bible/reference"
 import type { VerseRange } from "@/lib/bible/reference"
+import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 type ChapterVerseListProps = {
   verses: { number: number; text: string }[]
   highlightRange: VerseRange | null
-  strongsByVerse: Record<number, string[]>
+  /** KJV word + code per verse; when present for a verse, that verse is rendered from this (correct alignment). */
+  strongsWordsByVerse: Record<number, StrongsWordAndCode[]>
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
   onSelectStrongs?: (code: string) => void
 }
@@ -15,14 +17,14 @@ type ChapterVerseListProps = {
 export function ChapterVerseList({
   verses,
   highlightRange,
-  strongsByVerse,
+  strongsWordsByVerse,
   onSelectStrongs,
 }: ChapterVerseListProps) {
   return (
     <ol className="space-y-1 sm:space-y-2 text-[0.9375rem] sm:text-base leading-[1.8] sm:leading-relaxed">
       {verses.map((verse) => {
         const isHighlighted = highlightRange ? isVerseInRange(verse.number, highlightRange) : false
-        const strongs = strongsByVerse[verse.number]
+        const wordsWithCodes = strongsWordsByVerse[verse.number]
         return (
           <li
             key={verse.number}
@@ -45,7 +47,7 @@ export function ChapterVerseList({
             <VerseWords
               verseNumber={verse.number}
               text={verse.text}
-              strongs={strongs}
+              wordsWithCodes={wordsWithCodes}
               highlightStrongs={true}
               onSelectStrongs={onSelectStrongs}
             />

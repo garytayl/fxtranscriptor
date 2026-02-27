@@ -75,15 +75,48 @@ const SLUG_TO_KJV_CODE: Record<string, string> = {
   revelation: "Rev",
 }
 
+/** Normalize Strong's code to canonical form (e.g. "g26" -> "G26"). */
+function normalizeCode(code: string): string {
+  const c = code.toUpperCase()
+  return c.startsWith("G") || c.startsWith("H") ? c : code
+}
+
 /** Parse "en" string like "In[G1722] the beginning[G746] was[G2258]" -> ["G1722","G746","G2258",...] */
 function parseEnToStrongsOrder(en: string): string[] {
   const codes: string[] = []
   const regex = /\[([GH]\d+)\]/gi
   let m: RegExpExecArray | null
   while ((m = regex.exec(en)) !== null) {
-    codes.push(m[1].toUpperCase().replace(/^G/, "G").replace(/^H/, "H"))
+    codes.push(normalizeCode(m[1]))
   }
   return codes
+}
+
+export type StrongsWordAndCode = { word: string; code: string }
+
+/**
+ * Parse "en" to word+code pairs so the displayed text matches the Strong's codes (KJV wording).
+ * Handles consecutive codes like "every man[G3956][G444]" by using a zero-width space for the second code so the same word is not shown twice.
+ */
+export function parseEnToWordsAndCodes(en: string): StrongsWordAndCode[] {
+  const pairs: StrongsWordAndCode[] = []
+  const regex = /\[([GH]\d+)\]/gi
+  let lastIndex = 0
+  let lastWord = ""
+  let m: RegExpExecArray | null
+  while ((m = regex.exec(en)) !== null) {
+    const raw = en.slice(lastIndex, m.index).trim()
+    const code = normalizeCode(m[1])
+    const displayWord = raw || lastWord || code
+    if (!raw && lastWord) {
+      pairs.push({ word: "\u00b7", code })
+    } else {
+      pairs.push({ word: displayWord, code })
+    }
+    lastWord = displayWord
+    lastIndex = m.index + m[0].length
+  }
+  return pairs
 }
 
 type KaiserlikVerse = { en?: string }
@@ -147,6 +180,22 @@ export async function getStrongsForChapter(
   bookSlug: string,
   chapter: number
 ): Promise<Record<number, string[]>> {
+  const words = await getStrongsWordsForChapter(bookSlug, chapter)
+  const out: Record<number, string[]> = {}
+  for (const [verseNum, pairs] of Object.entries(words)) {
+    out[Number(verseNum)] = pairs.map((p) => p.code)
+  }
+  return out
+}
+
+/**
+ * Get KJV word + Strong's code per verse for a whole chapter.
+ * Use this to render verse text so each word matches its Strong's code (avoids WEB/KJV index mismatch).
+ */
+export async function getStrongsWordsForChapter(
+  bookSlug: string,
+  chapter: number
+): Promise<Record<number, StrongsWordAndCode[]>> {
   const book = await fetchBook(bookSlug)
   if (!book) return {}
   const kjvCode = getKjvCode(bookSlug)
@@ -156,12 +205,12 @@ export async function getStrongsForChapter(
   const chapterKey = `${kjvCode}|${chapter}`
   const chapterData = bookData[chapterKey]
   if (!chapterData || typeof chapterData !== "object") return {}
-  const out: Record<number, string[]> = {}
+  const out: Record<number, StrongsWordAndCode[]> = {}
   for (const [verseKey, verseObj] of Object.entries(chapterData)) {
     const lastPipe = verseKey.lastIndexOf("|")
     const verseNum = lastPipe >= 0 ? parseInt(verseKey.slice(lastPipe + 1), 10) : 0
     if (verseNum && verseObj?.en) {
-      out[verseNum] = parseEnToStrongsOrder(verseObj.en)
+      out[verseNum] = parseEnToWordsAndCodes(verseObj.en)
     }
   }
   return out
