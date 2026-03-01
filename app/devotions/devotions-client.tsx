@@ -84,11 +84,11 @@ function JournalPanel({
 }: JournalPanelProps) {
   const prompt = getReflectionPrompt(passageRef)
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
         <label
           htmlFor="devotions-prayer"
-          className="block font-sans text-sm font-light text-white/80 mb-1.5"
+          className="block font-sans text-sm font-light text-white/80 mb-2"
         >
           A prayer in your own words
         </label>
@@ -98,14 +98,14 @@ function JournalPanel({
           onChange={onPrayerChange}
           onBlur={onBlur}
           placeholder="Whatever you want to say—or leave blank"
-          rows={3}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
+          rows={4}
+          className="w-full min-h-[5rem] bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
         />
       </div>
       <div>
         <label
           htmlFor="devotions-reflection"
-          className="block font-sans text-sm font-light text-white/80 mb-1.5"
+          className="block font-sans text-sm font-light text-white/80 mb-2"
         >
           {prompt}
         </label>
@@ -115,8 +115,8 @@ function JournalPanel({
           onChange={onReflectionChange}
           onBlur={onBlur}
           placeholder="Just a line or two—or nothing"
-          rows={3}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
+          rows={4}
+          className="w-full min-h-[5rem] bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y transition-colors"
         />
       </div>
     </div>
@@ -166,18 +166,18 @@ function MobileJournalSheet({
         dragConstraints={{ top: 0 }}
         dragElastic={{ top: 0.05, bottom: 0.8 }}
         onDragEnd={handleDragEnd}
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-[71] bg-[#0a0a0a] border-t border-white/10 rounded-t-[20px] max-h-[75vh] flex flex-col shadow-[0_-4px_40px_rgba(0,0,0,0.5)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-[71] bg-[#0a0a0a] border-t border-white/10 rounded-t-[20px] max-h-[88vh] flex flex-col shadow-[0_-4px_40px_rgba(0,0,0,0.5)]"
         data-lenis-prevent
       >
         <div
-          className="shrink-0 flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
+          className="shrink-0 flex flex-col items-center pt-4 pb-3 cursor-grab active:cursor-grabbing select-none"
           style={{ touchAction: "none" }}
           onPointerDown={(e) => dragControls.start(e)}
         >
           <div className="w-14 h-1.5 rounded-full bg-white/30 active:bg-white/50 transition-colors" />
         </div>
         <div
-          className="shrink-0 px-5 pb-3 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
+          className="shrink-0 px-5 pb-4 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
           style={{ touchAction: "none" }}
           onPointerDown={(e) => dragControls.start(e)}
         >
@@ -188,21 +188,21 @@ function MobileJournalSheet({
             <button
               type="button"
               onClick={onDismiss}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/8 active:bg-white/15 transition-colors"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/8 active:bg-white/15 transition-colors touch-manipulation"
               aria-label="Close journal"
             >
-              <X className="size-3.5 text-white/60" />
+              <X className="size-4 text-white/60" />
             </button>
           </div>
         </div>
         <div className="mx-5 h-px bg-white/8" />
         <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-6 pb-6"
+          style={{ WebkitOverflowScrolling: "touch", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
           {children}
         </div>
-        <div className="shrink-0 flex items-center justify-center gap-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
+        <div className="shrink-0 flex items-center justify-center gap-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
           <ChevronDown className="size-3 text-white/25" />
           <span className="font-mono text-[9px] tracking-widest text-white/25 uppercase">
             Drag down to close
@@ -1276,7 +1276,7 @@ export function DevotionsClient() {
       <AnimatePresence>
         {step === "reading" && journalSheetOpen && (
           <MobileJournalSheet onDismiss={() => setJournalSheetOpen(false)}>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-1">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
               <JournalPanel
                 passageRef={passageRef}
                 prayer={prayer}
