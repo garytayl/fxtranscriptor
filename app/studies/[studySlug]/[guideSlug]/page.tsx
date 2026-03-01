@@ -38,7 +38,7 @@ export default async function StudyGuidePage({ params }: Props) {
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="grid-bg fixed inset-0 opacity-20 pointer-events-none" aria-hidden="true" />
       <div className="relative z-10 pt-[var(--navbar-offset)]">
-        <div className="px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:max-w-none">
+        <div className="px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:max-w-none lg:pr-[22rem]">
           <header className="mb-8 sm:mb-12 pb-8 sm:pb-10 border-b border-white/10">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
               <Link

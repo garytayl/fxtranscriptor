@@ -191,19 +191,19 @@ export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellP
 
   return (
     <>
-      <div className="pb-32 lg:pb-24 lg:flex lg:gap-12 lg:items-start lg:pr-[22rem]">
+      <div className="pb-32 lg:pb-24 lg:flex lg:gap-12 lg:items-start">
         <main className="min-w-0 flex-1 lg:min-w-0">
           <article className="study-guide study-guide-resonates">
             <StudyGuideContent content={content} onSelectPassage={handleSelectPassage} />
           </article>
         </main>
 
-        {/* Sidebar — desktop only, fixed so it stays visible when scrolling */}
+        {/* Sidebar — desktop only, full height so it meets the navbar */}
         <aside
-          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-[var(--navbar-offset)] lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] border-l border-white/10 bg-[#050505] z-10 pt-6"
+          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-0 lg:w-[22rem] lg:h-screen lg:min-h-screen border-l border-white/10 bg-[#050505] z-10 lg:pt-[var(--navbar-offset)]"
           aria-label="Verses"
         >
-          <div className="shrink-0 px-6 pb-2">
+          <div className="shrink-0 px-6 pb-2 pt-6">
             <p className="font-mono text-xs tracking-[0.25em] text-white/50 uppercase">
               Verses
             </p>
