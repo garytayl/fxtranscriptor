@@ -43,6 +43,25 @@ import { exportToCSV, exportToJSON, downloadFile } from "@/lib/export";
 import { analytics, errorTracker } from "@/lib/analytics";
 import { format } from "date-fns";
 
+/**
+ * Derive the real status from available data. The DB `status` field can be
+ * stale — e.g. a sermon may have a transcript but still be marked "pending",
+ * or be stuck in "generating" indefinitely.
+ */
+function getEffectiveStatus(sermon: Sermon): Sermon["status"] {
+  if (sermon.transcript_source && sermon.transcript_generated_at) {
+    return "completed";
+  }
+  if (sermon.status === "generating") {
+    const updatedAt = sermon.updated_at ? new Date(sermon.updated_at).getTime() : 0;
+    const staleMs = Date.now() - updatedAt;
+    if (staleMs > 2 * 60 * 60 * 1000) {
+      return "failed";
+    }
+  }
+  return sermon.status;
+}
+
 export default function SermonsPage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,7 +86,7 @@ export default function SermonsPage() {
   const [visibleCount, setVisibleCount] = useState(pageSize);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Filter sermons based on search and status
+  // Filter sermons based on search and status (using effective status)
   const filteredSermons = useMemo(() => {
     let filtered = sermons;
     
@@ -80,9 +99,9 @@ export default function SermonsPage() {
       );
     }
     
-    // Status filter
+    // Status filter — compare against effective status, not raw DB status
     if (statusFilter) {
-      filtered = filtered.filter(sermon => sermon.status === statusFilter);
+      filtered = filtered.filter(sermon => getEffectiveStatus(sermon) === statusFilter);
     }
     
     return filtered;
@@ -752,7 +771,7 @@ export default function SermonsPage() {
   }, [selectedSermon]);
 
   const getStatusBadge = useCallback((sermon: Sermon) => {
-    switch (sermon.status) {
+    switch (getEffectiveStatus(sermon)) {
       case "completed":
         return (
           <Badge variant="default" className="gap-1">
@@ -966,46 +985,33 @@ export default function SermonsPage() {
                     
                     {/* Status Filter */}
                     <div className="flex gap-2 flex-wrap">
-                      <Button
-                        variant={statusFilter === null ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setStatusFilter(null)}
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        All ({sermons.length})
-                      </Button>
-                      <Button
-                        variant={statusFilter === "pending" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setStatusFilter("pending")}
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        Pending ({sermons.filter(s => s.status === "pending").length})
-                      </Button>
-                      <Button
-                        variant={statusFilter === "generating" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setStatusFilter("generating")}
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        Generating ({sermons.filter(s => s.status === "generating").length})
-                      </Button>
-                      <Button
-                        variant={statusFilter === "completed" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setStatusFilter("completed")}
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        Completed ({sermons.filter(s => s.status === "completed").length})
-                      </Button>
-                      <Button
-                        variant={statusFilter === "failed" ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setStatusFilter("failed")}
-                        className="font-mono text-xs uppercase tracking-widest"
-                      >
-                        Failed ({sermons.filter(s => s.status === "failed").length})
-                      </Button>
+                      {(() => {
+                        const counts = { pending: 0, generating: 0, completed: 0, failed: 0 };
+                        sermons.forEach(s => { const es = getEffectiveStatus(s); if (es in counts) counts[es as keyof typeof counts]++; });
+                        return (
+                          <>
+                            <Button variant={statusFilter === null ? "default" : "outline"} size="sm" onClick={() => setStatusFilter(null)} className="font-mono text-xs uppercase tracking-widest">
+                              All ({sermons.length})
+                            </Button>
+                            <Button variant={statusFilter === "pending" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("pending")} className="font-mono text-xs uppercase tracking-widest">
+                              Pending ({counts.pending})
+                            </Button>
+                            {counts.generating > 0 && (
+                              <Button variant={statusFilter === "generating" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("generating")} className="font-mono text-xs uppercase tracking-widest">
+                                Generating ({counts.generating})
+                              </Button>
+                            )}
+                            <Button variant={statusFilter === "completed" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("completed")} className="font-mono text-xs uppercase tracking-widest">
+                              Completed ({counts.completed})
+                            </Button>
+                            {counts.failed > 0 && (
+                              <Button variant={statusFilter === "failed" ? "default" : "outline"} size="sm" onClick={() => setStatusFilter("failed")} className="font-mono text-xs uppercase tracking-widest">
+                                Failed ({counts.failed})
+                              </Button>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     
                     {/* Results count */}
