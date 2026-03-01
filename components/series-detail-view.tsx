@@ -11,6 +11,7 @@ import { format } from "date-fns"
 import { Sermon as SermonType } from "@/lib/supabase"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { BatchOperations } from "@/components/batch-operations"
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -20,6 +21,11 @@ interface SeriesDetailViewProps {
   onViewSermon: (sermon: SermonType) => void
   getStatusBadge: (sermon: SermonType) => ReactElement
   getSourceBadge: (source: string | null) => ReactElement | null
+  /** When provided with isAdmin, shows batch "Generate (N)" above the grid. */
+  onGenerate?: (sermonIds: string[]) => Promise<void>
+  /** When provided with isAdmin, shows "Generate narratives (N)" in the batch bar. */
+  onGenerateNarratives?: (sermonIds: string[]) => Promise<void>
+  isAdmin?: boolean
 }
 
 export function SeriesDetailView({
@@ -28,6 +34,9 @@ export function SeriesDetailView({
   onViewSermon,
   getStatusBadge,
   getSourceBadge,
+  onGenerate,
+  onGenerateNarratives,
+  isAdmin,
 }: SeriesDetailViewProps) {
   const sectionRef = useRef<HTMLElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -105,6 +114,17 @@ export function SeriesDetailView({
           </div>
         </div>
       </div>
+
+      {/* Batch transcribe (admin only) */}
+      {isAdmin && onGenerate && series.sermons.length > 0 && (
+        <div className="mb-6">
+          <BatchOperations
+            sermons={series.sermons}
+            onGenerate={onGenerate}
+            onGenerateNarratives={onGenerateNarratives}
+          />
+        </div>
+      )}
 
       {/* Sermons Grid */}
       <div ref={sermonsRef} className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

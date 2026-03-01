@@ -608,6 +608,24 @@ export default function SermonsPage() {
     }
   }, [sermons]);
 
+  const handleBatchGenerateNarratives = useCallback(async (sermonIds: string[]) => {
+    const withTranscript = sermons.filter(
+      (s) => sermonIds.includes(s.id) && (s.transcript || (s.transcript_source && s.transcript_generated_at))
+    );
+    const ids = withTranscript.map((s) => s.id);
+    if (ids.length === 0) return;
+    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const res = await fetch(`/api/sermons/${id}/summaries/narrative`, { method: "POST", credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(`Narrative failed: ${data.error || res.statusText}`, { description: id });
+      }
+      if (i < ids.length - 1) await delay(500);
+    }
+  }, [sermons]);
+
   const handleCopyAll = useCallback(async (transcript: string) => {
     try {
       await navigator.clipboard.writeText(transcript);
@@ -839,6 +857,9 @@ export default function SermonsPage() {
             onViewSermon={handleViewSermon}
             getStatusBadge={getStatusBadge}
             getSourceBadge={getSourceBadge}
+            onGenerate={isAdmin ? async (sermonIds) => { await Promise.all(sermonIds.map((id) => generateTranscript(id))) } : undefined}
+            onGenerateNarratives={isAdmin ? handleBatchGenerateNarratives : undefined}
+            isAdmin={isAdmin}
           />
         ) : (
           <>
@@ -1053,6 +1074,7 @@ export default function SermonsPage() {
                           onGenerate={async (sermonIds) => {
                             await Promise.all(sermonIds.map(id => generateTranscript(id)))
                           }}
+                          onGenerateNarratives={handleBatchGenerateNarratives}
                           onExport={(selectedSermons) => {
                             const csv = exportToCSV(selectedSermons)
                             downloadFile(csv, `sermons-export-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv')

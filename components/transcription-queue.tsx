@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { X, Loader2, Clock, CheckCircle2, AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -278,7 +279,10 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
         {queue.processing && (
           <div className="border rounded-lg p-3 bg-card space-y-2">
             <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
+              <Link
+                href={`/sermons/${queue.processing.sermonId}`}
+                className="flex-1 min-w-0 cursor-pointer rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+              >
                 <div className="flex items-center gap-2 mb-1">
                   {getStatusBadge(queue.processing)}
                   <span className="text-xs font-mono text-muted-foreground">
@@ -300,13 +304,18 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
                       )}
                   </p>
                 )}
-              </div>
+              </Link>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleCancel(queue.processing!.sermonId)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCancel(queue.processing!.sermonId);
+                }}
                 disabled={cancelling.has(queue.processing.sermonId)}
                 className="flex-shrink-0"
+                aria-label="Cancel"
               >
                 {cancelling.has(queue.processing.sermonId) ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -330,7 +339,10 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
                 className="border rounded-lg p-3 bg-card/50 space-y-2"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/sermons/${item.sermonId}`}
+                    className="flex-1 min-w-0 cursor-pointer rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       {getStatusBadge(item)}
                       <span className="text-xs font-mono text-muted-foreground">
@@ -345,13 +357,18 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
                         {item.sermon.progress_json.message}
                       </p>
                     )}
-                  </div>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleCancel(item.sermonId)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleCancel(item.sermonId);
+                    }}
                     disabled={cancelling.has(item.sermonId)}
                     className="flex-shrink-0"
+                    aria-label="Cancel"
                   >
                     {cancelling.has(item.sermonId) ? (
                       <Loader2 className="size-4 animate-spin" />

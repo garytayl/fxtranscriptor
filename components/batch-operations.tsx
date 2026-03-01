@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
-import { Loader2, Play, Trash2, Download, X } from 'lucide-react'
+import { Loader2, Play, Trash2, Download, X, FileText } from 'lucide-react'
 import { Sermon } from '@/lib/supabase'
 import { analytics } from '@/lib/analytics'
 
@@ -13,7 +13,13 @@ interface BatchOperationsProps {
   onGenerate: (sermonIds: string[]) => Promise<void>
   onDelete?: (sermonIds: string[]) => Promise<void>
   onExport?: (sermons: Sermon[]) => void
+  /** When provided, shows "Generate narratives (N)" for selected sermons that have a transcript. */
+  onGenerateNarratives?: (sermonIds: string[]) => Promise<void>
   className?: string
+}
+
+function hasTranscript(s: Sermon): boolean {
+  return !!(s.transcript || (s.transcript_source && s.transcript_generated_at))
 }
 
 export function BatchOperations({
@@ -21,10 +27,12 @@ export function BatchOperations({
   onGenerate,
   onDelete,
   onExport,
+  onGenerateNarratives,
   className = '',
 }: BatchOperationsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isGeneratingNarratives, setIsGeneratingNarratives] = useState(false)
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -155,6 +163,43 @@ export function BatchOperations({
     }
   }
 
+  const eligibleNarrativeIds = sermons.filter(
+    (s) => selectedIds.has(s.id) && hasTranscript(s)
+  ).map((s) => s.id)
+
+  const handleBatchGenerateNarratives = async () => {
+    if (eligibleNarrativeIds.length === 0) {
+      toast.warning('No eligible sermons', {
+        description: 'Select sermons that have a transcript to generate narratives.',
+        duration: 4000,
+      })
+      return
+    }
+    if (!onGenerateNarratives) return
+
+    setIsGeneratingNarratives(true)
+    const toastId = toast.loading(`Generating narratives for ${eligibleNarrativeIds.length} sermons…`, {
+      description: 'This may take a while. You can leave this page.',
+    })
+    try {
+      await onGenerateNarratives(eligibleNarrativeIds)
+      toast.dismiss(toastId)
+      toast.success('Narratives generation started', {
+        description: `Queued ${eligibleNarrativeIds.length} sermon${eligibleNarrativeIds.length > 1 ? 's' : ''} for narrative generation.`,
+        duration: 5000,
+      })
+      clearSelection()
+    } catch (error) {
+      toast.dismiss(toastId)
+      toast.error('Narrative generation failed', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+        duration: 6000,
+      })
+    } finally {
+      setIsGeneratingNarratives(false)
+    }
+  }
+
   if (sermons.length === 0) {
     return null
   }
@@ -197,6 +242,22 @@ export function BatchOperations({
               )}
               Generate ({selectedIds.size})
             </Button>
+            {onGenerateNarratives && eligibleNarrativeIds.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-mono text-xs uppercase tracking-widest gap-2"
+                onClick={handleBatchGenerateNarratives}
+                disabled={isProcessing || isGeneratingNarratives}
+              >
+                {isGeneratingNarratives ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <FileText className="size-3" />
+                )}
+                Generate narratives ({eligibleNarrativeIds.length})
+              </Button>
+            )}
             {onExport && (
               <Button
                 variant="outline"
