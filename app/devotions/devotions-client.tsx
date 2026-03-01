@@ -18,7 +18,7 @@ import {
   Flame,
   Calendar,
 } from "lucide-react"
-import { getPassageEntry, savePassageEntry } from "@/lib/devotions-storage"
+import { getPassageEntry, savePassageEntry, listPassageEntries, type ListedPassageEntry } from "@/lib/devotions-storage"
 import { getDevotionsSettings, setShowTracking, setChaptersPerDay } from "@/lib/devotions-settings"
 import {
   getDevotionsTracking,
@@ -240,7 +240,7 @@ type PassageData = {
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "landing" | "planPicker" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
+type Step = "landing" | "planPicker" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -570,7 +570,7 @@ export function DevotionsClient() {
   const goBack = useCallback(() => {
     setDir(-1)
     if (step === "landing") return
-    if (step === "planPicker") setStep("landing")
+    if (step === "planPicker" || step === "journalHistory") setStep("landing")
     else if (step === "testament") setStep("landing")
     else if (step === "book") setStep("testament")
     else if (step === "chapter") setStep("book")
@@ -589,6 +589,30 @@ export function DevotionsClient() {
     setDir(1)
     setStep("testament")
   }, [])
+
+  /** Load a passage from journal history and prefill prayer/reflection. */
+  const loadPassageFromJournalEntry = useCallback((entry: ListedPassageEntry) => {
+    setLoading(true)
+    setError(null)
+    setActivePlanSession(null)
+    fetch(`/api/bible/passage?ref=${encodeURIComponent(entry.passageRef)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error)
+        setPassage({ reference: data.reference, verses: data.verses ?? [] })
+        setPrayer(entry.prayer)
+        setReflection(entry.reflection)
+        setDir(1)
+        setStep("reading")
+        recordDevotionSession(data.reference, settings.showTracking)
+        setTracking(getDevotionsTracking())
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not load passage.")
+        toast.error("Could not load passage")
+      })
+      .finally(() => setLoading(false))
+  }, [settings.showTracking])
 
   const openReflection = useCallback(() => {
     setJournalSheetOpen(false)
@@ -682,6 +706,41 @@ export function DevotionsClient() {
     input.click()
   }, [passageRef])
 
+  const handleExportJournal = useCallback(() => {
+    const entries = listPassageEntries()
+    if (entries.length === 0) {
+      toast.info("No journal entries to export")
+      return
+    }
+    const lines: string[] = ["# Devotions Journal", "", `Exported ${new Date().toISOString().slice(0, 10)}`, ""]
+    entries.forEach((entry) => {
+      const date = entry.updatedAt ? new Date(entry.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : ""
+      lines.push(`## ${entry.passageRef}${date ? ` (${date})` : ""}`)
+      lines.push("")
+      if (entry.prayer?.trim()) {
+        lines.push("**Prayer**")
+        lines.push("")
+        lines.push(entry.prayer.trim())
+        lines.push("")
+      }
+      if (entry.reflection?.trim()) {
+        lines.push("**Reflection**")
+        lines.push("")
+        lines.push(entry.reflection.trim())
+        lines.push("")
+      }
+      lines.push("---")
+      lines.push("")
+    })
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" })
+    const a = document.createElement("a")
+    a.href = URL.createObjectURL(blob)
+    a.download = `devotions-journal-${new Date().toISOString().slice(0, 10)}.md`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    toast.success("Journal exported as Markdown")
+  }, [])
+
   const stagger = reduced ? 0.02 : 0.06
 
   return (
@@ -732,6 +791,7 @@ export function DevotionsClient() {
         <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 truncate max-w-[45vw] text-center">
           {step === "landing" && "Devotions"}
           {step === "planPicker" && "Start a reading plan"}
+          {step === "journalHistory" && "Your journal"}
           {step === "testament" && "Choose testament"}
           {step === "book" && "Choose book"}
           {step === "chapter" && "Choose chapter"}
@@ -878,7 +938,87 @@ export function DevotionsClient() {
                     >
                       Choose a passage
                     </button>
+                    {typeof window !== "undefined" && listPassageEntries().length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setDir(1); setStep("journalHistory"); }}
+                        className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/60 border border-white/10 hover:bg-white/5 hover:text-white/80 transition-colors"
+                      >
+                        Your journal
+                      </button>
+                    )}
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Journal history — list past reflections */}
+            {step === "journalHistory" && (
+              <motion.div
+                key="journalHistory"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border"
+              >
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                    <div>
+                      <p className="font-sans text-xl sm:text-2xl font-light text-white/90 mb-2">
+                        Your journal
+                      </p>
+                      <p className="font-mono text-[10px] tracking-wider text-white/60">
+                        Tap an entry to open the passage and your reflection.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExportJournal}
+                      className="shrink-0 flex items-center gap-2 font-mono text-[10px] tracking-wider text-white/60 hover:text-white/80 border border-white/15 hover:border-white/25 rounded-lg px-3 py-2 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Export as Markdown
+                    </button>
+                  </div>
+                  <ul className="space-y-0 border border-white/10 rounded-xl overflow-hidden divide-y divide-white/10">
+                    {typeof window !== "undefined" &&
+                      listPassageEntries().map((entry) => {
+                        const snippet = entry.reflection?.trim() || entry.prayer?.trim() || "—"
+                        const oneLine = snippet.length > 80 ? snippet.slice(0, 80).trim() + "…" : snippet
+                        const dateLabel = entry.updatedAt
+                          ? new Date(entry.updatedAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : ""
+                        return (
+                          <li key={`${entry.passageRef}-${entry.updatedAt ?? ""}`}>
+                            <button
+                              type="button"
+                              onClick={() => loadPassageFromJournalEntry(entry)}
+                              disabled={loading}
+                              className="w-full text-left px-4 py-4 sm:px-5 sm:py-5 hover:bg-white/5 transition-colors disabled:opacity-50"
+                            >
+                              <p className="font-sans text-base font-medium text-white/95">
+                                {entry.passageRef}
+                              </p>
+                              {dateLabel && (
+                                <p className="font-mono text-[10px] tracking-wider text-white/50 mt-0.5">
+                                  {dateLabel}
+                                </p>
+                              )}
+                              <p className="font-sans text-sm text-white/60 mt-1 line-clamp-2">
+                                {oneLine}
+                              </p>
+                            </button>
+                          </li>
+                        )
+                      })}
+                  </ul>
                 </div>
               </motion.div>
             )}
