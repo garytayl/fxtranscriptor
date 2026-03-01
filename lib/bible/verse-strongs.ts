@@ -162,8 +162,8 @@ export async function getStrongsForVerse(
   if (!book) return []
   const kjvCode = getKjvCode(bookSlug)
   if (!kjvCode) return []
-  const bookData = book[kjvCode]
-  if (!bookData || typeof bookData !== "object") return []
+  const bookData = getBookData(book)
+  if (!bookData) return []
   const chapterKey = `${kjvCode}|${chapter}`
   const chapterData = bookData[chapterKey]
   if (!chapterData || typeof chapterData !== "object") return []
@@ -171,6 +171,14 @@ export async function getStrongsForVerse(
   const verseData = (chapterData as Record<string, KaiserlikVerse>)[verseKey]
   if (!verseData?.en) return []
   return parseEnToStrongsOrder(verseData.en)
+}
+
+/** Kaiserlik JSON has one top-level key per book; numbered books use full name (e.g. "1 Samuel"), others use code (e.g. "Jhn"). */
+function getBookData(book: KaiserlikBook): Record<string, KaiserlikChapter> | null {
+  const keys = Object.keys(book)
+  if (keys.length === 0) return null
+  const data = book[keys[0]]
+  return data && typeof data === "object" ? (data as Record<string, KaiserlikChapter>) : null
 }
 
 /**
@@ -200,8 +208,8 @@ export async function getStrongsWordsForChapter(
   if (!book) return {}
   const kjvCode = getKjvCode(bookSlug)
   if (!kjvCode) return {}
-  const bookData = book[kjvCode]
-  if (!bookData || typeof bookData !== "object") return {}
+  const bookData = getBookData(book)
+  if (!bookData) return {}
   const chapterKey = `${kjvCode}|${chapter}`
   const chapterData = bookData[chapterKey]
   if (!chapterData || typeof chapterData !== "object") return {}
