@@ -49,6 +49,7 @@ import {
   supportsNotifications,
   isNotificationPermissionGranted,
   requestNotificationPermission,
+  subscribeToPush,
 } from "@/lib/notifications"
 
 const JOURNAL_SHEET_DISMISS_THRESHOLD = 60
@@ -1490,7 +1491,12 @@ export function DevotionsClient() {
                     const p = await requestNotificationPermission()
                     setNotificationPermission(p)
                     if (p === "granted") {
-                      toast.success("Notifications enabled", { description: "You can get reminders when we add them." })
+                      const sub = await subscribeToPush()
+                      if (sub.ok) {
+                        toast.success("Notifications enabled", { description: "You’ll get devotions reminders when we send them." })
+                      } else {
+                        toast.success("Notifications allowed", { description: sub.error || "Reminders will work once configured." })
+                      }
                     } else if (p === "denied") {
                       toast.info("Notifications blocked", { description: "You can enable them in device settings." })
                     }

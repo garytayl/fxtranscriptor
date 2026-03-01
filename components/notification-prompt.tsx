@@ -12,6 +12,7 @@ import {
   wasNotificationPromptDismissed,
   setNotificationPromptDismissed,
   requestNotificationPermission,
+  subscribeToPush,
 } from "@/lib/notifications"
 
 export function NotificationPrompt() {
@@ -45,10 +46,18 @@ export function NotificationPrompt() {
     try {
       const permission = await requestNotificationPermission()
       if (permission === "granted") {
-        toast.success("Notifications enabled", {
-          description: "You can get reminders when we add them.",
-          duration: 4000,
-        })
+        const sub = await subscribeToPush()
+        if (sub.ok) {
+          toast.success("Notifications enabled", {
+            description: "You’ll get reminders for devotions when we send them.",
+            duration: 4000,
+          })
+        } else {
+          toast.success("Notifications allowed", {
+            description: sub.error || "Reminders will work once the app is fully configured.",
+            duration: 4000,
+          })
+        }
         setShow(false)
       } else if (permission === "denied") {
         toast.info("Notifications blocked", {

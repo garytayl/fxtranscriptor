@@ -16,6 +16,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const webpush = require('web-push');
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
@@ -42,7 +43,7 @@ app.get('/', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     service: 'audio-chunking-worker',
-    endpoints: ['/health', '/chunk', '/transcribe'],
+    endpoints: ['/health', '/chunk', '/transcribe', '/push/subscribe', '/push/send'],
   });
 });
 
@@ -951,6 +952,88 @@ app.post('/transcribe', async (req, res) => {
         error: error.message || 'Unknown error',
       });
     }
+  }
+});
+
+// ——— Web Push (PWA notifications, e.g. iOS devotions reminders) ———
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails('mailto:fxarchives@fxchurch.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('[Worker] ✅ Web Push (VAPID) configured for /push/subscribe and /push/send');
+} else {
+  console.log('[Worker] ⚠️  Web Push not configured (set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY for push notifications)');
+}
+
+app.post('/push/subscribe', async (req, res) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return res.status(503).json({ success: false, error: 'Push notifications not configured' });
+  }
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Supabase not configured' });
+  }
+  const subscription = req.body?.subscription;
+  if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+    return res.status(400).json({ success: false, error: 'Invalid subscription: need endpoint and keys.p256dh, keys.auth' });
+  }
+  try {
+    const { error } = await supabase.from('push_subscriptions').upsert(
+      {
+        endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: 'endpoint' }
+    );
+    if (error) throw error;
+    res.status(200).json({ success: true });
+  } catch (e) {
+    console.error('[Worker] Push subscribe error:', e);
+    res.status(500).json({ success: false, error: e.message || 'Failed to store subscription' });
+  }
+});
+
+app.post('/push/send', async (req, res) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return res.status(503).json({ success: false, error: 'Push notifications not configured' });
+  }
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Supabase not configured' });
+  }
+  const title = req.body?.title ?? 'fxarchives';
+  const body = req.body?.body ?? 'Time for devotions.';
+  try {
+    const { data: rows, error } = await supabase.from('push_subscriptions').select('id,endpoint,p256dh,auth');
+    if (error) throw error;
+    if (!rows?.length) {
+      return res.status(200).json({ success: true, sent: 0, message: 'No subscriptions' });
+    }
+    let sent = 0;
+    const toRemove = [];
+    for (const row of rows) {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: row.endpoint,
+            keys: { p256dh: row.p256dh, auth: row.auth },
+          },
+          JSON.stringify({ title, body }),
+          { TTL: 86400 }
+        );
+        sent++;
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) toRemove.push(row.id);
+        else console.warn('[Worker] Push send failed for', row.endpoint?.slice(0, 50), err.message);
+      }
+    }
+    if (toRemove.length) {
+      await supabase.from('push_subscriptions').delete().in('id', toRemove);
+    }
+    res.status(200).json({ success: true, sent, total: rows.length });
+  } catch (e) {
+    console.error('[Worker] Push send error:', e);
+    res.status(500).json({ success: false, error: e.message || 'Failed to send' });
   }
 });
 
