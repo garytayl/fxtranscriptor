@@ -19,7 +19,7 @@ import {
   Calendar,
 } from "lucide-react"
 import { getPassageEntry, savePassageEntry } from "@/lib/devotions-storage"
-import { getDevotionsSettings, saveDevotionsSettings, setShowTracking } from "@/lib/devotions-settings"
+import { getDevotionsSettings, setShowTracking, setChaptersPerDay } from "@/lib/devotions-settings"
 import {
   getDevotionsTracking,
   recordDevotionSession,
@@ -27,6 +27,15 @@ import {
   currentStreak,
 } from "@/lib/devotions-tracking"
 import { getPassageRefForDate } from "@/lib/devotions-passages"
+import { getSection, getPredefinedSections } from "@/lib/devotions-sections"
+import {
+  getReadingPlan,
+  setReadingPlan as persistReadingPlan,
+  clearReadingPlan,
+  getNextChapter,
+  advanceReadingPlan,
+  type ReadingPlanState,
+} from "@/lib/devotions-plan"
 import { getReaderUrlFromReference } from "@/lib/bible/reference"
 import {
   Dialog,
@@ -231,7 +240,7 @@ type PassageData = {
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "landing" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
+type Step = "landing" | "planPicker" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -254,6 +263,19 @@ export function DevotionsClient() {
   const [journalSheetOpen, setJournalSheetOpen] = useState(false)
   const [settings, setSettings] = useState(() => getDevotionsSettings())
   const [tracking, setTracking] = useState(() => getDevotionsTracking())
+  const [readingPlan, setReadingPlanState] = useState<ReadingPlanState | null>(() => getReadingPlan())
+  /** When we loaded a passage from a reading plan, track for progress + Next. */
+  const [activePlanSession, setActivePlanSession] = useState<{
+    bookId: string
+    chapterNumber: number
+    sectionLabel: string
+    maxChapterInBook: number
+  } | null>(null)
+  /** Section meta for progress (total chapters, books) when in plan mode. */
+  const [sectionMeta, setSectionMeta] = useState<{
+    totalChapters: number
+    books: { bookId: string; chapterCount: number }[]
+  } | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [oldTestament, setOldTestament] = useState<BibleBook[]>([])
@@ -284,6 +306,10 @@ export function DevotionsClient() {
   }, [])
 
   const books = selectedTestament === "old" ? oldTestament : selectedTestament === "new" ? newTestament : []
+  const bookIdToName = useCallback(() => {
+    const all: BibleBook[] = [...oldTestament, ...newTestament]
+    return new Map(all.map((b) => [b.id, b.name]))
+  }, [oldTestament, newTestament])
 
   useEffect(() => {
     if (!selectedBook) {
@@ -316,11 +342,34 @@ export function DevotionsClient() {
     if (step !== "reading") setJournalSheetOpen(false)
   }, [step])
 
-  // Sync settings and tracking from storage (e.g. after settings change in another tab or after import)
+  useEffect(() => {
+    if (!activePlanSession || !readingPlan) {
+      setSectionMeta(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/bible/section/${encodeURIComponent(readingPlan.sectionId)}/meta`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || data.error) return
+        setSectionMeta({
+          totalChapters: data.totalChapters ?? 0,
+          books: (data.books ?? []).map((b: { bookId: string; chapterCount: number }) => ({
+            bookId: b.bookId,
+            chapterCount: b.chapterCount ?? 0,
+          })),
+        })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [activePlanSession, readingPlan?.sectionId])
+
+  // Sync settings, tracking, and reading plan from storage
   useEffect(() => {
     setSettings(getDevotionsSettings())
     setTracking(getDevotionsTracking())
-  }, [settingsOpen, moreOpen])
+    setReadingPlanState(getReadingPlan())
+  }, [settingsOpen, moreOpen, step])
 
   const scheduleSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -342,6 +391,7 @@ export function DevotionsClient() {
   }, [selectedBook, selectedChapter, verseRange])
 
   const loadPassage = useCallback((verseOverride?: string) => {
+    setActivePlanSession(null)
     const ref = buildRef(verseOverride)
     if (!ref) return
     setLoading(true)
@@ -368,6 +418,7 @@ export function DevotionsClient() {
   }, [loadPassage])
 
   const loadTodaysPassage = useCallback(() => {
+    setActivePlanSession(null)
     const ref = getPassageRefForDate(new Date())
     if (!ref) return
     setLoading(true)
@@ -389,10 +440,110 @@ export function DevotionsClient() {
       .finally(() => setLoading(false))
   }, [settings.showTracking])
 
+  /** Load a passage by book id + chapter (for reading plan). Uses bookIdToName for ref. */
+  const loadPlanPassage = useCallback(
+    (bookId: string, chapterNumber: number, sectionLabel: string) => {
+      const name = bookIdToName().get(bookId) ?? bookId
+      const ref = `${name} ${chapterNumber}`
+      setLoading(true)
+      setError(null)
+      setActivePlanSession(null)
+      fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.error) throw new Error(data.error)
+          setPassage({ reference: data.reference, verses: data.verses ?? [] })
+          setDir(1)
+          setStep("reading")
+          recordDevotionSession(data.reference, settings.showTracking)
+          setTracking(getDevotionsTracking())
+          return fetch(`/api/bible/book/${encodeURIComponent(bookId)}/chapters`).then((r) => r.json())
+        })
+        .then((chaptersData) => {
+          const chList = (chaptersData.chapters ?? []) as { number: number }[]
+          const maxChapter = chList.length > 0 ? Math.max(...chList.map((c) => c.number)) : chapterNumber
+          setActivePlanSession({
+            bookId,
+            chapterNumber,
+            sectionLabel,
+            maxChapterInBook: maxChapter,
+          })
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "Could not load passage.")
+          toast.error("Could not load passage")
+        })
+        .finally(() => setLoading(false))
+    },
+    [bookIdToName, settings.showTracking]
+  )
+
+  /** Continue reading plan: load next chapter. */
+  const continueReadingPlan = useCallback(() => {
+    const plan = getReadingPlan()
+    if (!plan) return
+    const next = getNextChapter(plan)
+    if (!next) return
+    const section = getSection(plan.sectionId)
+    if (!section) return
+    loadPlanPassage(next.bookId, next.chapterNumber, section.label)
+  }, [loadPlanPassage])
+
+  /** Start a new reading plan and load first chapter. */
+  const startReadingPlan = useCallback(
+    (sectionId: string) => {
+      const section = getSection(sectionId)
+      if (!section || section.bookIds.length === 0) return
+      const plan: ReadingPlanState = {
+        sectionId,
+        lastBookId: section.bookIds[0],
+        lastChapter: 0,
+        chaptersPerDay: settings.chaptersPerDay,
+        startedAt: new Date().toISOString(),
+      }
+      persistReadingPlan(plan)
+      setReadingPlanState(plan)
+      loadPlanPassage(section.bookIds[0], 1, section.label)
+    },
+    [loadPlanPassage, settings.chaptersPerDay]
+  )
+
+  /** Advance plan after reading current chapter and go to next (or finish). */
+  const advancePlanAndNext = useCallback(() => {
+    const plan = getReadingPlan()
+    if (!plan || !activePlanSession) return
+    const nextPlan = advanceReadingPlan(
+      plan,
+      activePlanSession.bookId,
+      activePlanSession.chapterNumber,
+      activePlanSession.maxChapterInBook
+    )
+    if (nextPlan) {
+      persistReadingPlan(nextPlan)
+      setReadingPlanState(nextPlan)
+      const next = getNextChapter(nextPlan)
+      if (next) {
+        const section = getSection(nextPlan.sectionId)
+        if (section) loadPlanPassage(next.bookId, next.chapterNumber, section.label)
+      } else {
+        setActivePlanSession(null)
+      }
+    } else {
+      clearReadingPlan()
+      setReadingPlanState(null)
+      setActivePlanSession(null)
+      setPassage(null)
+      setStep("landing")
+      setDir(-1)
+      toast.success("You finished this plan!")
+    }
+  }, [activePlanSession, loadPlanPassage])
+
   const goBack = useCallback(() => {
     setDir(-1)
     if (step === "landing") return
-    if (step === "testament") setStep("landing")
+    if (step === "planPicker") setStep("landing")
+    else if (step === "testament") setStep("landing")
     else if (step === "book") setStep("testament")
     else if (step === "chapter") setStep("book")
     else if (step === "verses") setStep("chapter")
@@ -510,7 +661,7 @@ export function DevotionsClient() {
       {/* Header: back/leave + title + menu (reading only) */}
       <header className="shrink-0 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:px-6 md:px-12 border-b border-white/5">
         <div className="min-w-[80px] flex justify-start">
-          {step === "landing" || step === "testament" ? (
+          {step === "landing" || step === "testament" || step === "planPicker" ? (
             <Link
               href="/"
               className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
@@ -552,6 +703,7 @@ export function DevotionsClient() {
         </div>
         <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 truncate max-w-[45vw] text-center">
           {step === "landing" && "Devotions"}
+          {step === "planPicker" && "Start a reading plan"}
           {step === "testament" && "Choose testament"}
           {step === "book" && "Choose book"}
           {step === "chapter" && "Choose chapter"}
@@ -665,6 +817,16 @@ export function DevotionsClient() {
                     </motion.div>
                   )}
                   <div className="flex flex-col gap-3 sm:gap-4 pt-2">
+                    {readingPlan && (
+                      <button
+                        type="button"
+                        onClick={continueReadingPlan}
+                        disabled={loading || booksLoading}
+                        className="w-full min-h-[56px] rounded-xl font-sans text-lg font-light text-white/95 bg-white/15 border border-white/25 hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {loading ? "Loading…" : booksLoading ? "Preparing…" : `Continue in ${getSection(readingPlan.sectionId)?.label ?? readingPlan.sectionId}`}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={loadTodaysPassage}
@@ -675,12 +837,59 @@ export function DevotionsClient() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => { setDir(1); setStep("planPicker"); }}
+                      disabled={booksLoading}
+                      className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors disabled:opacity-50"
+                    >
+                      {booksLoading ? "Preparing…" : "Start a reading plan"}
+                    </button>
+                    <button
+                      type="button"
                       onClick={enterDevotions}
                       className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors"
                     >
                       Choose a passage
                     </button>
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Plan picker — choose section */}
+            {step === "planPicker" && (
+              <motion.div
+                key="planPicker"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 pb-12 box-border"
+              >
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
+                    Read through a section
+                  </p>
+                  <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
+                    Pick up where you left off each time.
+                  </p>
+                  <ul className="space-y-0 md:max-h-[50vh] md:overflow-y-auto md:pr-1">
+                    {getPredefinedSections().map((sec) => (
+                      <li key={sec.id}>
+                        <button
+                          type="button"
+                          onClick={() => startReadingPlan(sec.id)}
+                          disabled={loading || booksLoading}
+                          className="w-full flex items-center justify-between py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
+                        >
+                          <span>{sec.label}</span>
+                          <span className="font-mono text-[10px] text-white/45">{sec.bookIds.length} book{sec.bookIds.length !== 1 ? "s" : ""}</span>
+                          <ChevronRight className="w-5 h-5 text-white/40 shrink-0" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </motion.div>
             )}
@@ -870,6 +1079,32 @@ export function DevotionsClient() {
             >
               <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 pb-24 sm:px-6 md:px-12 lg:pb-6 box-border">
                 <div className="w-full max-w-2xl mx-auto lg:max-w-none">
+                  {activePlanSession && (
+                    <div className="mb-6 flex flex-col gap-3">
+                      <p className="font-mono text-[11px] tracking-wider text-white/55">
+                        {sectionMeta
+                          ? (() => {
+                              let current = 0
+                              for (const b of sectionMeta.books) {
+                                if (b.bookId === activePlanSession.bookId) {
+                                  current += activePlanSession.chapterNumber
+                                  break
+                                }
+                                current += b.chapterCount
+                              }
+                              return `${passageRef} · ${current} of ${sectionMeta.totalChapters} in ${activePlanSession.sectionLabel}`
+                            })()
+                          : `${passageRef} · ${activePlanSession.sectionLabel}`}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={advancePlanAndNext}
+                        className="w-full min-h-[48px] rounded-xl font-mono text-[11px] tracking-[0.15em] uppercase text-white/90 border border-white/20 hover:bg-white/10 transition-colors"
+                      >
+                        Next chapter
+                      </button>
+                    </div>
+                  )}
                   <motion.div
                     className="mb-8"
                     initial="hidden"
@@ -1110,6 +1345,31 @@ export function DevotionsClient() {
             <p className="font-mono text-[10px] tracking-wider text-white/45">
               When on, you’ll see streak and “this week” on the landing and in the menu. Your data stays on this device.
             </p>
+            <div className="pt-2 border-t border-white/10">
+              <p className="font-sans text-sm text-white/90 mb-2">Chapters per session (reading plans)</p>
+              <div className="flex gap-2">
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      setChaptersPerDay(n)
+                      setSettings((s) => ({ ...s, chaptersPerDay: n }))
+                    }}
+                    className={`min-h-[36px] px-4 rounded-lg font-mono text-xs border transition-colors ${
+                      settings.chaptersPerDay === n
+                        ? "bg-white/20 border-white/30 text-white"
+                        : "border-white/15 text-white/70 hover:bg-white/5"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="font-mono text-[10px] tracking-wider text-white/45 mt-1.5">
+                How many chapters to advance when you tap “Next chapter” in a plan (future use).
+              </p>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
