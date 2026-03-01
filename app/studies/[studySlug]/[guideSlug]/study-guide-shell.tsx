@@ -198,9 +198,9 @@ export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellP
           </article>
         </main>
 
-        {/* Sidebar — desktop only, in-flow so content never overlaps and zoom is stable */}
+        {/* Sidebar — desktop only, sticky so it stays visible when scrolling */}
         <aside
-          className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] border-l border-white/10 bg-[#050505] z-10 pt-6"
+          className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] border-l border-white/10 bg-[#050505] z-10 pt-6"
           aria-label="Verses"
         >
           <div className="shrink-0 px-6 pb-2">

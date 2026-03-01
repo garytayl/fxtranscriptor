@@ -1403,7 +1403,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {(organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0) && (
-            <div className="hidden md:block flex-shrink-0 w-64 lg:w-72">
+            <div className="hidden md:block flex-shrink-0 w-64 lg:w-72 sticky top-[var(--navbar-offset)] self-start max-h-[calc(100dvh-var(--navbar-offset)-1rem)]">
               <SermonVerseSidebar organizedVerses={organizedVerses} />
             </div>
           )}

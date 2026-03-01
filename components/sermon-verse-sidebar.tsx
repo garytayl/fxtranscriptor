@@ -39,9 +39,9 @@ export function SermonVerseSidebar({ organizedVerses, className }: SermonVerseSi
   return (
     <aside
       data-sermon-verse-sidebar
-      className={cn("w-full z-20", className)}
+      className={cn("w-full z-20 h-full min-h-0 flex flex-col", className)}
     >
-      <div className="bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg p-4 shadow-lg flex flex-col">
+      <div className="bg-card/95 backdrop-blur-sm border border-border/30 rounded-lg p-4 shadow-lg flex flex-col h-full min-h-0">
         <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border/30 flex-shrink-0">
           <BookOpen className="size-4 text-accent" />
           <h3 className="font-mono text-xs uppercase tracking-widest text-foreground">
@@ -52,7 +52,7 @@ export function SermonVerseSidebar({ organizedVerses, className }: SermonVerseSi
           </Badge>
         </div>
 
-        <div className="space-y-4 overflow-y-auto overscroll-contain pr-1 scrollbar-thin scrollbar-thumb-accent/20 scrollbar-track-transparent">
+        <div className="space-y-4 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 scrollbar-thin scrollbar-thumb-accent/20 scrollbar-track-transparent">
           {mainChapter && mainChapter.verses.length > 0 && (
             <div>
               <h4 className="font-mono text-[10px] uppercase tracking-widest text-accent mb-2 px-1">
