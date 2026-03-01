@@ -128,3 +128,8 @@ export function getAllSections(): DevotionSection[] {
 export function isPredefinedSection(sectionId: string): boolean {
   return SECTION_BY_ID.has(sectionId.toLowerCase())
 }
+
+/** Book display names for a section, in order (e.g. ["Genesis", "Exodus", ...]). */
+export function getSectionBookNames(section: DevotionSection): string[] {
+  return section.bookIds.map((id) => BOOK_ID_TO_LABEL[id] ?? id)
+}

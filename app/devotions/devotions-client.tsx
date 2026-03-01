@@ -27,7 +27,7 @@ import {
   currentStreak,
 } from "@/lib/devotions-tracking"
 import { getPassageRefForDate } from "@/lib/devotions-passages"
-import { getSection, getPredefinedSections } from "@/lib/devotions-sections"
+import { getSection, getPredefinedSections, getSectionBookNames } from "@/lib/devotions-sections"
 import {
   getReadingPlan,
   setReadingPlan as persistReadingPlan,
@@ -416,6 +416,34 @@ export function DevotionsClient() {
   const loadFullChapter = useCallback(() => {
     loadPassage("")
   }, [loadPassage])
+
+  /** Load a specific chapter by number (e.g. for "Last chapter" on the chapter step). */
+  const loadChapterNumber = useCallback(
+    (chapterNum: number) => {
+      if (!selectedBook) return
+      const ref = `${selectedBook.name} ${chapterNum}`
+      setLoading(true)
+      setError(null)
+      setActivePlanSession(null)
+      setSelectedChapter(chapterNum)
+      fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.error) throw new Error(data.error)
+          setPassage({ reference: data.reference, verses: data.verses ?? [] })
+          setDir(1)
+          setStep("reading")
+          recordDevotionSession(data.reference, settings.showTracking)
+          setTracking(getDevotionsTracking())
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : "Could not load passage.")
+          toast.error("Could not load passage")
+        })
+        .finally(() => setLoading(false))
+    },
+    [selectedBook, settings.showTracking]
+  )
 
   const loadTodaysPassage = useCallback(() => {
     setActivePlanSession(null)
@@ -875,24 +903,32 @@ export function DevotionsClient() {
                     Pick up where you left off each time.
                   </p>
                   <ul className="space-y-0 md:max-h-[50vh] md:overflow-y-auto md:pr-1">
-                    {getPredefinedSections().map((sec) => (
-                      <li key={sec.id}>
-                        <button
-                          type="button"
-                          onClick={() => startReadingPlan(sec.id)}
-                          disabled={loading || booksLoading}
-                          className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
-                        >
-                          <span className="flex-1 truncate">{sec.label}</span>
-                          <span className="flex items-center gap-2 shrink-0 self-center">
-                            <span className="font-mono text-[11px] tracking-wider text-white/60 tabular-nums">
-                              {sec.bookIds.length} book{sec.bookIds.length !== 1 ? "s" : ""}
+                    {getPredefinedSections().map((sec) => {
+                      const bookNames = getSectionBookNames(sec)
+                      return (
+                        <li key={sec.id}>
+                          <button
+                            type="button"
+                            onClick={() => startReadingPlan(sec.id)}
+                            disabled={loading || booksLoading}
+                            className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
+                          >
+                            <span className="flex-1 min-w-0 text-left">
+                              <span className="block truncate">{sec.label}</span>
+                              <span className="block font-sans text-xs text-white/55 mt-0.5 leading-snug">
+                                {bookNames.join(", ")}
+                              </span>
                             </span>
-                            <ChevronRight className="w-5 h-5 text-white/40" aria-hidden />
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                            <span className="flex items-center gap-2 shrink-0 self-center">
+                              <span className="font-mono text-[11px] tracking-wider text-white/60 tabular-nums">
+                                {sec.bookIds.length} book{sec.bookIds.length !== 1 ? "s" : ""}
+                              </span>
+                              <ChevronRight className="w-5 h-5 text-white/40" aria-hidden />
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               </motion.div>
@@ -999,18 +1035,30 @@ export function DevotionsClient() {
                   {chaptersLoading ? (
                     <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
                   ) : (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
-                      {chapters.map((ch) => (
+                    <>
+                      {chapters.length > 0 && (
                         <button
-                          key={ch.id}
                           type="button"
-                          onClick={() => handleChapterPick(ch.number)}
-                          className="min-h-[52px] sm:min-h-[56px] rounded-lg font-sans text-lg sm:text-xl text-white/90 border border-white/15 hover:bg-white/10 hover:border-white/25 hover:text-white transition-colors"
+                          onClick={() => loadChapterNumber(chapters[chapters.length - 1].number)}
+                          disabled={loading}
+                          className="w-full min-h-[48px] rounded-xl font-mono text-[11px] tracking-[0.15em] uppercase text-white/80 border border-white/15 hover:bg-white/10 hover:text-white transition-colors mb-4 disabled:opacity-50"
                         >
-                          {ch.number}
+                          {loading ? "Loading…" : `Last chapter (${chapters[chapters.length - 1].number})`}
                         </button>
-                      ))}
-                    </div>
+                      )}
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
+                        {chapters.map((ch) => (
+                          <button
+                            key={ch.id}
+                            type="button"
+                            onClick={() => handleChapterPick(ch.number)}
+                            className="min-h-[52px] sm:min-h-[56px] rounded-lg font-sans text-lg sm:text-xl text-white/90 border border-white/15 hover:bg-white/10 hover:border-white/25 hover:text-white transition-colors"
+                          >
+                            {ch.number}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </motion.div>
