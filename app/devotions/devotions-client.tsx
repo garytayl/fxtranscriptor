@@ -14,8 +14,19 @@ import {
   PenLine,
   X,
   ChevronDown,
+  Settings,
+  Flame,
+  Calendar,
 } from "lucide-react"
 import { getPassageEntry, savePassageEntry } from "@/lib/devotions-storage"
+import { getDevotionsSettings, saveDevotionsSettings, setShowTracking } from "@/lib/devotions-settings"
+import {
+  getDevotionsTracking,
+  recordDevotionSession,
+  sessionsThisWeek,
+  currentStreak,
+} from "@/lib/devotions-tracking"
+import { getPassageRefForDate } from "@/lib/devotions-passages"
 import { getReaderUrlFromReference } from "@/lib/bible/reference"
 import {
   Dialog,
@@ -220,7 +231,7 @@ type PassageData = {
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "testament" | "book" | "chapter" | "verses" | "reading"
+type Step = "landing" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -231,7 +242,7 @@ const slide = {
 }
 
 export function DevotionsClient() {
-  const [step, setStep] = useState<Step>("testament")
+  const [step, setStep] = useState<Step>("landing")
   const [dir, setDir] = useState(0) // 1 = forward, -1 = back
   const [passage, setPassage] = useState<PassageData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -239,7 +250,10 @@ export function DevotionsClient() {
   const [prayer, setPrayer] = useState("")
   const [reflection, setReflection] = useState("")
   const [moreOpen, setMoreOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [journalSheetOpen, setJournalSheetOpen] = useState(false)
+  const [settings, setSettings] = useState(() => getDevotionsSettings())
+  const [tracking, setTracking] = useState(() => getDevotionsTracking())
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [oldTestament, setOldTestament] = useState<BibleBook[]>([])
@@ -302,6 +316,12 @@ export function DevotionsClient() {
     if (step !== "reading") setJournalSheetOpen(false)
   }, [step])
 
+  // Sync settings and tracking from storage (e.g. after settings change in another tab or after import)
+  useEffect(() => {
+    setSettings(getDevotionsSettings())
+    setTracking(getDevotionsTracking())
+  }, [settingsOpen, moreOpen])
+
   const scheduleSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
@@ -333,31 +353,73 @@ export function DevotionsClient() {
         setPassage({ reference: data.reference, verses: data.verses ?? [] })
         setDir(1)
         setStep("reading")
+        recordDevotionSession(data.reference, settings.showTracking)
+        setTracking(getDevotionsTracking())
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Could not load passage.")
         toast.error("Could not load passage")
       })
       .finally(() => setLoading(false))
-  }, [buildRef])
+  }, [buildRef, settings.showTracking])
 
   const loadFullChapter = useCallback(() => {
     loadPassage("")
   }, [loadPassage])
 
+  const loadTodaysPassage = useCallback(() => {
+    const ref = getPassageRefForDate(new Date())
+    if (!ref) return
+    setLoading(true)
+    setError(null)
+    fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error)
+        setPassage({ reference: data.reference, verses: data.verses ?? [] })
+        setDir(1)
+        setStep("reading")
+        recordDevotionSession(data.reference, settings.showTracking)
+        setTracking(getDevotionsTracking())
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not load passage.")
+        toast.error("Could not load passage")
+      })
+      .finally(() => setLoading(false))
+  }, [settings.showTracking])
+
   const goBack = useCallback(() => {
     setDir(-1)
-    if (step === "testament") return
-    if (step === "book") setStep("testament")
+    if (step === "landing") return
+    if (step === "testament") setStep("landing")
+    else if (step === "book") setStep("testament")
     else if (step === "chapter") setStep("book")
     else if (step === "verses") setStep("chapter")
     else if (step === "reading") setStep("verses")
+    else if (step === "reflection") setStep("reading")
   }, [step])
 
   const goToBook = useCallback(() => {
     setStep("testament")
     setDir(-1)
     setError(null)
+  }, [])
+
+  const enterDevotions = useCallback(() => {
+    setDir(1)
+    setStep("testament")
+  }, [])
+
+  const openReflection = useCallback(() => {
+    setJournalSheetOpen(false)
+    setDir(1)
+    setStep("reflection")
+  }, [])
+
+  const closeReflection = useCallback(() => {
+    setDir(-1)
+    setStep("reading")
   }, [])
 
   const handleTestamentPick = useCallback((t: "old" | "new") => {
@@ -403,7 +465,7 @@ export function DevotionsClient() {
     a.click()
     URL.revokeObjectURL(a.href)
     setMoreOpen(false)
-    toast.success("Backup downloaded")
+    toast.success("Backup downloaded (includes journal, settings & tracking)")
   }, [])
 
   const handleImport = useCallback(() => {
@@ -426,12 +488,14 @@ export function DevotionsClient() {
             }
           })
           setMoreOpen(false)
+          setSettings(getDevotionsSettings())
+          setTracking(getDevotionsTracking())
           if (passageRef) {
             const entry = getPassageEntry(passageRef)
             setPrayer(entry.prayer)
             setReflection(entry.reflection)
           }
-          toast.success(`Restored ${count} entries`)
+          toast.success(`Restored ${count} entries (journal, settings & tracking)`)
         } catch { toast.error("Invalid backup file") }
       }
       reader.readAsText(file)
@@ -446,7 +510,7 @@ export function DevotionsClient() {
       {/* Header: back/leave + title + menu (reading only) */}
       <header className="shrink-0 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:px-6 md:px-12 border-b border-white/5">
         <div className="min-w-[80px] flex justify-start">
-          {step === "reading" ? (
+          {step === "landing" || step === "testament" ? (
             <Link
               href="/"
               className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
@@ -455,7 +519,17 @@ export function DevotionsClient() {
               <LogOut className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Leave</span>
             </Link>
-          ) : step === "testament" ? (
+          ) : step === "reflection" ? (
+            <button
+              type="button"
+              onClick={closeReflection}
+              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
+              aria-label="Back to passage"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Passage</span>
+            </button>
+          ) : step === "reading" ? (
             <Link
               href="/"
               className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
@@ -477,20 +551,32 @@ export function DevotionsClient() {
           )}
         </div>
         <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 truncate max-w-[45vw] text-center">
-          {step === "testament" && "Where?"}
-          {step === "book" && "What book?"}
-          {step === "chapter" && "Which chapter?"}
+          {step === "landing" && "Devotions"}
+          {step === "testament" && "Choose testament"}
+          {step === "book" && "Choose book"}
+          {step === "chapter" && "Choose chapter"}
           {step === "verses" && (selectedBook ? `${selectedBook.name} ${selectedChapter}` : "Read")}
           {step === "reading" && (passage?.reference ?? "Devotions")}
+          {step === "reflection" && "Reflection"}
         </span>
         <div className="min-w-[80px] flex justify-end gap-1">
+          {step === "landing" && (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="min-h-[44px] px-2 flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/45 hover:text-white/70 rounded"
+              aria-label="Devotions settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
           {step === "reading" ? (
             <>
               <button
                 type="button"
                 onClick={() => setJournalSheetOpen(true)}
                 className="lg:hidden min-h-[44px] px-3 flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/50 hover:text-white/80 rounded"
-                aria-label="Open journal"
+                aria-label="Quick journal"
               >
                 <PenLine className="w-4 h-4" />
                 Journal
@@ -504,6 +590,17 @@ export function DevotionsClient() {
                 <MoreHorizontal className="w-5 h-5" />
               </button>
             </>
+          ) : step === "reflection" ? (
+            <button
+              type="button"
+              onClick={closeReflection}
+              className="lg:hidden min-h-[44px] px-3 font-mono text-[10px] tracking-wider text-white/50 hover:text-white/80 rounded"
+              aria-label="Back to passage"
+            >
+              Done
+            </button>
+          ) : step !== "landing" ? (
+            <span />
           ) : (
             <span />
           )}
@@ -517,6 +614,77 @@ export function DevotionsClient() {
           data-lenis-prevent
         >
           <AnimatePresence mode="wait" custom={dir}>
+            {/* Step 0: Landing — Be still and know */}
+            {step === "landing" && (
+              <motion.div
+                key="landing"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.3 }}
+                className="w-full min-h-full flex flex-col items-center justify-center px-4 py-8 sm:px-6 md:px-12 box-border"
+              >
+                <div className="w-full max-w-lg mx-auto text-center space-y-10 sm:space-y-12">
+                  <motion.div
+                    className="space-y-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: reduced ? 0 : 0.2, duration: 0.5 }}
+                  >
+                    <p className="font-sans text-2xl sm:text-3xl md:text-4xl font-light text-white/95 leading-snug tracking-tight">
+                      Be still, and know that I am God.
+                    </p>
+                    <p className="font-mono text-[10px] tracking-[0.25em] text-white/50 uppercase">
+                      Psalm 46:10
+                    </p>
+                  </motion.div>
+                  <p className="font-sans text-base sm:text-lg text-white/70 font-light max-w-sm mx-auto">
+                    Find the stillness. He is the Lord.
+                  </p>
+                  {settings.showTracking && (tracking.totalSessions > 0 || currentStreak(tracking) > 0) && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="flex items-center justify-center gap-6 font-mono text-[11px] tracking-wider text-white/50"
+                    >
+                      {currentStreak(tracking) > 0 && (
+                        <span className="flex items-center gap-1.5">
+                          <Flame className="w-3.5 h-3.5 text-white/60" />
+                          {currentStreak(tracking)} day{currentStreak(tracking) !== 1 ? "s" : ""} streak
+                        </span>
+                      )}
+                      {sessionsThisWeek(tracking) > 0 && (
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-white/60" />
+                          {sessionsThisWeek(tracking)} this week
+                        </span>
+                      )}
+                    </motion.div>
+                  )}
+                  <div className="flex flex-col gap-3 sm:gap-4 pt-2">
+                    <button
+                      type="button"
+                      onClick={loadTodaysPassage}
+                      disabled={loading}
+                      className="w-full min-h-[56px] rounded-xl font-sans text-lg font-light text-white/95 bg-white/10 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-colors disabled:opacity-50"
+                    >
+                      {loading ? "Loading…" : "Today’s passage"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={enterDevotions}
+                      className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors"
+                    >
+                      Choose a passage
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Step 1: Old or New Testament? */}
             {step === "testament" && (
               <motion.div
@@ -530,8 +698,11 @@ export function DevotionsClient() {
                 className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 box-border"
               >
                 <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-mono text-[10px] tracking-[0.2em] text-white/50 uppercase mb-3">
+                    The Law and the Prophets · The Gospels and the Letters
+                  </p>
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-8 sm:mb-10">
-                    Old Testament or New Testament?
+                    Where would you like to read?
                   </p>
                   <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
                     <button
@@ -569,7 +740,7 @@ export function DevotionsClient() {
               >
                 <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-6 sm:mb-8">
-                    What book?
+                    Which book speaks to you today?
                   </p>
                   {booksLoading ? (
                     <p className="font-mono text-xs tracking-wider text-white/50">Loading…</p>
@@ -607,7 +778,7 @@ export function DevotionsClient() {
               >
                 <div className="w-full max-w-2xl md:max-w-3xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
-                    Which chapter?
+                    Sit with a chapter
                   </p>
                   <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
                     {selectedBook.name}
@@ -646,7 +817,7 @@ export function DevotionsClient() {
             >
               <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
                 <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
-                  Read
+                  Read this
                 </p>
                 <p className="font-mono text-[10px] tracking-wider text-white/50 mb-8">
                   {selectedBook.name} {selectedChapter}
@@ -739,6 +910,17 @@ export function DevotionsClient() {
                       </motion.p>
                     ))}
                   </motion.div>
+                  {/* Mobile: reflection as the next step (after reading), not stuck at bottom */}
+                  <div className="lg:hidden mt-10 pt-8 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={openReflection}
+                      className="w-full min-h-[56px] rounded-xl font-mono text-[11px] tracking-[0.18em] uppercase text-white/85 border border-white/20 hover:bg-white/10 hover:text-white transition-colors flex items-center justify-center gap-2"
+                    >
+                      <PenLine className="w-4 h-4" />
+                      Continue to reflection
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -768,6 +950,37 @@ export function DevotionsClient() {
               </aside>
             </motion.div>
           )}
+
+          {/* Step: Reflection — full-screen journal (mobile primary; desktop can use sidebar or this) */}
+          {step === "reflection" && passage && (
+            <motion.div
+              key="reflection"
+              custom={dir}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              variants={slide}
+              transition={{ duration: reduced ? 0.15 : 0.25 }}
+              className="w-full min-h-full flex flex-col px-4 py-6 sm:px-6 md:px-12 lg:max-w-2xl lg:mx-auto lg:py-12 box-border"
+            >
+              <div className="mb-6">
+                <p className="font-mono text-[10px] tracking-[0.2em] text-white/50 uppercase mb-1">
+                  After reading
+                </p>
+                <p className="font-sans text-lg font-light text-white/90">{passageRef}</p>
+              </div>
+              <div className="flex-1">
+                <JournalPanel
+                  passageRef={passageRef}
+                  prayer={prayer}
+                  reflection={reflection}
+                  onPrayerChange={handlePrayerChange}
+                  onReflectionChange={handleReflectionChange}
+                  onBlur={scheduleSave}
+                />
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
         </div>
       </div>
@@ -790,12 +1003,7 @@ export function DevotionsClient() {
         )}
       </AnimatePresence>
 
-      {/* Mobile: floating pill to open journal when sheet is closed */}
-      <AnimatePresence>
-        {step === "reading" && !journalSheetOpen && (
-          <MobileJournalPill onTap={() => setJournalSheetOpen(true)} />
-        )}
-      </AnimatePresence>
+      {/* Mobile: optional quick journal sheet (pill removed — use "Continue to reflection" as primary path) */}
 
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent className="border-white/10 bg-[#0a0a0a] text-white max-w-sm">
@@ -804,7 +1012,31 @@ export function DevotionsClient() {
               Menu
             </DialogTitle>
           </DialogHeader>
+          {settings.showTracking && (tracking.totalSessions > 0 || currentStreak(tracking) > 0) && (
+            <div className="flex items-center gap-4 font-mono text-[11px] tracking-wider text-white/55 pb-3 border-b border-white/10">
+              {currentStreak(tracking) > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5" />
+                  {currentStreak(tracking)} day streak
+                </span>
+              )}
+              {sessionsThisWeek(tracking) > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {sessionsThisWeek(tracking)} this week
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => { setMoreOpen(false); setSettingsOpen(true); }}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-white/80 hover:text-white py-3 px-4 rounded-lg border border-white/15 hover:bg-white/5 transition-colors text-left"
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              Devotions settings
+            </button>
             <button
               type="button"
               onClick={() => { setMoreOpen(false); goToBook(); }}
@@ -841,6 +1073,44 @@ export function DevotionsClient() {
           <p className="font-mono text-[10px] tracking-wider text-white/40 mt-2">
             Prayers and reflections are stored only on this device.
           </p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="border-white/10 bg-[#0a0a0a] text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-sans text-lg font-light text-white">
+              Devotions settings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="flex items-center justify-between gap-4 cursor-pointer">
+              <span className="font-sans text-sm text-white/90">Show devotion tracking</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.showTracking}
+                onClick={() => {
+                  const next = !settings.showTracking
+                  setShowTracking(next)
+                  setSettings((s) => ({ ...s, showTracking: next }))
+                  setTracking(getDevotionsTracking())
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                  settings.showTracking ? "bg-white/20 border-white/30" : "bg-white/5 border-white/15"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform mt-0.5 ${
+                    settings.showTracking ? "translate-x-6 ml-0.5" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </label>
+            <p className="font-mono text-[10px] tracking-wider text-white/45">
+              When on, you’ll see streak and “this week” on the landing and in the menu. Your data stays on this device.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
