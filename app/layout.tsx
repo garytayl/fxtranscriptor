@@ -52,12 +52,16 @@ export const metadata: Metadata = {
   },
 }
 
-/** Allow native browser zoom (pinch, Ctrl/Cmd+scroll) for accessibility. */
+/** Stable viewport: avoid "zoomed in on load" or after rotation; keep user zoom for a11y. */
 export const viewport: Viewport = {
   width: "device-width",
+  height: "device-height",
   initialScale: 1,
+  minimumScale: 1,
   maximumScale: 10,
   userScalable: true,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-visual",
 }
 
 export default function RootLayout({

@@ -26,7 +26,7 @@ import {
   sessionsThisWeek,
   currentStreak,
 } from "@/lib/devotions-tracking"
-import { getPassageRefForDate } from "@/lib/devotions-passages"
+import { getPassageRefForDate, getLandingComboForDate } from "@/lib/devotions-passages"
 import { getSection, getPredefinedSections, getSectionBookNames } from "@/lib/devotions-sections"
 import {
   getReadingPlan,
@@ -854,8 +854,10 @@ export function DevotionsClient() {
           data-lenis-prevent
         >
           <AnimatePresence mode="wait" custom={dir}>
-            {/* Step 0: Landing — Be still and know */}
-            {step === "landing" && (
+            {/* Step 0: Landing — rotating verse + subtitle by day */}
+            {step === "landing" && (() => {
+              const combo = getLandingComboForDate(new Date())
+              return (
               <motion.div
                 key="landing"
                 custom={dir}
@@ -874,14 +876,14 @@ export function DevotionsClient() {
                     transition={{ delay: reduced ? 0 : 0.2, duration: 0.5 }}
                   >
                     <p className="font-sans text-2xl sm:text-3xl md:text-4xl font-light text-white/95 leading-snug tracking-tight">
-                      Be still, and know that I am God.
+                      {combo.verse}
                     </p>
                     <p className="font-mono text-[10px] tracking-[0.25em] text-white/50 uppercase">
-                      Psalm 46:10
+                      {combo.reference}
                     </p>
                   </motion.div>
                   <p className="font-sans text-base sm:text-lg text-white/70 font-light max-w-sm mx-auto">
-                    Find the stillness. He is the Lord.
+                    {combo.subtitle}
                   </p>
                   {settings.showTracking && (tracking.totalSessions > 0 || currentStreak(tracking) > 0) && (
                     <motion.div
@@ -950,7 +952,8 @@ export function DevotionsClient() {
                   </div>
                 </div>
               </motion.div>
-            )}
+              )
+            })()}
 
             {/* Step: Journal history — list past reflections */}
             {step === "journalHistory" && (
