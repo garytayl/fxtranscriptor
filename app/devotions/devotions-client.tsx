@@ -17,6 +17,7 @@ import {
   Settings,
   Flame,
   Calendar,
+  Bell,
 } from "lucide-react"
 import { getPassageEntry, savePassageEntry, listPassageEntries, type ListedPassageEntry } from "@/lib/devotions-storage"
 import { getDevotionsSettings, setShowTracking, setChaptersPerDay } from "@/lib/devotions-settings"
@@ -44,6 +45,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import {
+  supportsNotifications,
+  isNotificationPermissionGranted,
+  requestNotificationPermission,
+} from "@/lib/notifications"
 
 const JOURNAL_SHEET_DISMISS_THRESHOLD = 60
 
@@ -261,6 +267,8 @@ export function DevotionsClient() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [journalSheetOpen, setJournalSheetOpen] = useState(false)
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | null>(null)
+  const [notificationRequesting, setNotificationRequesting] = useState(false)
   const [settings, setSettings] = useState(() => getDevotionsSettings())
   const [tracking, setTracking] = useState(() => getDevotionsTracking())
   const [readingPlan, setReadingPlanState] = useState<ReadingPlanState | null>(() => getReadingPlan())
@@ -341,6 +349,12 @@ export function DevotionsClient() {
   useEffect(() => {
     if (step !== "reading") setJournalSheetOpen(false)
   }, [step])
+
+  useEffect(() => {
+    if (moreOpen && supportsNotifications()) {
+      setNotificationPermission(Notification.permission)
+    }
+  }, [moreOpen])
 
   useEffect(() => {
     if (!activePlanSession || !readingPlan) {
@@ -1467,6 +1481,32 @@ export function DevotionsClient() {
               <Settings className="w-4 h-4 shrink-0" />
               Devotions settings
             </button>
+            {supportsNotifications() && notificationPermission !== "granted" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setNotificationRequesting(true)
+                  try {
+                    const p = await requestNotificationPermission()
+                    setNotificationPermission(p)
+                    if (p === "granted") {
+                      toast.success("Notifications enabled", { description: "You can get reminders when we add them." })
+                    } else if (p === "denied") {
+                      toast.info("Notifications blocked", { description: "You can enable them in device settings." })
+                    }
+                  } catch {
+                    toast.error("Could not enable notifications")
+                  } finally {
+                    setNotificationRequesting(false)
+                  }
+                }}
+                disabled={notificationRequesting}
+                className="flex items-center gap-2 font-mono text-xs tracking-wider text-white/80 hover:text-white py-3 px-4 rounded-lg border border-white/15 hover:bg-white/5 transition-colors text-left disabled:opacity-50"
+              >
+                <Bell className="w-4 h-4 shrink-0" />
+                {notificationRequesting ? "Enabling…" : "Enable notifications"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setMoreOpen(false); goToBook(); }}

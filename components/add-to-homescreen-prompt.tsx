@@ -74,7 +74,7 @@ export function AddToHomeScreenPrompt() {
             <p className="text-sm text-muted-foreground">
               Get quick access like an app: tap the <strong className="text-foreground">Share</strong> button{" "}
               <ShareIcon className="inline size-4" /> at the bottom of Safari, then choose{" "}
-              <strong className="text-foreground">Add to Home Screen</strong>.
+              <strong className="text-foreground">Add to Home Screen</strong>. After adding, you can enable notifications in the app menu for reminders.
             </p>
           </div>
           <Button
