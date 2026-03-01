@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toast"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { AnalyticsProvider } from "@/components/analytics-provider"
 import { Navbar } from "@/components/navbar"
+import { AddToHomeScreenPrompt } from "@/components/add-to-homescreen-prompt"
 import "./globals.css"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -75,6 +76,7 @@ export default function RootLayout({
             <Navbar />
             <SmoothScroll>{children}</SmoothScroll>
             <Toaster position="top-right" richColors closeButton />
+            <AddToHomeScreenPrompt />
           </AnalyticsProvider>
         </ErrorBoundary>
       </body>
