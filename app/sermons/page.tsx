@@ -430,8 +430,9 @@ export default function SermonsPage() {
         // Reload sermons after sync
         await loadSermons();
         toast.dismiss(syncToastId);
+        const skipped = data.summary.skipped ?? 0;
         toast.success("Catalog Synced", {
-          description: `Found ${data.summary.matchedSermons} sermons. Created: ${data.summary.created}, Updated: ${data.summary.updated}${data.errors && data.errors.length > 0 ? `. ${data.errors.length} errors occurred.` : ""}`,
+          description: `Found ${data.summary.matchedSermons} sermons. Created: ${data.summary.created}, Skipped (already exist): ${skipped}${data.errors && data.errors.length > 0 ? `. ${data.errors.length} errors occurred.` : ""}`,
           duration: 5000,
         });
       } else {

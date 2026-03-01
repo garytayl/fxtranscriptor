@@ -281,7 +281,7 @@ export async function GET(request: NextRequest) {
     
     const results = {
       created: 0,
-      updated: 0,
+      skipped: 0,
       matched: matchedCount,
       podbeanOnly: podbeanOnlyCount,
       youtubeOnly: youtubeOnlyCount,
@@ -327,7 +327,13 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Prepare sermon data (decode HTML entities in title so we don't store &amp; etc.)
+        if (existingSermonId) {
+          // Already in catalog: skip, do not overwrite
+          results.skipped++;
+          continue;
+        }
+
+        // Prepare sermon data for new insert only (decode HTML entities in title)
         const sermonData = {
           title: decodeHtmlEntities(matched.title) || matched.title,
           date: matched.date?.toISOString() || null,
@@ -340,52 +346,7 @@ export async function GET(request: NextRequest) {
           updated_at: new Date().toISOString(),
         };
 
-        if (existingSermonId) {
-          // Update existing sermon
-          // Preserve audio_url if it already exists and new match doesn't have one
-          const { data: existingSermon, error: fetchExistingError } = await supabaseClient
-            .from("sermons")
-            .select("audio_url, podbean_url, youtube_url")
-            .eq("id", existingSermonId)
-            .maybeSingle();
-          
-          if (fetchExistingError) {
-            throw new Error(`Failed to fetch existing sermon: ${fetchExistingError.message}`);
-          }
-          
-          // If existing sermon has audio_url but new match doesn't, preserve it
-          if (existingSermon?.audio_url && !sermonData.audio_url) {
-            sermonData.audio_url = existingSermon.audio_url;
-            console.log(`[Sync] Preserved existing audio_url for sermon: ${matched.title.substring(0, 50)}...`);
-          }
-          
-          // If existing sermon has YouTube URL but new match has Podbean, try to merge
-          if (existingSermon?.youtube_url && !sermonData.youtube_url && matched.youtubeVideo?.url) {
-            sermonData.youtube_url = existingSermon.youtube_url;
-            sermonData.youtube_video_id = existingSermon.youtube_url.match(/[?&]v=([^&]+)/)?.[1] || null;
-            console.log(`[Sync] Merging YouTube URL from existing sermon: ${matched.title.substring(0, 50)}...`);
-          }
-          
-          // If existing sermon has Podbean URL but new match has YouTube, try to merge
-          if (existingSermon?.podbean_url && !sermonData.podbean_url && matched.podbeanEpisode?.url) {
-            sermonData.podbean_url = existingSermon.podbean_url;
-            if (matched.podbeanEpisode?.audioUrl) {
-              sermonData.audio_url = matched.podbeanEpisode.audioUrl;
-            }
-            console.log(`[Sync] Merging Podbean URL from existing sermon: ${matched.title.substring(0, 50)}...`);
-          }
-          
-          const { error: updateError } = await supabaseClient
-            .from("sermons")
-            .update(sermonData)
-            .eq("id", existingSermonId);
-
-          if (updateError) {
-            throw new Error(`Update failed: ${updateError.message}`);
-          }
-          results.updated++;
-          console.log(`[Sync] Updated existing sermon: ${matched.title.substring(0, 50)}...`);
-        } else {
+        {
           // Create new sermon
           const { data: newSermon, error: insertError } = await supabaseClient
             .from("sermons")
