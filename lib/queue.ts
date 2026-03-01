@@ -342,3 +342,107 @@ export async function getNextQueueItemAndMarkProcessing(): Promise<ProcessQueueR
     };
   }
 }
+
+/**
+ * Get the next queued item, mark it processing, and call the worker.
+ * Used by the processor route and by the complete route (to start the next job when one finishes).
+ */
+export async function triggerWorkerForNextItem(): Promise<{
+  started: boolean;
+  error?: string;
+  message?: string;
+}> {
+  let queueItem: any = null;
+  let sermon: any = null;
+  try {
+    const supabase = createSupabaseAdminClient();
+    const processData = await getNextQueueItemAndMarkProcessing();
+    if (!processData.success) {
+      return { started: false, error: processData.error };
+    }
+    if (!processData.processing || !processData.sermon || processData.alreadyProcessing) {
+      return { started: false, message: processData.alreadyProcessing ? "Item already being processed" : "No items in queue" };
+    }
+    queueItem = processData.queueItem;
+    sermon = processData.sermon;
+    const workerUrl = process.env.AUDIO_WORKER_URL?.trim();
+    if (!workerUrl) {
+      await supabase
+        .from("transcription_queue")
+        .update({
+          status: "failed",
+          error_message: "Worker service not configured (AUDIO_WORKER_URL missing)",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", queueItem.id);
+      await supabase
+        .from("sermons")
+        .update({ status: "failed", error_message: "Worker service not configured" })
+        .eq("id", sermon.id);
+      return { started: false, error: "Worker service not configured" };
+    }
+    const audioSource = sermon.audio_url || sermon.youtube_url;
+    if (!audioSource) {
+      await supabase
+        .from("transcription_queue")
+        .update({
+          status: "failed",
+          error_message: "No audio_url or youtube_url available",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", queueItem.id);
+      await supabase
+        .from("sermons")
+        .update({ status: "failed", error_message: "No audio_url or youtube_url available" })
+        .eq("id", sermon.id);
+      return { started: false, error: "No audio source available" };
+    }
+    const { data: currentQueueItem } = await supabase
+      .from("transcription_queue")
+      .select("status")
+      .eq("id", queueItem.id)
+      .single();
+    if (currentQueueItem?.status === "cancelled") {
+      return { started: false, message: "Queue item was cancelled" };
+    }
+    const cleanWorkerUrl = workerUrl.replace(/\/$/, "");
+    const workerResponse = await fetch(`${cleanWorkerUrl}/transcribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sermonId: sermon.id, audioUrl: audioSource }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!workerResponse.ok) {
+      const errorText = await workerResponse.text().catch(() => "Unknown error");
+      throw new Error(`Worker error: ${workerResponse.status} ${errorText}`);
+    }
+    console.log(`[Queue] Worker accepted transcription: ${sermon.id} - ${sermon.title}`);
+    return { started: true };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    let errorMessage = err.message;
+    if (errorMessage.includes("aborted") || errorMessage.includes("timeout")) {
+      errorMessage = "Worker took too long to respond (timeout). Try Trigger processor again.";
+    }
+    if (queueItem && sermon) {
+      try {
+        const supabase = createSupabaseAdminClient();
+        await supabase
+          .from("transcription_queue")
+          .update({
+            status: "failed",
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", queueItem.id);
+        await supabase
+          .from("sermons")
+          .update({ status: "failed", error_message: errorMessage })
+          .eq("id", sermon.id);
+      } catch {
+        // ignore
+      }
+    }
+    return { started: false, error: errorMessage };
+  }
+}

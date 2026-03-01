@@ -44,7 +44,7 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
 
   const loadQueue = useCallback(async () => {
     try {
-      const response = await fetch("/api/queue/list");
+      const response = await fetch("/api/queue/list", { cache: "no-store", credentials: "include" });
       if (!response.ok) {
         console.error("Failed to load queue");
         return;
@@ -70,6 +70,7 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
         await fetch("/api/queue/processor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
         });
       } catch (error) {
         // Silently fail - processor will be called by cron or other means
@@ -80,13 +81,18 @@ export function TranscriptionQueue({ showResetButton = true }: TranscriptionQueu
     // Trigger immediately
     triggerProcessor();
 
-    // Poll queue every 5 seconds and trigger processor every 10 seconds
-    const queueInterval = setInterval(loadQueue, 5000);
+    // Poll queue every 3s so UI stays in sync; trigger processor every 10s as backup
+    const queueInterval = setInterval(loadQueue, 3000);
     const processorInterval = setInterval(triggerProcessor, 10000);
-    
+
+    // Refresh when user returns to the tab so we don't show stale "previous" state
+    const onFocus = () => loadQueue();
+    window.addEventListener("focus", onFocus);
+
     return () => {
       clearInterval(queueInterval);
       clearInterval(processorInterval);
+      window.removeEventListener("focus", onFocus);
     };
   }, [loadQueue]);
 

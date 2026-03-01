@@ -67,14 +67,22 @@ export async function GET(request: NextRequest) {
         item.id !== processing?.id
     );
 
-    return NextResponse.json({
-      success: true,
-      queue: {
-        processing: processing || null,
-        queued: queued,
-        all: formattedQueue,
+    return NextResponse.json(
+      {
+        success: true,
+        queue: {
+          processing: processing || null,
+          queued: queued,
+          all: formattedQueue,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error listing queue:", error);
     return NextResponse.json(

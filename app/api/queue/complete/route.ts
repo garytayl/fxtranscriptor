@@ -1,10 +1,12 @@
 /**
  * API Route: Mark Queue Item as Complete
- * Called by the worker after transcription completes (success or failure)
+ * Called by the worker after transcription completes (success or failure).
+ * After marking complete, triggers the next queued item so the queue keeps moving.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { triggerWorkerForNextItem } from "@/lib/queue";
 
 export const runtime = "nodejs";
 
@@ -88,6 +90,11 @@ export async function POST(request: NextRequest) {
           .eq("id", remainingItems[i].id);
       }
     }
+
+    // Start the next job immediately so the queue doesn't sit stuck
+    triggerWorkerForNextItem().catch((err) => {
+      console.warn("[Queue Complete] Failed to trigger next item:", err);
+    });
 
     return NextResponse.json({
       success: true,

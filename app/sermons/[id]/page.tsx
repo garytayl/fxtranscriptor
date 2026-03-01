@@ -353,6 +353,8 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
               description: data.message || "Transcription queued. Progress will update below.",
               duration: 4000,
             });
+            // Trigger processor immediately so the job starts without waiting for cron or queue component
+            fetch("/api/queue/processor", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include" }).catch(() => {});
           } else {
             setGenerating(false);
             setProgress(null);
@@ -644,7 +646,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return (
       <main className="relative min-h-screen">
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-        <div className="relative z-10 pt-[var(--navbar-offset)] py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
+        <div className="relative z-10 pt-[calc(var(--navbar-offset)+0.75rem)] pb-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
           <div className="mb-8">
             <div className="h-10 w-32 bg-muted animate-pulse rounded mb-4" />
             <div className="h-16 w-3/4 bg-muted animate-pulse rounded mb-6" />
@@ -667,7 +669,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     return (
       <main className="relative min-h-screen">
         <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
-        <div className="relative z-10 pt-[var(--navbar-offset)] py-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
+        <div className="relative z-10 pt-[calc(var(--navbar-offset)+0.75rem)] pb-32 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
           <div className="text-center">
             <h1 className="font-display text-4xl mb-4">Sermon Not Found</h1>
             <Button onClick={() => router.push("/sermons")} variant="outline" className="font-mono text-xs uppercase tracking-widest">
@@ -686,7 +688,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
       
       <div
         className={cn(
-          "relative z-10 pt-[var(--navbar-offset)] py-6 sm:py-12 pl-4 sm:pl-6 md:pl-12",
+          "relative z-10 pt-[calc(var(--navbar-offset)+0.75rem)] pb-6 sm:pb-12 pl-4 sm:pl-6 md:pl-12",
           (organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0)
             ? "pr-4 sm:pr-6 md:pr-64 lg:pr-72"
             : "pr-4 sm:pr-6 md:pr-12",

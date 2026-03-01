@@ -535,6 +535,11 @@ export default function SermonsPage() {
             setSelectedSermon(data.sermon);
           }
           
+          // If queued, trigger processor immediately so the job starts without waiting for cron or interval
+          if (data.sermon.status === "generating") {
+            fetch("/api/queue/processor", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include" }).catch(() => {});
+          }
+          
           // Show success toast if transcript completed
           if (data.sermon.status === "completed" && data.sermon.transcript) {
             analytics.transcriptGenerated(sermonToUse.id);
