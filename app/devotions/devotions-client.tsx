@@ -871,7 +871,7 @@ export function DevotionsClient() {
                   <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
                     Read through a section
                   </p>
-                  <p className="font-mono text-[10px] tracking-wider text-white/50 mb-6 sm:mb-8">
+                  <p className="font-mono text-[10px] tracking-wider text-white/60 mb-6 sm:mb-8">
                     Pick up where you left off each time.
                   </p>
                   <ul className="space-y-0 md:max-h-[50vh] md:overflow-y-auto md:pr-1">
@@ -881,11 +881,15 @@ export function DevotionsClient() {
                           type="button"
                           onClick={() => startReadingPlan(sec.id)}
                           disabled={loading || booksLoading}
-                          className="w-full flex items-center justify-between py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
+                          className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
                         >
-                          <span>{sec.label}</span>
-                          <span className="font-mono text-[10px] text-white/45">{sec.bookIds.length} book{sec.bookIds.length !== 1 ? "s" : ""}</span>
-                          <ChevronRight className="w-5 h-5 text-white/40 shrink-0" />
+                          <span className="flex-1 truncate">{sec.label}</span>
+                          <span className="flex items-center gap-2 shrink-0 self-center">
+                            <span className="font-mono text-[11px] tracking-wider text-white/60 tabular-nums">
+                              {sec.bookIds.length} book{sec.bookIds.length !== 1 ? "s" : ""}
+                            </span>
+                            <ChevronRight className="w-5 h-5 text-white/40" aria-hidden />
+                          </span>
                         </button>
                       </li>
                     ))}
