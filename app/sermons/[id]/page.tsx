@@ -19,7 +19,7 @@ import { SermonNarrativeView } from "@/components/sermon-narrative-view";
 import { SermonVerseSidebar } from "@/components/sermon-verse-sidebar";
 import { extractVerseReferencesFromText } from "@/lib/bible/verse-extract";
 import { getBookFromSeriesName, normalizeBookName } from "@/lib/bible/reference";
-import { decodeHtmlEntities, formatRelativeTime } from "@/lib/utils";
+import { cn, decodeHtmlEntities, formatRelativeTime } from "@/lib/utils";
 import type { UnifiedSummarySection } from "@/app/api/sermons/[id]/summaries/unified/route";
 
 interface TranscriptionProgress {
@@ -684,7 +684,14 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
     <main className="relative min-h-screen">
       <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
       
-      <div className="relative z-10 pt-[var(--navbar-offset)] py-6 sm:py-12 pl-4 sm:pl-6 md:pl-12 pr-4 sm:pr-6 md:pr-12">
+      <div
+        className={cn(
+          "relative z-10 pt-[var(--navbar-offset)] py-6 sm:py-12 pl-4 sm:pl-6 md:pl-12",
+          (organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0)
+            ? "pr-4 sm:pr-6 md:pr-64 lg:pr-72"
+            : "pr-4 sm:pr-6 md:pr-12",
+        )}
+      >
         {/* Back Button */}
         <Button
           onClick={() => router.push("/sermons")}
@@ -1403,7 +1410,7 @@ export default function SermonDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {(organizedVerses.mainChapter || organizedVerses.supportingVerses.length > 0) && (
-            <div className="hidden md:block flex-shrink-0 w-64 lg:w-72 sticky top-[var(--navbar-offset)] self-start max-h-[calc(100dvh-var(--navbar-offset)-1rem)]">
+            <div className="hidden md:block fixed right-0 top-[var(--navbar-offset)] w-64 lg:w-72 max-h-[calc(100dvh-var(--navbar-offset)-1rem)] z-20">
               <SermonVerseSidebar organizedVerses={organizedVerses} />
             </div>
           )}

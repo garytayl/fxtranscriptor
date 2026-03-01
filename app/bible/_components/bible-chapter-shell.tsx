@@ -186,7 +186,7 @@ export function BibleChapterShell({
     <LexiconCacheProvider>
       <main className="min-h-screen bg-background text-foreground">
         {highlightRange && <ScrollToVerse verseNumber={highlightRange.start} />}
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:flex-row lg:gap-12 lg:items-start">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:flex-row lg:gap-12 lg:items-start lg:pr-[22rem]">
         <div className="min-w-0 flex-1 flex flex-col gap-4 sm:gap-6">
           <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/95 px-4 pt-3 sm:pt-4 backdrop-blur-md">
           <div className="flex items-center justify-between gap-3 pb-1 sm:pb-2">
@@ -272,9 +272,9 @@ export function BibleChapterShell({
         </div>
         </div>
 
-        {/* Sidebar — desktop: Greek & Hebrew, sticky so it stays visible when scrolling */}
+        {/* Sidebar — desktop: Greek & Hebrew, fixed so it stays visible when scrolling */}
         <aside
-          className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] lg:sticky lg:top-[var(--navbar-offset)] lg:self-start lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] border-l border-white/10 bg-[#050505] z-10 pt-6"
+          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-[var(--navbar-offset)] lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] border-l border-white/10 bg-[#050505] z-10 pt-6"
           aria-label="Greek & Hebrew"
         >
           <div className="shrink-0 px-6 pb-2">
