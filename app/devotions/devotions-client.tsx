@@ -19,7 +19,7 @@ import {
   Calendar,
   Bell,
 } from "lucide-react"
-import { getPassageEntry, savePassageEntry, listPassageEntries, type ListedPassageEntry } from "@/lib/devotions-storage"
+import { getPassageEntry, savePassageEntry, listPassageEntries, getPassageNotes, saveVerseNote, getVerseNote, type ListedPassageEntry, type VerseNote } from "@/lib/devotions-storage"
 import { getDevotionsSettings, setShowTracking, setChaptersPerDay } from "@/lib/devotions-settings"
 import {
   getDevotionsTracking,
@@ -297,8 +297,49 @@ export function DevotionsClient() {
   const [verseRange, setVerseRange] = useState("")
   const [chaptersLoading, setChaptersLoading] = useState(false)
 
+  const [activeVerseNum, setActiveVerseNum] = useState<number | null>(null)
+  const [verseNoteText, setVerseNoteText] = useState("")
+  const [verseNotes, setVerseNotes] = useState<VerseNote[]>([])
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false)
+
   const passageRef = passage?.reference ?? ""
   const reduced = useReducedMotion()
+
+  // Load verse notes when passage changes
+  useEffect(() => {
+    if (passageRef) {
+      const notes = getPassageNotes(passageRef)
+      setVerseNotes(notes.notes)
+    } else {
+      setVerseNotes([])
+    }
+    setActiveVerseNum(null)
+    setVerseNoteText("")
+  }, [passageRef])
+
+  const handleVerseTap = useCallback((verseNumber: number) => {
+    setActiveVerseNum(verseNumber)
+    const existing = getVerseNote(passageRef, verseNumber)
+    setVerseNoteText(existing)
+    setNoteSheetOpen(true)
+  }, [passageRef])
+
+  const handleSaveVerseNote = useCallback(() => {
+    if (activeVerseNum === null) return
+    saveVerseNote(passageRef, activeVerseNum, verseNoteText)
+    const updated = getPassageNotes(passageRef)
+    setVerseNotes(updated.notes)
+    if (!verseNoteText.trim()) {
+      setActiveVerseNum(null)
+      setNoteSheetOpen(false)
+    }
+  }, [passageRef, activeVerseNum, verseNoteText])
+
+  const handleCloseNoteSheet = useCallback(() => {
+    if (activeVerseNum !== null) handleSaveVerseNote()
+    setNoteSheetOpen(false)
+    setActiveVerseNum(null)
+  }, [activeVerseNum, handleSaveVerseNote])
 
   useEffect(() => {
     let cancelled = false
@@ -1328,32 +1369,52 @@ export function DevotionsClient() {
                       },
                     }}
                   >
-                    {passage.verses.map((v, i) => (
-                      <motion.p
-                        key={v.number}
-                        variants={{
-                          hidden: { opacity: 0, y: 12 },
-                          visible: {
-                            opacity: 1,
-                            y: 0,
-                            transition: {
-                              duration: reduced ? 0.15 : 0.4,
-                              ease: [0.25, 0.46, 0.45, 0.94],
+                    {passage.verses.map((v, i) => {
+                      const hasNote = verseNotes.some((n) => n.verseNumber === v.number)
+                      const isActive = activeVerseNum === v.number
+                      return (
+                        <motion.div
+                          key={v.number}
+                          variants={{
+                            hidden: { opacity: 0, y: 12 },
+                            visible: {
+                              opacity: 1,
+                              y: 0,
+                              transition: {
+                                duration: reduced ? 0.15 : 0.4,
+                                ease: [0.25, 0.46, 0.45, 0.94],
+                              },
                             },
-                          },
-                        }}
-                        className={`font-sans text-foreground/92 leading-[1.85] mb-5 text-[1.05rem] sm:text-[1.12rem] font-light ${
-                          i === 0
-                            ? "first-letter:text-2xl first-letter:sm:text-3xl first-letter:font-normal first-letter:mr-0.5 first-letter:float-left"
-                            : ""
-                        }`}
-                      >
-                        <span className="font-mono text-white/45 text-sm align-top mr-2 tabular-nums">
-                          {v.number}.
-                        </span>
-                        {v.text}
-                      </motion.p>
-                    ))}
+                          }}
+                          className={`group relative rounded-lg transition-colors cursor-pointer mb-1 ${
+                            isActive
+                              ? "bg-amber-500/10 ring-1 ring-amber-500/30"
+                              : hasNote
+                                ? "bg-white/[0.03]"
+                                : "hover:bg-white/[0.03] active:bg-white/[0.05]"
+                          }`}
+                          onClick={() => handleVerseTap(v.number)}
+                        >
+                          <p
+                            className={`font-sans text-foreground/92 leading-[1.85] py-2.5 px-3 text-[1.05rem] sm:text-[1.12rem] font-light ${
+                              i === 0
+                                ? "first-letter:text-2xl first-letter:sm:text-3xl first-letter:font-normal first-letter:mr-0.5 first-letter:float-left"
+                                : ""
+                            }`}
+                          >
+                            <span className={`font-mono text-sm align-top mr-2 tabular-nums ${isActive ? "text-amber-400/80" : "text-white/45"}`}>
+                              {v.number}.
+                            </span>
+                            {v.text}
+                          </p>
+                          {hasNote && (
+                            <div className="absolute right-2 top-2.5">
+                              <div className="w-2 h-2 rounded-full bg-amber-400/70" title="You added a note" />
+                            </div>
+                          )}
+                        </motion.div>
+                      )
+                    })}
                   </motion.div>
                   {/* Mobile: reflection as the next step (after reading), not stuck at bottom */}
                   <div className="lg:hidden mt-10 pt-8 border-t border-white/10">
@@ -1369,28 +1430,91 @@ export function DevotionsClient() {
                 </div>
               </div>
 
-              {/* Desktop: right sidebar for journal (same pattern as scripture reader) */}
+              {/* Desktop: right sidebar — verse notes + journal */}
               <aside
                 className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] border-l border-white/10 bg-[#050505] z-10"
-                aria-label="Journal"
+                aria-label="Journal & Notes"
               >
-                <div className="shrink-0 px-6 pt-6 pb-2">
-                  <p className="font-mono text-[10px] tracking-[0.2em] text-white/45 uppercase">
-                    After reading
-                  </p>
-                </div>
                 <div
-                  className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
+                  className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
-                  <JournalPanel
-                    passageRef={passageRef}
-                    prayer={prayer}
-                    reflection={reflection}
-                    onPrayerChange={handlePrayerChange}
-                    onReflectionChange={handleReflectionChange}
-                    onBlur={scheduleSave}
-                  />
+                  {/* Active verse note editor */}
+                  <AnimatePresence mode="wait">
+                    {activeVerseNum !== null && (
+                      <motion.div
+                        key={`note-${activeVerseNum}`}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.15 }}
+                        className="px-6 pt-5 pb-4 border-b border-white/10"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="font-mono text-[10px] tracking-[0.2em] text-amber-300/70 uppercase">
+                            Verse {activeVerseNum} — your thoughts
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => { handleSaveVerseNote(); setActiveVerseNum(null) }}
+                            className="text-white/40 hover:text-white/70 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <textarea
+                          value={verseNoteText}
+                          onChange={(e) => setVerseNoteText(e.target.value)}
+                          onBlur={handleSaveVerseNote}
+                          placeholder="What stands out to you about this verse?"
+                          rows={3}
+                          autoFocus
+                          className="w-full bg-white/5 border border-white/10 rounded-xl p-3 font-sans text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-amber-500/30 resize-y transition-colors"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Saved verse notes list */}
+                  {verseNotes.length > 0 && (
+                    <div className="px-6 pt-4 pb-4 border-b border-white/10">
+                      <p className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase mb-3">
+                        Your notes ({verseNotes.length})
+                      </p>
+                      <div className="space-y-2.5">
+                        {verseNotes.map((n) => (
+                          <button
+                            key={n.verseNumber}
+                            type="button"
+                            onClick={() => handleVerseTap(n.verseNumber)}
+                            className={`w-full text-left rounded-lg p-3 transition-colors ${
+                              activeVerseNum === n.verseNumber
+                                ? "bg-amber-500/10 border border-amber-500/25"
+                                : "bg-white/[0.03] border border-white/5 hover:border-white/15"
+                            }`}
+                          >
+                            <span className="font-mono text-[10px] text-amber-300/60 uppercase">v{n.verseNumber}</span>
+                            <p className="font-sans text-xs text-white/75 mt-1 line-clamp-2 leading-relaxed">{n.note}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Journal panel */}
+                  <div className="px-6 pt-5 pb-6">
+                    <p className="font-mono text-[10px] tracking-[0.2em] text-white/45 uppercase mb-4">
+                      After reading
+                    </p>
+                    <JournalPanel
+                      passageRef={passageRef}
+                      prayer={prayer}
+                      reflection={reflection}
+                      onPrayerChange={handlePrayerChange}
+                      onReflectionChange={handleReflectionChange}
+                      onBlur={scheduleSave}
+                    />
+                  </div>
                 </div>
               </aside>
             </motion.div>
@@ -1430,9 +1554,59 @@ export function DevotionsClient() {
         </div>
       </div>
 
+      {/* Mobile: bottom sheet for verse note */}
+      <AnimatePresence>
+        {step === "reading" && noteSheetOpen && activeVerseNum !== null && (
+          <MobileJournalSheet onDismiss={handleCloseNoteSheet}>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[11px] tracking-[0.2em] text-amber-300/70 uppercase">
+                  Verse {activeVerseNum}
+                </p>
+                {verseNoteText.trim() && (
+                  <span className="font-mono text-[9px] text-white/30">auto-saved</span>
+                )}
+              </div>
+              <textarea
+                value={verseNoteText}
+                onChange={(e) => setVerseNoteText(e.target.value)}
+                onBlur={handleSaveVerseNote}
+                placeholder="What stands out to you about this verse?"
+                rows={4}
+                autoFocus
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 font-sans text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-amber-500/30 resize-y transition-colors"
+              />
+              {/* Show other notes for context */}
+              {verseNotes.filter((n) => n.verseNumber !== activeVerseNum).length > 0 && (
+                <div className="pt-3 border-t border-white/10">
+                  <p className="font-mono text-[9px] tracking-wider text-white/30 uppercase mb-2">
+                    Other notes
+                  </p>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {verseNotes
+                      .filter((n) => n.verseNumber !== activeVerseNum)
+                      .map((n) => (
+                        <button
+                          key={n.verseNumber}
+                          type="button"
+                          onClick={() => handleVerseTap(n.verseNumber)}
+                          className="w-full text-left rounded-lg p-2.5 bg-white/[0.03] border border-white/5"
+                        >
+                          <span className="font-mono text-[9px] text-amber-300/50">v{n.verseNumber}</span>
+                          <p className="font-sans text-xs text-white/60 mt-0.5 line-clamp-1">{n.note}</p>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </MobileJournalSheet>
+        )}
+      </AnimatePresence>
+
       {/* Mobile: bottom sheet for journal */}
       <AnimatePresence>
-        {step === "reading" && journalSheetOpen && (
+        {step === "reading" && journalSheetOpen && !noteSheetOpen && (
           <MobileJournalSheet onDismiss={() => setJournalSheetOpen(false)}>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
               <JournalPanel

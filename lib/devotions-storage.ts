@@ -116,6 +116,64 @@ export type ListedPassageEntry = {
   updatedAt: string | null
 }
 
+// ——— Verse-level annotations per passage ———
+
+const VERSE_NOTES_PREFIX = "fx_devotions_v1_notes_"
+
+export type VerseNote = {
+  verseNumber: number
+  note: string
+  updatedAt: string
+}
+
+export type PassageNotes = {
+  passageRef: string
+  notes: VerseNote[]
+}
+
+function notesKey(ref: string): string {
+  return `${VERSE_NOTES_PREFIX}${slugifyPassageRef(ref)}`
+}
+
+export function getPassageNotes(ref: string): PassageNotes {
+  if (typeof window === "undefined") return { passageRef: ref, notes: [] }
+  try {
+    const raw = window.localStorage.getItem(notesKey(ref))
+    if (!raw) return { passageRef: ref, notes: [] }
+    const parsed = JSON.parse(raw) as PassageNotes
+    return { passageRef: ref, notes: Array.isArray(parsed.notes) ? parsed.notes : [] }
+  } catch {
+    return { passageRef: ref, notes: [] }
+  }
+}
+
+export function saveVerseNote(ref: string, verseNumber: number, note: string): void {
+  if (typeof window === "undefined") return
+  try {
+    const current = getPassageNotes(ref)
+    const existing = current.notes.findIndex((n) => n.verseNumber === verseNumber)
+    const trimmed = note.trim()
+    if (existing >= 0) {
+      if (!trimmed) {
+        current.notes.splice(existing, 1)
+      } else {
+        current.notes[existing] = { verseNumber, note: trimmed, updatedAt: new Date().toISOString() }
+      }
+    } else if (trimmed) {
+      current.notes.push({ verseNumber, note: trimmed, updatedAt: new Date().toISOString() })
+    }
+    current.notes.sort((a, b) => a.verseNumber - b.verseNumber)
+    window.localStorage.setItem(notesKey(ref), JSON.stringify(current))
+  } catch {
+    // ignore
+  }
+}
+
+export function getVerseNote(ref: string, verseNumber: number): string {
+  const notes = getPassageNotes(ref)
+  return notes.notes.find((n) => n.verseNumber === verseNumber)?.note ?? ""
+}
+
 export function listPassageEntries(): ListedPassageEntry[] {
   if (typeof window === "undefined") return []
   const entries: ListedPassageEntry[] = []
