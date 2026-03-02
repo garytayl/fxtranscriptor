@@ -1373,30 +1373,23 @@ export function DevotionsClient() {
                       const hasNote = verseNotes.some((n) => n.verseNumber === v.number)
                       const isActive = activeVerseNum === v.number
                       return (
-                        <motion.div
+                        <div
                           key={v.number}
-                          variants={{
-                            hidden: { opacity: 0, y: 12 },
-                            visible: {
-                              opacity: 1,
-                              y: 0,
-                              transition: {
-                                duration: reduced ? 0.15 : 0.4,
-                                ease: [0.25, 0.46, 0.45, 0.94],
-                              },
-                            },
-                          }}
-                          className={`group relative rounded-lg transition-colors cursor-pointer mb-1 ${
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleVerseTap(v.number)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleVerseTap(v.number) }}
+                          style={{ touchAction: "manipulation" }}
+                          className={`group relative rounded-lg transition-colors cursor-pointer mb-1 select-none ${
                             isActive
                               ? "bg-amber-500/10 ring-1 ring-amber-500/30"
                               : hasNote
                                 ? "bg-white/[0.03]"
                                 : "hover:bg-white/[0.03] active:bg-white/[0.05]"
                           }`}
-                          onClick={() => handleVerseTap(v.number)}
                         >
                           <p
-                            className={`font-sans text-foreground/92 leading-[1.85] py-2.5 px-3 text-[1.05rem] sm:text-[1.12rem] font-light ${
+                            className={`font-sans text-foreground/92 leading-[1.85] py-2.5 px-3 text-[1.05rem] sm:text-[1.12rem] font-light pointer-events-none ${
                               i === 0
                                 ? "first-letter:text-2xl first-letter:sm:text-3xl first-letter:font-normal first-letter:mr-0.5 first-letter:float-left"
                                 : ""
@@ -1408,11 +1401,11 @@ export function DevotionsClient() {
                             {v.text}
                           </p>
                           {hasNote && (
-                            <div className="absolute right-2 top-2.5">
-                              <div className="w-2 h-2 rounded-full bg-amber-400/70" title="You added a note" />
+                            <div className="absolute right-2 top-2.5 pointer-events-none">
+                              <div className="w-2 h-2 rounded-full bg-amber-400/70" />
                             </div>
                           )}
-                        </motion.div>
+                        </div>
                       )
                     })}
                   </motion.div>
