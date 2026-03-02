@@ -83,8 +83,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   
-  button, a {
-    /* Improve touch responsiveness */
+  button, a, [role="button"], label, summary, [tabindex] {
     touch-action: manipulation;
   }
   

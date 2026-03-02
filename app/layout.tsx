@@ -53,14 +53,12 @@ export const metadata: Metadata = {
   },
 }
 
-/** Stable viewport: avoid "zoomed in on load" or after rotation; keep user zoom for a11y. */
 export const viewport: Viewport = {
   width: "device-width",
-  height: "device-height",
   initialScale: 1,
   minimumScale: 1,
-  maximumScale: 10,
-  userScalable: true,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   interactiveWidget: "resizes-visual",
 }
