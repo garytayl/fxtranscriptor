@@ -8,6 +8,7 @@ const navItems = [
   { href: "/admin/dashboard", label: "Sermon Manager" },
   { href: "/admin/studies", label: "Study Guides" },
   { href: "/admin/devotions", label: "Devotions" },
+  { href: "/admin/bible-hcsb", label: "HCSB Import" },
 ];
 
 export function AdminSidebar() {

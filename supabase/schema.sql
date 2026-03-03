@@ -403,3 +403,56 @@ BEGIN
       FOR DELETE USING (public.is_admin(auth.uid()));
   END IF;
 END $$;
+
+-- Bible verses: local scripture text (e.g. HCSB import). One row per verse.
+CREATE TABLE IF NOT EXISTS bible_verses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  translation_slug TEXT NOT NULL,
+  book_slug TEXT NOT NULL,
+  chapter_number INT NOT NULL,
+  verse_number INT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(translation_slug, book_slug, chapter_number, verse_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bible_verses_lookup ON bible_verses(translation_slug, book_slug, chapter_number);
+CREATE INDEX IF NOT EXISTS idx_bible_verses_progress ON bible_verses(translation_slug, book_slug);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_bible_verses_updated_at') THEN
+    CREATE TRIGGER update_bible_verses_updated_at
+      BEFORE UPDATE ON bible_verses
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
+
+ALTER TABLE bible_verses ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_verses' AND policyname = 'Bible verses are viewable by everyone') THEN
+    CREATE POLICY "Bible verses are viewable by everyone" ON bible_verses FOR SELECT USING (true);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_verses' AND policyname = 'Bible verses insert by admins') THEN
+    CREATE POLICY "Bible verses insert by admins" ON bible_verses FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_verses' AND policyname = 'Bible verses update by admins') THEN
+    CREATE POLICY "Bible verses update by admins" ON bible_verses FOR UPDATE USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_verses' AND policyname = 'Bible verses delete by admins') THEN
+    CREATE POLICY "Bible verses delete by admins" ON bible_verses FOR DELETE USING (public.is_admin(auth.uid()));
+  END IF;
+END $$;
