@@ -44,6 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import ReactMarkdown from "react-markdown"
 import { toast } from "sonner"
 import {
   supportsNotifications,
@@ -247,7 +248,10 @@ type PassageData = {
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "landing" | "planPicker" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
+type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
+
+type DevotionTopicListItem = { id: string; title: string; slug: string; description: string | null; bible_references: string[]; sort_order: number }
+type DevotionTopicFull = DevotionTopicListItem & { body: string | null }
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -301,6 +305,10 @@ export function DevotionsClient() {
   const [verseNoteText, setVerseNoteText] = useState("")
   const [verseNotes, setVerseNotes] = useState<VerseNote[]>([])
   const [noteSheetOpen, setNoteSheetOpen] = useState(false)
+
+  const [topicsList, setTopicsList] = useState<DevotionTopicListItem[]>([])
+  const [topicsLoading, setTopicsLoading] = useState(false)
+  const [selectedTopic, setSelectedTopic] = useState<DevotionTopicFull | null>(null)
 
   const passageRef = passage?.reference ?? ""
   const reduced = useReducedMotion()
@@ -397,6 +405,21 @@ export function DevotionsClient() {
       setNotificationPermission(Notification.permission)
     }
   }, [moreOpen])
+
+  useEffect(() => {
+    if (step !== "topicPicker") return
+    let cancelled = false
+    setTopicsLoading(true)
+    fetch("/api/devotions/topics")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || data.error) return
+        setTopicsList(data.topics ?? [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setTopicsLoading(false) })
+    return () => { cancelled = true }
+  }, [step])
 
   useEffect(() => {
     if (!activePlanSession || !readingPlan) {
@@ -626,7 +649,8 @@ export function DevotionsClient() {
   const goBack = useCallback(() => {
     setDir(-1)
     if (step === "landing") return
-    if (step === "planPicker" || step === "journalHistory") setStep("landing")
+    if (step === "planPicker" || step === "topicPicker" || step === "journalHistory") setStep("landing")
+    else if (step === "topicReading") setStep("topicPicker")
     else if (step === "testament") setStep("landing")
     else if (step === "book") setStep("testament")
     else if (step === "chapter") setStep("book")
@@ -669,6 +693,24 @@ export function DevotionsClient() {
       })
       .finally(() => setLoading(false))
   }, [settings.showTracking])
+
+  const openTopic = useCallback((slug: string) => {
+    setLoading(true)
+    setError(null)
+    fetch(`/api/devotions/topics/${encodeURIComponent(slug)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error)
+        setSelectedTopic(data)
+        setDir(1)
+        setStep("topicReading")
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not load topic")
+        toast.error("Could not load topic")
+      })
+      .finally(() => setLoading(false))
+  }, [])
 
   const openReflection = useCallback(() => {
     setJournalSheetOpen(false)
@@ -804,7 +846,7 @@ export function DevotionsClient() {
       {/* Header: back/leave + title + menu (reading only) */}
       <header className="shrink-0 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:px-6 md:px-12 border-b border-white/5">
         <div className="min-w-[80px] flex justify-start">
-          {step === "landing" || step === "testament" || step === "planPicker" ? (
+          {step === "landing" || step === "testament" || step === "planPicker" || step === "topicPicker" ? (
             <Link
               href="/"
               className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
@@ -813,6 +855,16 @@ export function DevotionsClient() {
               <LogOut className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Leave</span>
             </Link>
+          ) : step === "topicReading" ? (
+            <button
+              type="button"
+              onClick={() => { setDir(-1); setStep("topicPicker"); setSelectedTopic(null); }}
+              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
+              aria-label="Back to topics"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Topics</span>
+            </button>
           ) : step === "reflection" ? (
             <button
               type="button"
@@ -847,6 +899,8 @@ export function DevotionsClient() {
         <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 truncate max-w-[45vw] text-center">
           {step === "landing" && "Devotions"}
           {step === "planPicker" && "Start a reading plan"}
+          {step === "topicPicker" && "Topical study"}
+          {step === "topicReading" && (selectedTopic?.title ?? "Topic")}
           {step === "journalHistory" && "Your journal"}
           {step === "testament" && "Choose testament"}
           {step === "book" && "Choose book"}
@@ -991,6 +1045,13 @@ export function DevotionsClient() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => { setDir(1); setStep("topicPicker"); }}
+                      className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors"
+                    >
+                      Weekly topical study
+                    </button>
+                    <button
+                      type="button"
                       onClick={enterDevotions}
                       className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors"
                     >
@@ -1129,6 +1190,107 @@ export function DevotionsClient() {
                       )
                     })}
                   </ul>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Topic picker — weekly topical studies */}
+            {step === "topicPicker" && (
+              <motion.div
+                key="topicPicker"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 pb-12 box-border"
+              >
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto md:rounded-2xl md:border md:border-white/10 md:bg-white/[0.02] md:px-10 md:py-10 lg:px-12 lg:py-12">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
+                    Weekly topical study
+                  </p>
+                  <p className="font-mono text-[10px] tracking-wider text-white/60 mb-6 sm:mb-8">
+                    What does the Bible say about a topic? Pick one to read.
+                  </p>
+                  {topicsLoading ? (
+                    <p className="font-mono text-sm text-white/50">Loading topics…</p>
+                  ) : topicsList.length === 0 ? (
+                    <p className="font-sans text-sm text-white/60">
+                      No topics yet. Check back later for weekly studies.
+                    </p>
+                  ) : (
+                    <ul className="space-y-0 md:max-h-[50vh] md:overflow-y-auto md:pr-1">
+                      {topicsList.map((topic) => (
+                        <li key={topic.id}>
+                          <button
+                            type="button"
+                            onClick={() => openTopic(topic.slug)}
+                            disabled={loading}
+                            className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
+                          >
+                            <span className="flex-1 min-w-0 text-left">
+                              <span className="block truncate">{topic.title}</span>
+                              {topic.description && (
+                                <span className="block font-sans text-xs text-white/55 mt-0.5 leading-snug line-clamp-2">
+                                  {topic.description}
+                                </span>
+                              )}
+                            </span>
+                            <ChevronRight className="w-5 h-5 text-white/40 shrink-0" aria-hidden />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Topic reading — single topical study content */}
+            {step === "topicReading" && selectedTopic && (
+              <motion.div
+                key="topicReading"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border"
+              >
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto">
+                  <h2 className="font-sans text-2xl sm:text-3xl font-light text-white/95 mb-2">
+                    {selectedTopic.title}
+                  </h2>
+                  {selectedTopic.description && (
+                    <p className="font-sans text-sm text-white/70 mb-6">
+                      {selectedTopic.description}
+                    </p>
+                  )}
+                  {(selectedTopic.bible_references?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {(selectedTopic.bible_references as string[]).map((ref) => (
+                        <a
+                          key={ref}
+                          href={getReaderUrlFromReference(ref) ?? "/bible"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3 py-2 font-mono text-[11px] tracking-wider text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          {ref}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {selectedTopic.body ? (
+                    <div className="devotion-topic-prose prose prose-invert max-w-none font-sans text-white/90 text-base leading-relaxed [&_h1]:text-xl [&_h2]:text-lg [&_h3]:text-base [&_h1]:mt-6 [&_h2]:mt-5 [&_h3]:mt-4 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:text-amber-400 [&_a]:underline">
+                      <ReactMarkdown>{selectedTopic.body}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="font-sans text-sm text-white/50 italic">No content for this topic yet.</p>
+                  )}
                 </div>
               </motion.div>
             )}

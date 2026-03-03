@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/admin/dashboard", label: "Sermon Manager" },
   { href: "/admin/studies", label: "Study Guides" },
+  { href: "/admin/devotions", label: "Devotions" },
 ];
 
 export function AdminSidebar() {

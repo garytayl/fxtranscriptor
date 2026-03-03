@@ -309,3 +309,90 @@ BEGIN
       WITH CHECK (public.is_admin(auth.uid()));
   END IF;
 END $$;
+
+-- Devotion topics: weekly topical studies (e.g. Immigration — What the Bible Says)
+CREATE TABLE IF NOT EXISTS devotion_topics (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  description TEXT,
+  body TEXT,
+  bible_references TEXT[] DEFAULT '{}',
+  sort_order INT NOT NULL DEFAULT 0,
+  published BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_devotion_topics_published_sort ON devotion_topics(published, sort_order ASC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_devotion_topics_slug ON devotion_topics(slug);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'update_devotion_topics_updated_at'
+  ) THEN
+    CREATE TRIGGER update_devotion_topics_updated_at
+      BEFORE UPDATE ON devotion_topics
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
+
+ALTER TABLE devotion_topics ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'devotion_topics' AND policyname = 'Devotion topics are viewable by everyone when published'
+  ) THEN
+    CREATE POLICY "Devotion topics are viewable by everyone when published" ON devotion_topics
+      FOR SELECT USING (published = true);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'devotion_topics' AND policyname = 'Devotion topics are viewable by admins'
+  ) THEN
+    CREATE POLICY "Devotion topics are viewable by admins" ON devotion_topics
+      FOR SELECT USING (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'devotion_topics' AND policyname = 'Devotion topics can be created by admins'
+  ) THEN
+    CREATE POLICY "Devotion topics can be created by admins" ON devotion_topics
+      FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'devotion_topics' AND policyname = 'Devotion topics can be updated by admins'
+  ) THEN
+    CREATE POLICY "Devotion topics can be updated by admins" ON devotion_topics
+      FOR UPDATE USING (public.is_admin(auth.uid()))
+      WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'devotion_topics' AND policyname = 'Devotion topics can be deleted by admins'
+  ) THEN
+    CREATE POLICY "Devotion topics can be deleted by admins" ON devotion_topics
+      FOR DELETE USING (public.is_admin(auth.uid()));
+  END IF;
+END $$;
