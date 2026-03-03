@@ -250,8 +250,16 @@ type BibleChapter = { id: string; number: number }
 
 type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
-type DevotionTopicListItem = { id: string; title: string; slug: string; description: string | null; bible_references: string[]; sort_order: number }
+type DevotionTopicListItem = { id: string; title: string; slug: string; description: string | null; bible_references: string[]; sort_order: number; is_current?: boolean; featured_at?: string | null }
 type DevotionTopicFull = DevotionTopicListItem & { body: string | null }
+
+function isNewThisWeek(featuredAt: string | null | undefined): boolean {
+  if (!featuredAt) return false
+  const d = new Date(featuredAt)
+  const now = new Date()
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  return Number(now) - Number(d) < sevenDaysMs
+}
 
 const SAVE_DEBOUNCE_MS = 400
 
@@ -1221,26 +1229,42 @@ export function DevotionsClient() {
                     </p>
                   ) : (
                     <ul className="space-y-0 md:max-h-[50vh] md:overflow-y-auto md:pr-1">
-                      {topicsList.map((topic) => (
-                        <li key={topic.id}>
-                          <button
-                            type="button"
-                            onClick={() => openTopic(topic.slug)}
-                            disabled={loading}
-                            className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
-                          >
-                            <span className="flex-1 min-w-0 text-left">
-                              <span className="block truncate">{topic.title}</span>
-                              {topic.description && (
-                                <span className="block font-sans text-xs text-white/55 mt-0.5 leading-snug line-clamp-2">
-                                  {topic.description}
+                      {topicsList.map((topic) => {
+                        const current = topic.is_current === true
+                        const newThisWeek = isNewThisWeek(topic.featured_at)
+                        return (
+                          <li key={topic.id}>
+                            <button
+                              type="button"
+                              onClick={() => openTopic(topic.slug)}
+                              disabled={loading}
+                              className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
+                            >
+                              <span className="flex-1 min-w-0 text-left">
+                                <span className="flex items-center gap-2 flex-wrap">
+                                  <span className="block truncate">{topic.title}</span>
+                                  {current && (
+                                    <span className="font-mono text-[10px] tracking-widest uppercase text-amber-400/95 border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 rounded shrink-0">
+                                      This week’s topic
+                                    </span>
+                                  )}
+                                  {newThisWeek && (
+                                    <span className="font-mono text-[10px] tracking-widest uppercase text-white/60 border border-white/20 bg-white/5 px-2 py-0.5 rounded shrink-0">
+                                      {current ? "New" : "New this week"}
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                            <ChevronRight className="w-5 h-5 text-white/40 shrink-0" aria-hidden />
-                          </button>
-                        </li>
-                      ))}
+                                {topic.description && (
+                                  <span className="block font-sans text-xs text-white/55 mt-0.5 leading-snug line-clamp-2">
+                                    {topic.description}
+                                  </span>
+                                )}
+                              </span>
+                              <ChevronRight className="w-5 h-5 text-white/40 shrink-0" aria-hidden />
+                            </button>
+                          </li>
+                        )
+                      })}
                     </ul>
                   )}
                 </div>

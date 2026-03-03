@@ -52,12 +52,23 @@ export async function PATCH(
   if (typeof body.published === "boolean") {
     updates.published = body.published;
   }
+  if (typeof body.is_current === "boolean") {
+    updates.is_current = body.is_current;
+    if (body.is_current) {
+      updates.featured_at = new Date().toISOString();
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No fields to update." }, { status: 400 });
   }
 
   const supabase = createSupabaseAdminClient();
+
+  if (updates.is_current === true) {
+    await supabase.from("devotion_topics").update({ is_current: false }).eq("is_current", true);
+  }
+
   const { data, error } = await supabase
     .from("devotion_topics")
     .update(updates)

@@ -9,7 +9,7 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-/** Admin: list all devotion topics (including unpublished). */
+/** Admin: list all devotion topics (including unpublished). Current first. */
 export async function GET() {
   const auth = await requireAdmin();
   if ("response" in auth) return auth.response;
@@ -18,6 +18,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("devotion_topics")
     .select("*")
+    .order("is_current", { ascending: false })
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
@@ -54,8 +55,14 @@ export async function POST(req: NextRequest) {
     : [];
   const sortOrder = typeof body.sort_order === "number" && Number.isFinite(body.sort_order) ? body.sort_order : 0;
   const published = body.published !== false;
+  const isCurrent = body.is_current === true;
 
   const supabase = createSupabaseAdminClient();
+
+  if (isCurrent) {
+    await supabase.from("devotion_topics").update({ is_current: false }).eq("is_current", true);
+  }
+
   const { data, error } = await supabase
     .from("devotion_topics")
     .insert({
@@ -66,6 +73,8 @@ export async function POST(req: NextRequest) {
       bible_references: bibleRefs,
       sort_order: sortOrder,
       published,
+      is_current: isCurrent,
+      featured_at: isCurrent ? new Date().toISOString() : null,
     })
     .select()
     .single();

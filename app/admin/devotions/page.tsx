@@ -15,6 +15,8 @@ export type DevotionTopic = {
   bible_references: string[];
   sort_order: number;
   published: boolean;
+  is_current: boolean;
+  featured_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +73,7 @@ export default function AdminDevotionsPage() {
         : [],
       sort_order: typeof editing.sort_order === "number" ? editing.sort_order : 0,
       published: !!editing.published,
+      is_current: !!editing.is_current,
     };
 
     setSaving(true);
@@ -141,6 +144,8 @@ export default function AdminDevotionsPage() {
                 bible_references: [],
                 sort_order: topics.length,
                 published: true,
+                is_current: false,
+                featured_at: null,
                 created_at: "",
                 updated_at: "",
               });
@@ -173,6 +178,11 @@ export default function AdminDevotionsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-foreground">{topic.title}</h3>
+                  {topic.is_current && (
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-accent bg-accent/10 border border-accent/30 px-2 py-0.5 rounded">
+                      Current
+                    </span>
+                  )}
                   {!topic.published && (
                     <span className="text-[10px] font-mono uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
                       Draft
@@ -299,17 +309,31 @@ export default function AdminDevotionsPage() {
                 placeholder="## Overview\n\nWhat does the Bible say about this topic?\n\n## Key passages\n\n..."
               />
             </div>
-            <div className="flex items-center gap-3 pt-2 sm:col-span-2">
-              <input
-                type="checkbox"
-                id="published"
-                checked={editing.published}
-                onChange={(e) => setEditing({ ...editing, published: e.target.checked })}
-                className="rounded"
-              />
-              <label htmlFor="published" className="text-sm text-foreground">
-                Published (visible in Devotions)
-              </label>
+            <div className="flex flex-col gap-3 pt-2 sm:col-span-2">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="published"
+                  checked={editing.published}
+                  onChange={(e) => setEditing({ ...editing, published: e.target.checked })}
+                  className="rounded"
+                />
+                <label htmlFor="published" className="text-sm text-foreground">
+                  Published (visible in Devotions)
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="is_current"
+                  checked={editing.is_current}
+                  onChange={(e) => setEditing({ ...editing, is_current: e.target.checked })}
+                  className="rounded"
+                />
+                <label htmlFor="is_current" className="text-sm text-foreground">
+                  Set as current topic (this week’s topic — shown first with “This week’s topic” in the app)
+                </label>
+              </div>
             </div>
           </div>
 

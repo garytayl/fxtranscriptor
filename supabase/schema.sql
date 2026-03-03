@@ -320,12 +320,19 @@ CREATE TABLE IF NOT EXISTS devotion_topics (
   bible_references TEXT[] DEFAULT '{}',
   sort_order INT NOT NULL DEFAULT 0,
   published BOOLEAN NOT NULL DEFAULT true,
+  is_current BOOLEAN NOT NULL DEFAULT false,
+  featured_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(slug)
 );
 
+-- Add columns for existing installs that ran the table without is_current/featured_at
+ALTER TABLE devotion_topics ADD COLUMN IF NOT EXISTS is_current BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE devotion_topics ADD COLUMN IF NOT EXISTS featured_at TIMESTAMP WITH TIME ZONE;
+
 CREATE INDEX IF NOT EXISTS idx_devotion_topics_published_sort ON devotion_topics(published, sort_order ASC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_devotion_topics_is_current ON devotion_topics(is_current) WHERE is_current = true;
 CREATE INDEX IF NOT EXISTS idx_devotion_topics_slug ON devotion_topics(slug);
 
 DO $$
