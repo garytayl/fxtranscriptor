@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, Save, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ export default function AdminDevotionsPage() {
   const [topics, setTopics] = useState<DevotionTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [seedingDefault, setSeedingDefault] = useState(false);
   const [editing, setEditing] = useState<DevotionTopic | null>(null);
   const [showNew, setShowNew] = useState(false);
 
@@ -53,6 +54,26 @@ export default function AdminDevotionsPage() {
 
   useEffect(() => {
     loadTopics();
+  }, [loadTopics]);
+
+  const seedDefaultTopic = useCallback(async () => {
+    setSeedingDefault(true);
+    try {
+      const res = await fetch("/api/admin/devotions/seed-default", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Seed failed");
+      toast.success(data.message ?? "Default topic added.");
+      loadTopics();
+    } catch (err) {
+      toast.error("Could not add default topic", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setSeedingDefault(false);
+    }
   }, [loadTopics]);
 
   const handleSave = async () => {
@@ -133,29 +154,42 @@ export default function AdminDevotionsPage() {
           </p>
         </div>
         {!isEditing && (
-          <Button
-            onClick={() => {
-              setEditing({
-                id: "",
-                title: "",
-                slug: "",
-                description: "",
-                body: "",
-                bible_references: [],
-                sort_order: topics.length,
-                published: true,
-                is_current: false,
-                featured_at: null,
-                created_at: "",
-                updated_at: "",
-              });
-              setShowNew(true);
-            }}
-            className="gap-2 font-mono text-xs uppercase tracking-widest"
-          >
-            <Plus className="size-4" />
-            New Topic
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {topics.length === 0 && (
+              <Button
+                onClick={seedDefaultTopic}
+                disabled={seedingDefault}
+                variant="outline"
+                className="gap-2 font-mono text-xs uppercase tracking-widest"
+              >
+                {seedingDefault ? <Loader2 className="size-4 animate-spin" /> : <BookOpen className="size-4" />}
+                {seedingDefault ? "Adding…" : "Add default (Immigration)"}
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                setEditing({
+                  id: "",
+                  title: "",
+                  slug: "",
+                  description: "",
+                  body: "",
+                  bible_references: [],
+                  sort_order: topics.length,
+                  published: true,
+                  is_current: false,
+                  featured_at: null,
+                  created_at: "",
+                  updated_at: "",
+                });
+                setShowNew(true);
+              }}
+              className="gap-2 font-mono text-xs uppercase tracking-widest"
+            >
+              <Plus className="size-4" />
+              New Topic
+            </Button>
+          </div>
         )}
       </div>
 
@@ -166,8 +200,21 @@ export default function AdminDevotionsPage() {
       {!isEditing && !loading && (
         <div className="space-y-3">
           {topics.length === 0 && (
-            <div className="rounded-lg border border-border bg-card/60 p-6 text-center text-sm text-muted-foreground">
-              No topics yet. Click &quot;New Topic&quot; to add a weekly topical study (e.g. Immigration, Justice).
+            <div className="rounded-lg border border-border bg-card/60 p-6 text-center space-y-4">
+              <p className="text-sm text-muted-foreground">
+                No topics yet. Add the default Immigration topic so it appears on the Weekly topical study page, or create your own.
+              </p>
+              <Button
+                onClick={seedDefaultTopic}
+                disabled={seedingDefault}
+                className="gap-2 font-mono text-xs uppercase tracking-widest"
+              >
+                {seedingDefault ? <Loader2 className="size-4 animate-spin" /> : <BookOpen className="size-4" />}
+                {seedingDefault ? "Adding…" : "Add default topic (Immigration)"}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Or click &quot;New Topic&quot; above to create a different topical study.
+              </p>
             </div>
           )}
           {topics.map((topic) => (
