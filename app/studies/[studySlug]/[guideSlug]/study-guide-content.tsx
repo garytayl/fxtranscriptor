@@ -2,7 +2,7 @@
 
 import React from "react"
 import ReactMarkdown from "react-markdown"
-import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
+import { parsePassageReference, parsePassageList, isKnownBookName } from "@/lib/bible/reference"
 
 /** Replace parenthetical verse refs with markdown links so they become interactive (hover + sidebar).
  * Handles: (Jn 1:14), (Rom 15:15; 1 Cor 3:10), and (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10).
@@ -33,6 +33,15 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(${inner})`
+    return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
+  })
+  // (Genesis 3) or (Gen 3) — chapter-only refs (no verse number)
+  out = out.replace(/\(([^)]+)\)/g, (_, inner) => {
+    const trimmed = inner.trim()
+    if (!trimmed || /^ref:/i.test(trimmed)) return `(${inner})`
+    if (/\d+:\d+/.test(trimmed)) return `(${inner})` // already handled above
+    const parsed = parsePassageReference(trimmed)
+    if (!parsed || !isKnownBookName(parsed.book)) return `(${inner})`
     return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
   })
   return out
