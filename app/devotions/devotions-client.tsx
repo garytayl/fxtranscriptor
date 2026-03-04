@@ -249,7 +249,7 @@ type PassageData = {
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
+type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "studyGuide" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
 type DevotionTopicListItem = { id: string; title: string; slug: string; description: string | null; bible_references: string[]; sort_order: number; is_current?: boolean; featured_at?: string | null }
 type DevotionTopicFull = DevotionTopicListItem & { body: string | null }
@@ -318,6 +318,16 @@ export function DevotionsClient() {
   const [topicsList, setTopicsList] = useState<DevotionTopicListItem[]>([])
   const [topicsLoading, setTopicsLoading] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<DevotionTopicFull | null>(null)
+
+  const [currentStudy, setCurrentStudy] = useState<{
+    title: string
+    slug: string
+    guideLabel: string
+    guideSlug: string
+    content: string
+    defaultPassageRef: string | null
+  } | null>(null)
+  const [studyLoading, setStudyLoading] = useState(false)
 
   const passageRef = passage?.reference ?? ""
   const reduced = useReducedMotion()
@@ -663,6 +673,10 @@ export function DevotionsClient() {
       setStep("topicPicker")
       setSelectedTopic(null)
     }
+    else if (step === "studyGuide") {
+      setStep("landing")
+      setCurrentStudy(null)
+    }
     else if (step === "testament") setStep("landing")
     else if (step === "book") setStep("testament")
     else if (step === "chapter") setStep("book")
@@ -725,6 +739,33 @@ export function DevotionsClient() {
         toast.error("Could not load topic")
       })
       .finally(() => setLoading(false))
+  }, [])
+
+  const openCurrentStudy = useCallback(async () => {
+    setStudyLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/devotions/current-study")
+      const data = await res.json()
+      if (data.error || !data.content) {
+        toast.error(data.error || "No study guide available right now")
+        return
+      }
+      setCurrentStudy({
+        title: data.studyTitle ?? "Current Study",
+        slug: data.studySlug ?? "",
+        guideLabel: data.guideLabel ?? "Study Guide",
+        guideSlug: data.guideSlug ?? "",
+        content: data.content,
+        defaultPassageRef: data.defaultPassageRef ?? null,
+      })
+      setDir(1)
+      setStep("studyGuide")
+    } catch (err) {
+      toast.error("Could not load study guide")
+    } finally {
+      setStudyLoading(false)
+    }
   }, [])
 
   const openReflection = useCallback(() => {
@@ -899,6 +940,7 @@ export function DevotionsClient() {
           {step === "planPicker" && "Start a reading plan"}
           {step === "topicPicker" && "Topical study"}
           {step === "topicReading" && (selectedTopic?.title ?? "Topic")}
+          {step === "studyGuide" && (currentStudy?.title ?? "Study Guide")}
           {step === "journalHistory" && "Your journal"}
           {step === "testament" && "Choose testament"}
           {step === "book" && "Choose book"}
@@ -1040,6 +1082,15 @@ export function DevotionsClient() {
                       className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors disabled:opacity-50"
                     >
                       {booksLoading ? "Preparing…" : "Start a reading plan"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openCurrentStudy}
+                      disabled={studyLoading}
+                      className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/15 hover:border-amber-500/40 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <BookOpen className="w-5 h-5 text-amber-400/80" />
+                      {studyLoading ? "Loading…" : "This week's study guide"}
                     </button>
                     <button
                       type="button"
@@ -1257,6 +1308,31 @@ export function DevotionsClient() {
                       })}
                     </ul>
                   )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Current study guide */}
+            {step === "studyGuide" && currentStudy && (
+              <motion.div
+                key="studyGuide"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border lg:pr-[22rem]"
+                style={{ ["--navbar-offset" as string]: "52px" }}
+              >
+                <div className="w-full max-w-4xl mx-auto lg:max-w-none">
+                  <StudyGuideShell
+                    content={currentStudy.content}
+                    defaultPassageRef={currentStudy.defaultPassageRef}
+                    title={currentStudy.guideLabel}
+                    description={currentStudy.title}
+                    sidebarTopOffset="52px"
+                  />
                 </div>
               </motion.div>
             )}
