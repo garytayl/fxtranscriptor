@@ -1,6 +1,7 @@
 import "server-only"
 
 import { getBibleInfo } from "@/lib/bible/api"
+import { LOCAL_HCSB_BIBLE_ID } from "@/lib/bible/local-hcsb"
 
 export type BibleTranslation = {
   key: string
@@ -85,13 +86,16 @@ export async function getResolvedTranslations(): Promise<BibleTranslation[]> {
   }
 
   const available = getAvailableTranslations()
-  if (available.length === 0) {
-    cachedResolvedTranslations = []
-    return cachedResolvedTranslations
-  }
+  const withHcsb: BibleTranslation[] = [
+    { key: "hcsb", label: "HCSB (Holman Christian Standard Bible)", bibleId: LOCAL_HCSB_BIBLE_ID },
+    ...available,
+  ]
 
   const resolved = await Promise.all(
-    available.map(async (translation) => {
+    withHcsb.map(async (translation) => {
+      if (translation.bibleId === LOCAL_HCSB_BIBLE_ID) {
+        return translation
+      }
       try {
         const info = await getBibleInfo(translation.bibleId)
         return {
@@ -126,16 +130,20 @@ export function getDefaultTranslationKey(): string | null {
   }
 
   const available = getAvailableTranslations()
-  return available.length > 0 ? available[0].key : null
+  if (available.length > 0) return available[0].key
+  return "hcsb"
 }
 
 export function getDefaultTranslation(): BibleTranslation | null {
   const available = getAvailableTranslations()
   const defaultKey = getDefaultTranslationKey()
-  if (!defaultKey) {
-    return null
+  if (!defaultKey) return null
+  const fromAvailable = available.find((t) => t.key === defaultKey) ?? available[0]
+  if (fromAvailable) return fromAvailable
+  if (defaultKey === "hcsb") {
+    return { key: "hcsb", label: "HCSB (Holman Christian Standard Bible)", bibleId: LOCAL_HCSB_BIBLE_ID }
   }
-  return available.find((translation) => translation.key === defaultKey) ?? available[0] ?? null
+  return null
 }
 
 export function getTranslationByKey(key: string | null | undefined): BibleTranslation | null {

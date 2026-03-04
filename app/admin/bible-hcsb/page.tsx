@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Save, Loader2, FileText, ChevronDown, ChevronRight, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { getVerseCountsForBook } from "@/lib/bible/verse-counts";
 
 type BookProgress = {
   id: string;
@@ -165,6 +167,38 @@ function parseBlockToChapters(block: string): ParsedChapter[] {
   return chapters.sort((a, b) => a.chapterNumber - b.chapterNumber);
 }
 
+/**
+ * Split a flat list of verses into chapters using known verse counts per chapter (e.g. Genesis 31, 25, 24, ...).
+ * Use when the pasted text has no "Chapter N" headers. Handles partial pastes (fewer verses than full book).
+ */
+function splitFlatVersesByChapterCounts(
+  flatVerses: { number: number; text: string }[],
+  verseCountsPerChapter: number[]
+): ParsedChapter[] {
+  const chapters: ParsedChapter[] = [];
+  let idx = 0;
+  for (let ch = 1; ch <= verseCountsPerChapter.length && idx < flatVerses.length; ch++) {
+    const count = verseCountsPerChapter[ch - 1] ?? 0;
+    const slice = flatVerses.slice(idx, idx + count);
+    if (slice.length === 0) break;
+    chapters.push({
+      chapterNumber: ch,
+      verses: slice.map((v, i) => ({ number: i + 1, text: v.text })),
+    });
+    idx += slice.length;
+  }
+  if (idx < flatVerses.length) {
+    const totalExpected = verseCountsPerChapter.reduce((a, b) => a + b, 0);
+    if (flatVerses.length > totalExpected) {
+      chapters.push({
+        chapterNumber: chapters.length + 1,
+        verses: flatVerses.slice(idx).map((v, i) => ({ number: i + 1, text: v.text })),
+      });
+    }
+  }
+  return chapters;
+}
+
 type ImportMode = "single" | "multi";
 
 export default function AdminBibleHcsbPage() {
@@ -209,12 +243,28 @@ export default function AdminBibleHcsbPage() {
     }
     const text = stripFootnotesSection(blockText);
     if (importMode === "multi") {
-      const chapters = parseBlockToChapters(text);
-      if (chapters.length === 0) {
-        toast.error(
-          "No chapters detected. Add chapter boundaries: lines like 'Chapter 1', 'Chapter 2', or a line with only the chapter number (e.g. '1' then '2')."
-        );
-        return;
+      const book = books.find((b) => b.slug === bookSlug);
+      const verseCounts = book ? getVerseCountsForBook(book.id) : undefined;
+      let chapters: ParsedChapter[];
+      if (verseCounts && verseCounts.length > 0) {
+        const flatVerses = parseBlockToVerses(text);
+        if (flatVerses.length === 0) {
+          toast.error("No verses detected in the pasted text.");
+          return;
+        }
+        chapters = splitFlatVersesByChapterCounts(flatVerses, verseCounts);
+        if (chapters.length === 0) {
+          toast.error("Could not split into chapters.");
+          return;
+        }
+      } else {
+        chapters = parseBlockToChapters(text);
+        if (chapters.length === 0) {
+          toast.error(
+            "No chapters detected. Add chapter boundaries: lines like 'Chapter 1', 'Chapter 2', or a line with only the chapter number (e.g. '1' then '2')."
+          );
+          return;
+        }
       }
       setParsedChapters(chapters);
       setStep("multi-summary");
@@ -356,10 +406,20 @@ export default function AdminBibleHcsbPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">HCSB Import</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Add the Holman Christian Standard Bible to your Supabase database. Paste a block of text, organize into verses, revise, then save. Track progress by book and chapter below.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">HCSB Import</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add the Holman Christian Standard Bible to your Supabase database. Paste a block of text, organize into verses, revise, then save. Track progress by book and chapter below.
+            </p>
+          </div>
+          <Link
+            href="/bible?t=hcsb"
+            className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground border border-border hover:border-foreground/30 px-3 py-2 rounded-md transition-colors"
+          >
+            View HCSB in Bible reader →
+          </Link>
+        </div>
       </div>
 
       {/* Progress tracker */}

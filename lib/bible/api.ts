@@ -1,6 +1,13 @@
 import "server-only"
 
 import { getBookTestament } from "@/lib/bible/constants"
+import {
+  getLocalHcsbBookBySlug,
+  getLocalHcsbBooks,
+  getLocalHcsbChapterVerses,
+  getLocalHcsbChapters,
+  LOCAL_HCSB_BIBLE_ID,
+} from "@/lib/bible/local-hcsb"
 import { parseChapterHtmlToVerses, sanitizeChapterHtml } from "@/lib/bible/parse"
 import { slugifyBookName } from "@/lib/bible/reference"
 import { getDefaultBibleId } from "@/lib/bible/translations"
@@ -117,6 +124,9 @@ export async function listBooks(bibleId?: string): Promise<ApiBibleBook[]> {
 
 export async function getBibleInfo(bibleId?: string): Promise<ApiBibleInfo | null> {
   const resolvedBibleId = resolveBibleId(bibleId)
+  if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
+    return { id: LOCAL_HCSB_BIBLE_ID, name: "HCSB", abbreviation: "HCSB" }
+  }
   const now = Date.now()
   const cached = cachedBibleInfo.get(resolvedBibleId)
   if (cached && now - cached.cachedAt < BIBLE_CACHE_SECONDS * 1000) {
@@ -133,6 +143,9 @@ export async function getBibleInfo(bibleId?: string): Promise<ApiBibleInfo | nul
 
 export async function listChapters(bookId: string, bibleId?: string): Promise<BibleChapter[]> {
   const resolvedBibleId = resolveBibleId(bibleId)
+  if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
+    return getLocalHcsbChapters(bookId)
+  }
   const response = await bibleFetch<ApiBibleResponse<ApiBibleChapter[]>>(
     `/bibles/${resolvedBibleId}/books/${bookId}/chapters`
   )
@@ -156,14 +169,36 @@ export async function getChapterText(
   bibleId?: string
 ): Promise<BibleChapterContent> {
   const resolvedBibleId = resolveBibleId(bibleId)
+  let bookId: string
+  let chapterNumber: number
+
+  if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
+    if ("chapterNumber" in input) {
+      bookId = input.bookId
+      chapterNumber = input.chapterNumber
+    } else {
+      const match = input.chapterId.match(/^([A-Z0-9]+)-(\d+)$/)
+      if (!match) throw new Error(`Invalid chapter id for local HCSB: ${input.chapterId}`)
+      bookId = match[1]
+      chapterNumber = parseInt(match[2], 10)
+    }
+    const result = await getLocalHcsbChapterVerses(bookId, chapterNumber)
+    const chapterId = "chapterId" in input ? input.chapterId : `${bookId}-${chapterNumber}`
+    return {
+      id: chapterId,
+      bookId,
+      number: chapterNumber,
+      reference: result.reference,
+      content: result.verses.map((v) => `<p class="v"><span class="v">${v.number}</span> ${escapeHtml(v.text)}</p>`).join("\n"),
+    }
+  }
+
   let chapterId: string
-  let bookId = "bookId" in input ? input.bookId : undefined
-  let chapterNumber: number | undefined
+  let bookIdOpt = "bookId" in input ? input.bookId : undefined
 
   if ("chapterId" in input) {
     chapterId = input.chapterId
   } else {
-    chapterNumber = input.chapterNumber
     const chapters = await listChapters(input.bookId, resolvedBibleId)
     const match = chapters.find((chapter) => chapter.number === input.chapterNumber)
     if (!match) {
@@ -185,22 +220,58 @@ export async function getChapterText(
   )
 
   const data = response.data
-  const resolvedBookId = data.bookId ?? bookId ?? ""
-  const resolvedNumber = Number(data.number ?? chapterNumber ?? NaN)
+  const resolvedBookId = data.bookId ?? bookIdOpt ?? ""
+  const resolvedNumber = Number(data.number ?? ("chapterNumber" in input ? input.chapterNumber : undefined) ?? NaN)
 
   return {
     id: data.id,
     bookId: resolvedBookId,
-    number: Number.isFinite(resolvedNumber) ? resolvedNumber : chapterNumber ?? 0,
+    number: Number.isFinite(resolvedNumber) ? resolvedNumber : ("chapterNumber" in input ? input.chapterNumber : 0) ?? 0,
     reference: data.reference,
     content: data.content,
   }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 }
 
 export async function getChapterVerses(
   input: { chapterId: string; bookId?: string } | { bookId: string; chapterNumber: number },
   bibleId?: string
 ): Promise<{ chapter: BibleChapterContent; verses: BibleVerse[] }> {
+  const resolvedBibleId = resolveBibleId(bibleId)
+  if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
+    let bookId: string
+    let chapterNumber: number
+    if ("chapterNumber" in input) {
+      bookId = input.bookId
+      chapterNumber = input.chapterNumber
+    } else {
+      const match = input.chapterId.match(/^([A-Z0-9]+)-(\d+)$/)
+      if (!match) throw new Error(`Invalid chapter id for local HCSB: ${input.chapterId}`)
+      bookId = match[1]
+      chapterNumber = parseInt(match[2], 10)
+    }
+    const result = await getLocalHcsbChapterVerses(bookId, chapterNumber)
+    const chapterId = "chapterId" in input ? input.chapterId : `${bookId}-${chapterNumber}`
+    const book = BIBLE_BOOKS_WITH_CHAPTER_COUNTS.find((b) => b.id === bookId)
+    return {
+      chapter: {
+        id: chapterId,
+        bookId,
+        number: chapterNumber,
+        reference: result.reference,
+        content: "",
+      },
+      verses: result.verses,
+    }
+  }
   const chapter = await getChapterText(input, bibleId)
   const sanitized = sanitizeChapterHtml(chapter.content)
   const verses = parseChapterHtmlToVerses(sanitized)
@@ -209,6 +280,9 @@ export async function getChapterVerses(
 
 export async function getBooksWithSlugs(bibleId?: string): Promise<BibleBook[]> {
   const resolvedBibleId = resolveBibleId(bibleId)
+  if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
+    return getLocalHcsbBooks()
+  }
   const now = Date.now()
   const cached = cachedBooks.get(resolvedBibleId)
   if (cached && now - cached.cachedAt < BIBLE_CACHE_SECONDS * 1000) {
@@ -251,6 +325,10 @@ function levenshtein(a: string, b: string): number {
 }
 
 export async function getBookBySlug(slug: string, bibleId?: string): Promise<BibleBook | null> {
+  const resolvedBibleId = resolveBibleId(bibleId)
+  if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
+    return getLocalHcsbBookBySlug(slug)
+  }
   const books = await getBooksWithSlugs(bibleId)
   const normalizedSlug = slug.toLowerCase().trim()
   const found = books.find((book) => book.slug === normalizedSlug) ?? null
