@@ -17,29 +17,82 @@ type BookProgress = {
 
 const TRANSLATION_SLUG = "HCSB";
 
-/** Parse a block of text into verse-like lines. Supports "1 Text", "1. Text", or numbered lines. */
+/**
+ * Remove the Footnotes section from pasted text so it isn't parsed as verses.
+ * Strips from a line that is exactly "Footnotes" (or "Footnote") to the end of the block.
+ */
+function stripFootnotesSection(block: string): string {
+  const lines = block.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    if (/^Footnotes?$/i.test(lines[i].trim())) {
+      return lines.slice(0, i).join("\n").trim();
+    }
+  }
+  return block;
+}
+
+/** Remove footnote markers like [a], [b], [c] from verse text. */
+function stripFootnoteMarkers(text: string): string {
+  return text.replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const VERSE_START_REGEX = /^\s*(\d+)[.)\s]+(.*)$/;
+/** Matches verse number at line start or after space (e.g. "2 ... 3 Then" on one line). Allows "3 " or "3. " or "3) ". */
+const INLINE_VERSE_REGEX = /(?:^|\s)(\d{1,3})(?:[.)]\s+|\s+)([\s\S]*?)(?=\s\d{1,3}(?:[.)]\s+|\s+)|$)/g;
+
+/**
+ * Split a line that may contain multiple verses (e.g. "2 Now the earth... 3 Then God said") into [num, text] pairs.
+ * Returns [] if the line doesn't start with a verse number.
+ */
+function splitLineIntoVerses(line: string): { number: number; text: string }[] {
+  const results: { number: number; text: string }[] = [];
+  const matches = [...line.matchAll(INLINE_VERSE_REGEX)];
+  for (const m of matches) {
+    const num = parseInt(m[1], 10);
+    if (Number.isFinite(num) && num >= 1 && m[2] != null) {
+      results.push({ number: num, text: stripFootnoteMarkers(m[2].trim()) });
+    }
+  }
+  return results;
+}
+
+/**
+ * Parse a block of text into verse-like lines.
+ * - Skips leading section titles (e.g. "The Creation") and blank lines until the first verse.
+ * - Supports "1 Text", "1. Text", numbered lines, and multiple verses on one line ("2 ... 3 Then").
+ * - Strips footnote markers like [a], [b], [c] from verse text.
+ */
 function parseBlockToVerses(block: string): { number: number; text: string }[] {
   const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const verses: { number: number; text: string }[] = [];
-  let currentNumber = 1;
+  let seenFirstVerse = false;
 
   for (const line of lines) {
-    const match = line.match(/^\s*(\d+)[.)\s]+(.*)$/);
+    const inlineVerses = splitLineIntoVerses(line);
+    if (inlineVerses.length > 0) {
+      seenFirstVerse = true;
+      for (const v of inlineVerses) {
+        if (v.text.length > 0) verses.push(v);
+      }
+      continue;
+    }
+    const match = line.match(VERSE_START_REGEX);
     if (match) {
+      seenFirstVerse = true;
       const num = parseInt(match[1], 10);
-      const text = match[2].trim();
-      if (Number.isFinite(num) && num >= 1) {
-        currentNumber = num;
-        verses.push({ number: currentNumber, text: text || "" });
-      } else {
-        verses.push({ number: currentNumber, text: line });
+      const text = stripFootnoteMarkers(match[2].trim());
+      if (Number.isFinite(num) && num >= 1 && text.length > 0) {
+        verses.push({ number: num, text });
       }
+      continue;
+    }
+    if (verses.length > 0) {
+      verses[verses.length - 1].text += " " + stripFootnoteMarkers(line);
+    } else if (!seenFirstVerse) {
+      // Skip section title (e.g. "The Creation") and any leading non-verse lines
+      continue;
     } else {
-      if (verses.length > 0) {
-        verses[verses.length - 1].text += " " + line;
-      } else {
-        verses.push({ number: 1, text: line });
-      }
+      verses.push({ number: 1, text: stripFootnoteMarkers(line) });
     }
   }
 
@@ -154,8 +207,9 @@ export default function AdminBibleHcsbPage() {
       toast.error("Select a book first.");
       return;
     }
+    const text = stripFootnotesSection(blockText);
     if (importMode === "multi") {
-      const chapters = parseBlockToChapters(blockText);
+      const chapters = parseBlockToChapters(text);
       if (chapters.length === 0) {
         toast.error(
           "No chapters detected. Add chapter boundaries: lines like 'Chapter 1', 'Chapter 2', or a line with only the chapter number (e.g. '1' then '2')."
@@ -173,7 +227,7 @@ export default function AdminBibleHcsbPage() {
       toast.error("Enter a chapter number (e.g. 1)");
       return;
     }
-    const parsed = parseBlockToVerses(blockText);
+    const parsed = parseBlockToVerses(text);
     if (parsed.length === 0) {
       toast.error("No verses detected. Paste text with verse numbers (e.g. '1 In the beginning...')");
       return;
@@ -470,8 +524,8 @@ export default function AdminBibleHcsbPage() {
                 rows={importMode === "multi" ? 16 : 12}
                 placeholder={
                   importMode === "multi"
-                    ? `Paste or upload text with chapter boundaries, e.g.:\nChapter 1\n1 In the beginning God created...\n2 The earth was formless...\n\nChapter 2\n1 Thus the heavens and the earth...\n\nOr use a line with only the chapter number:\n1\n1 First verse of ch 1...\n2\n1 First verse of ch 2...`
-                    : `Paste one chapter. Use verse numbers at the start of each line, e.g.:\n1 In the beginning God created the heavens and the earth.\n2 The earth was formless and empty...\n\nOr: 1. First verse 2. Second verse`
+                    ? `Paste or upload text with chapter boundaries. A "Footnotes" section at the end is stripped automatically.\n\nExample:\nChapter 1\n1 In the beginning God created...\n2 The earth was formless...\n\nChapter 2\n1 Thus the heavens...\n\nFootnotes\nGenesis 1:1 Or created the universe\n...`
+                    : `Paste one chapter. A "Footnotes" section at the end is stripped automatically.\n\nUse verse numbers at the start of each line, e.g.:\n1 In the beginning God created...\n2 The earth was formless...\n\nOr: 1. First verse 2. Second verse`
                 }
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono leading-relaxed"
               />

@@ -204,13 +204,6 @@ const BOOK_ABBREVIATIONS: Record<string, string> = {
   revelation: "Revelation",
 }
 
-/** Canonical Bible book names (for validating refs like "Genesis 3" so we don't link "see Section 3"). */
-const CANONICAL_BOOK_NAMES = new Set(Object.values(BOOK_ABBREVIATIONS))
-
-export function isKnownBookName(name: string): boolean {
-  return CANONICAL_BOOK_NAMES.has(normalizeBookName(name.trim()))
-}
-
 /**
  * Resolve a sermon series name to its primary Bible book, if recognizable.
  * e.g. "John: πιστεύω" → "John", "Isaiah: The Holy One of Israel" → "Isaiah", "2 Chronicles" → "2 Chronicles".
