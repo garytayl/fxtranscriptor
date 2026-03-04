@@ -1,5 +1,82 @@
 -- Seed: Galatians 2026 re:group study — Week 1 (Gospel & identity)
--- Run in Supabase SQL Editor. If RLS blocks inserts, run as service_role or add via Admin → Studies.
+-- Run in Supabase SQL Editor. Creates bible_studies + study_guides if missing, then seeds.
+-- If RLS blocks inserts, run as service_role or add via Admin → Studies.
+
+-- ========== Ensure tables exist (from migration_add_bible_studies.sql) ==========
+CREATE TABLE IF NOT EXISTS bible_studies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  notion_url TEXT NOT NULL DEFAULT '',
+  summary TEXT DEFAULT '',
+  podcast_url TEXT,
+  vault_url TEXT,
+  tags TEXT[] DEFAULT '{}',
+  year INTEGER,
+  is_current BOOLEAN DEFAULT FALSE,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS study_guides (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  study_id UUID NOT NULL REFERENCES bible_studies(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+  label TEXT NOT NULL,
+  notion_url TEXT NOT NULL DEFAULT '',
+  default_passage_ref TEXT,
+  content_md TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(study_id, slug)
+);
+
+ALTER TABLE bible_studies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE study_guides ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_studies' AND policyname = 'bible_studies_public_read') THEN
+    CREATE POLICY "bible_studies_public_read" ON bible_studies FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_studies' AND policyname = 'bible_studies_admin_insert') THEN
+    CREATE POLICY "bible_studies_admin_insert" ON bible_studies FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_studies' AND policyname = 'bible_studies_admin_update') THEN
+    CREATE POLICY "bible_studies_admin_update" ON bible_studies FOR UPDATE USING (public.is_admin(auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_studies' AND policyname = 'bible_studies_admin_delete') THEN
+    CREATE POLICY "bible_studies_admin_delete" ON bible_studies FOR DELETE USING (public.is_admin(auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'study_guides' AND policyname = 'study_guides_public_read') THEN
+    CREATE POLICY "study_guides_public_read" ON study_guides FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'study_guides' AND policyname = 'study_guides_admin_insert') THEN
+    CREATE POLICY "study_guides_admin_insert" ON study_guides FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'study_guides' AND policyname = 'study_guides_admin_update') THEN
+    CREATE POLICY "study_guides_admin_update" ON study_guides FOR UPDATE USING (public.is_admin(auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'study_guides' AND policyname = 'study_guides_admin_delete') THEN
+    CREATE POLICY "study_guides_admin_delete" ON study_guides FOR DELETE USING (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'bible_studies_updated_at') THEN
+    CREATE TRIGGER bible_studies_updated_at BEFORE UPDATE ON bible_studies
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'study_guides_updated_at') THEN
+    CREATE TRIGGER study_guides_updated_at BEFORE UPDATE ON study_guides
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
+
+-- ========== Seed data ==========
 
 -- 1) Insert or update the series
 INSERT INTO bible_studies (
