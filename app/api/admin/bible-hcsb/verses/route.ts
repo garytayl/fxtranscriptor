@@ -116,8 +116,15 @@ export async function DELETE(request: NextRequest) {
   }
 
   const supabase = createSupabaseAdminClient();
-  let query = supabase
+
+  let versesQuery = supabase
     .from("bible_verses")
+    .delete()
+    .eq("translation_slug", TRANSLATION_SLUG)
+    .eq("book_slug", bookSlug);
+
+  let footnotesQuery = supabase
+    .from("bible_footnotes")
     .delete()
     .eq("translation_slug", TRANSLATION_SLUG)
     .eq("book_slug", bookSlug);
@@ -127,13 +134,20 @@ export async function DELETE(request: NextRequest) {
     if (!Number.isFinite(chapterNumber) || chapterNumber < 1) {
       return NextResponse.json({ error: "chapter must be a positive integer" }, { status: 400 });
     }
-    query = query.eq("chapter_number", chapterNumber);
+    versesQuery = versesQuery.eq("chapter_number", chapterNumber);
+    footnotesQuery = footnotesQuery.eq("chapter_number", chapterNumber);
   }
 
-  const { error } = await query;
+  const [versesResult, footnotesResult] = await Promise.all([
+    versesQuery,
+    footnotesQuery,
+  ]);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (versesResult.error) {
+    return NextResponse.json({ error: versesResult.error.message }, { status: 500 });
+  }
+  if (footnotesResult.error) {
+    return NextResponse.json({ error: footnotesResult.error.message }, { status: 500 });
   }
 
   return NextResponse.json({

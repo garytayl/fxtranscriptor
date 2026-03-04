@@ -65,3 +65,35 @@ export async function getLocalHcsbChapterVerses(
     verses,
   }
 }
+
+export type BibleFootnote = { verseNumber: number; marker: string; text: string }
+
+export async function getLocalHcsbChapterFootnotes(
+  bookId: string,
+  chapterNumber: number
+): Promise<BibleFootnote[]> {
+  const book = BIBLE_BOOKS_WITH_CHAPTER_COUNTS.find((b) => b.id === bookId)
+  if (!book || chapterNumber < 1 || chapterNumber > book.chapters) {
+    return []
+  }
+  const bookSlug = slugifyBookName(book.name)
+  const supabase = createSupabaseAdminClient()
+  const { data, error } = await supabase
+    .from("bible_footnotes")
+    .select("verse_number, marker, text")
+    .eq("translation_slug", TRANSLATION_SLUG)
+    .eq("book_slug", bookSlug)
+    .eq("chapter_number", chapterNumber)
+    .order("verse_number", { ascending: true })
+    .order("marker", { ascending: true })
+
+  if (error) {
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    verseNumber: row.verse_number as number,
+    marker: row.marker as string,
+    text: row.text as string,
+  }))
+}

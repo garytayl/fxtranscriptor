@@ -12,6 +12,19 @@ type ChapterVerseListProps = {
   strongsWordsByVerse: Record<number, StrongsWordAndCode[]>
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
   onSelectStrongs?: (code: string) => void
+  /** Footnote text by verse and marker (e.g. [a] -> text) for tooltips on HCSB/local. */
+  footnotes?: { verseNumber: number; marker: string; text: string }[]
+}
+
+function buildFootnotesByVerse(
+  footnotes: { verseNumber: number; marker: string; text: string }[]
+): Record<number, Record<string, string>> {
+  const byVerse: Record<number, Record<string, string>> = {}
+  for (const f of footnotes) {
+    if (!byVerse[f.verseNumber]) byVerse[f.verseNumber] = {}
+    byVerse[f.verseNumber][f.marker] = f.text
+  }
+  return byVerse
 }
 
 export function ChapterVerseList({
@@ -19,12 +32,15 @@ export function ChapterVerseList({
   highlightRange,
   strongsWordsByVerse,
   onSelectStrongs,
+  footnotes,
 }: ChapterVerseListProps) {
+  const footnotesByVerse = footnotes ? buildFootnotesByVerse(footnotes) : {}
   return (
     <ol className="space-y-1 sm:space-y-2 text-[0.9375rem] sm:text-base leading-[1.8] sm:leading-relaxed">
       {verses.map((verse) => {
         const isHighlighted = highlightRange ? isVerseInRange(verse.number, highlightRange) : false
         const wordsWithCodes = strongsWordsByVerse[verse.number]
+        const footnotesForVerse = footnotesByVerse[verse.number]
         return (
           <li
             key={verse.number}
@@ -50,6 +66,7 @@ export function ChapterVerseList({
               wordsWithCodes={wordsWithCodes}
               highlightStrongs={true}
               onSelectStrongs={onSelectStrongs}
+              footnotesForVerse={footnotesForVerse}
             />
           </li>
         )

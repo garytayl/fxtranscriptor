@@ -6,6 +6,7 @@ import { Save, Loader2, FileText, ChevronDown, ChevronRight, Upload, Trash2 } fr
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { slugifyBookName } from "@/lib/bible/reference";
 import { getVerseCountsForBook } from "@/lib/bible/verse-counts";
 
 type BookProgress = {
@@ -20,22 +21,56 @@ type BookProgress = {
 const TRANSLATION_SLUG = "HCSB";
 
 /**
- * Remove the Footnotes section from pasted text so it isn't parsed as verses.
- * Strips from a line that is exactly "Footnotes" (or "Footnote") to the end of the block.
+ * Split pasted block into main text (verses) and the Footnotes section.
+ * The same letter in the footnote block (e.g. [a]) corresponds to markers in the verse text.
  */
-function stripFootnotesSection(block: string): string {
+function splitBlockIntoMainAndFootnotes(block: string): { mainText: string; footnotesText: string } {
   const lines = block.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     if (/^Footnotes?$/i.test(lines[i].trim())) {
-      return lines.slice(0, i).join("\n").trim();
+      const mainText = lines.slice(0, i).join("\n").trim();
+      const footnotesText = lines.slice(i + 1).join("\n").trim();
+      return { mainText, footnotesText };
     }
   }
-  return block;
+  return { mainText: block.trim(), footnotesText: "" };
 }
 
-/** Remove footnote markers like [a], [b], [c] from verse text. */
-function stripFootnoteMarkers(text: string): string {
-  return text.replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim();
+/** Footnote line format: "BookName 1:1 Note text" or "1 Samuel 2:3 Note text". */
+const FOOTNOTE_LINE_REGEX = /^(.+?)\s+(\d+):(\d+)\s+(.+)$/;
+
+export type ParsedFootnote = { chapterNumber: number; verseNumber: number; marker: string; text: string };
+
+/**
+ * Parse the Footnotes section into entries keyed by book/chapter/verse.
+ * Only includes lines for the given bookSlug (book name in line is normalized to slug).
+ * Assigns marker a, b, c, ... by order of appearance per (chapter, verse).
+ */
+function parseFootnoteSection(footnotesText: string, bookSlug: string): ParsedFootnote[] {
+  const lines = footnotesText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const raw: { chapterNumber: number; verseNumber: number; text: string }[] = [];
+  const targetSlug = bookSlug.toLowerCase().trim();
+  for (const line of lines) {
+    const m = line.match(FOOTNOTE_LINE_REGEX);
+    if (!m) continue;
+    const [, bookName, chStr, vsStr, text] = m;
+    const slug = slugifyBookName(bookName ?? "");
+    if (slug !== targetSlug) continue;
+    const chapterNumber = parseInt(chStr ?? "0", 10);
+    const verseNumber = parseInt(vsStr ?? "0", 10);
+    if (!Number.isFinite(chapterNumber) || !Number.isFinite(verseNumber) || (text ?? "").trim().length === 0)
+      continue;
+    raw.push({ chapterNumber, verseNumber, text: (text ?? "").trim() });
+  }
+  const key = (ch: number, vs: number) => `${ch}:${vs}`;
+  const orderByVerse = new Map<string, number>();
+  return raw.map((r) => {
+    const k = key(r.chapterNumber, r.verseNumber);
+    const idx = orderByVerse.get(k) ?? 0;
+    orderByVerse.set(k, idx + 1);
+    const marker = String.fromCharCode(97 + idx);
+    return { chapterNumber: r.chapterNumber, verseNumber: r.verseNumber, marker, text: r.text };
+  });
 }
 
 const VERSE_START_REGEX = /^\s*(\d+)[.)\s]+(.*)$/;
@@ -64,7 +99,7 @@ function splitLineIntoVerses(line: string): { number: number; text: string }[] {
     if (!Number.isFinite(num) || num < 1) continue;
     if (BOOK_ABBREV_PREFIX.test(text)) continue;
     if (text.length > 0 && !VERSE_TEXT_STARTS_LIKE.test(text)) continue;
-    results.push({ number: num, text: stripFootnoteMarkers(text) });
+    results.push({ number: num, text: text.replace(/\s+/g, " ").trim() });
   }
   return results;
 }
@@ -73,12 +108,13 @@ function splitLineIntoVerses(line: string): { number: number; text: string }[] {
  * Parse a block of text into verse-like lines.
  * - Skips leading section titles (e.g. "The Creation") and blank lines until the first verse.
  * - Supports "1 Text", "1. Text", numbered lines, and multiple verses on one line ("2 ... 3 Then").
- * - Strips footnote markers like [a], [b], [c] from verse text.
+ * - Keeps footnote markers [a], [b], [c] in verse text so they match the parsed footnote section.
  */
 function parseBlockToVerses(block: string): { number: number; text: string }[] {
   const lines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const verses: { number: number; text: string }[] = [];
   let seenFirstVerse = false;
+  const norm = (t: string) => t.replace(/\s+/g, " ").trim();
 
   for (const line of lines) {
     const inlineVerses = splitLineIntoVerses(line);
@@ -94,13 +130,13 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
       const num = parseInt(match[1], 10);
       const rawText = match[2].trim();
       if (BOOK_ABBREV_PREFIX.test(rawText)) {
-        if (verses.length > 0) verses[verses.length - 1].text += " " + stripFootnoteMarkers(line);
+        if (verses.length > 0) verses[verses.length - 1].text += " " + norm(line);
         else if (!seenFirstVerse) continue;
-        else verses.push({ number: 1, text: stripFootnoteMarkers(line) });
+        else verses.push({ number: 1, text: norm(line) });
         continue;
       }
       seenFirstVerse = true;
-      const text = stripFootnoteMarkers(rawText);
+      const text = norm(rawText);
       if (Number.isFinite(num) && num >= 1 && text.length > 0) {
         verses.push({ number: num, text });
       }
@@ -113,12 +149,12 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
       continue;
     }
     if (verses.length > 0) {
-      verses[verses.length - 1].text += " " + stripFootnoteMarkers(line);
+      verses[verses.length - 1].text += " " + norm(line);
     } else if (!seenFirstVerse) {
       // Skip section title (e.g. "The Creation") and any leading non-verse lines
       continue;
     } else {
-      verses.push({ number: 1, text: stripFootnoteMarkers(line) });
+      verses.push({ number: 1, text: norm(line) });
     }
   }
 
@@ -244,6 +280,7 @@ export default function AdminBibleHcsbPage() {
   const [clearBookSlug, setClearBookSlug] = useState("");
   const [clearChapter, setClearChapter] = useState<number | "all">("all");
   const [startChapterInput, setStartChapterInput] = useState("");
+  const [parsedFootnotes, setParsedFootnotes] = useState<ParsedFootnote[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleClear = async () => {
@@ -301,13 +338,16 @@ export default function AdminBibleHcsbPage() {
       toast.error("Select a book first.");
       return;
     }
-    const text = stripFootnotesSection(blockText);
+    const { mainText, footnotesText } = splitBlockIntoMainAndFootnotes(blockText);
+    const footnotes = parseFootnoteSection(footnotesText, bookSlug.trim().toLowerCase());
+    setParsedFootnotes(footnotes);
+
     if (importMode === "multi") {
       const book = books.find((b) => b.slug === bookSlug);
       const verseCounts = book ? getVerseCountsForBook(book.id) : undefined;
       let chapters: ParsedChapter[];
       if (verseCounts && verseCounts.length > 0) {
-        const flatVerses = parseBlockToVerses(text);
+        const flatVerses = parseBlockToVerses(mainText);
         if (flatVerses.length === 0) {
           toast.error("No verses detected in the pasted text.");
           return;
@@ -318,7 +358,7 @@ export default function AdminBibleHcsbPage() {
           return;
         }
       } else {
-        chapters = parseBlockToChapters(text);
+        chapters = parseBlockToChapters(mainText);
         if (chapters.length === 0) {
           toast.error(
             "No chapters detected. Add chapter boundaries: lines like 'Chapter 1', 'Chapter 2', or a line with only the chapter number (e.g. '1' then '2')."
@@ -333,7 +373,7 @@ export default function AdminBibleHcsbPage() {
       setParsedChapters(chapters);
       setStep("multi-summary");
       const totalVerses = chapters.reduce((s, c) => s + c.verses.length, 0);
-      toast.success(`Parsed ${chapters.length} chapter(s), ${totalVerses} verse(s). Review and Save all.`);
+      toast.success(`Parsed ${chapters.length} chapter(s), ${totalVerses} verse(s).${footnotes.length ? ` ${footnotes.length} footnote(s) will be saved.` : ""}`);
       return;
     }
     const ch = parseInt(chapterNumber, 10);
@@ -341,14 +381,14 @@ export default function AdminBibleHcsbPage() {
       toast.error("Enter a chapter number (e.g. 1)");
       return;
     }
-    const parsed = parseBlockToVerses(text);
+    const parsed = parseBlockToVerses(mainText);
     if (parsed.length === 0) {
       toast.error("No verses detected. Paste text with verse numbers (e.g. '1 In the beginning...')");
       return;
     }
     setVerses(parsed);
     setStep("revise");
-    toast.success(`Parsed ${parsed.length} verse(s). Review and edit below, then Save.`);
+    toast.success(`Parsed ${parsed.length} verse(s).${footnotes.length ? ` ${footnotes.length} footnote(s) will be saved.` : ""} Review and edit below, then Save.`);
   };
 
   const loadExistingChapter = async () => {
@@ -392,7 +432,23 @@ export default function AdminBibleHcsbPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
-      toast.success(`Saved ${data.count} verse(s) for ${bookSlug} ${ch}.`);
+      const chapterFootnotes = parsedFootnotes.filter((f) => f.chapterNumber === ch);
+      if (chapterFootnotes.length > 0) {
+        const fnRes = await fetch("/api/admin/bible-hcsb/footnotes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            bookSlug: bookSlug.trim().toLowerCase(),
+            footnotes: chapterFootnotes,
+          }),
+        });
+        if (!fnRes.ok) {
+          const fnData = await fnRes.json();
+          throw new Error(fnData.error || "Footnotes save failed");
+        }
+      }
+      toast.success(`Saved ${data.count} verse(s)${chapterFootnotes.length ? ` and ${chapterFootnotes.length} footnote(s)` : ""} for ${bookSlug} ${ch}.`);
       setStep("saved");
       loadProgress();
     } catch (err) {
@@ -426,13 +482,33 @@ export default function AdminBibleHcsbPage() {
         }
         saved += data.count ?? vs.length;
       }
+      const chapterSet = new Set(parsedChapters.map((c) => c.chapterNumber));
+      const footnotesToSave = parsedFootnotes.filter((f) => chapterSet.has(f.chapterNumber));
+      if (footnotesToSave.length > 0) {
+        const fnRes = await fetch("/api/admin/bible-hcsb/footnotes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            bookSlug: bookSlug.trim().toLowerCase(),
+            footnotes: footnotesToSave,
+          }),
+        });
+        if (!fnRes.ok) {
+          const fnData = await fnRes.json();
+          toast.error(`Verses saved; footnotes failed: ${fnData.error ?? "Unknown"}`);
+        }
+      }
       if (failed.length > 0) {
         toast.error(`Saved ${saved} verses; failed: ${failed.join(", ")}`);
       } else {
-        toast.success(`Saved ${parsedChapters.length} chapter(s), ${saved} verse(s).`);
+        toast.success(
+          `Saved ${parsedChapters.length} chapter(s), ${saved} verse(s).${footnotesToSave.length ? ` ${footnotesToSave.length} footnote(s).` : ""}`
+        );
       }
       setStep("paste");
       setParsedChapters([]);
+      setParsedFootnotes([]);
       loadProgress();
     } catch (err) {
       toast.error("Bulk save failed", { description: err instanceof Error ? err.message : "Unknown error" });

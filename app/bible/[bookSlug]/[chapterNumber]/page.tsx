@@ -52,6 +52,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   let verses: { number: number; text: string }[] = []
   let chapterReference = ""
 
+  let footnotes: { verseNumber: number; marker: string; text: string }[] | undefined
   try {
     const chapterResponse = await getChapterVerses(
       { chapterId: currentChapter.id, bookId: book.id },
@@ -59,6 +60,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
     )
     verses = chapterResponse.verses
     chapterReference = chapterResponse.chapter.reference
+    footnotes = "footnotes" in chapterResponse ? chapterResponse.footnotes : undefined
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : "Unable to load chapter."
   }
@@ -86,6 +88,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       errorMessage={errorMessage}
       translations={translations}
       activeKey={activeKey}
+      footnotes={footnotes}
     />
   )
 }

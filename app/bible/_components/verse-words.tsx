@@ -16,6 +16,8 @@ type VerseWordsProps = {
   highlightStrongs?: boolean
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). Definition is fetched on click only. */
   onSelectStrongs?: (code: string) => void
+  /** Map marker letter -> footnote text for this verse (e.g. [a] tooltip). Used when no wordsWithCodes. */
+  footnotesForVerse?: Record<string, string>
 }
 
 const buttonClasses =
@@ -78,6 +80,7 @@ export function VerseWords({
   className = "",
   highlightStrongs = true,
   onSelectStrongs,
+  footnotesForVerse,
 }: VerseWordsProps) {
   if (wordsWithCodes && wordsWithCodes.length > 0) {
     return (
@@ -102,5 +105,11 @@ export function VerseWords({
     )
   }
 
-  return <VerseText text={text} className={className} />
+  return (
+    <VerseText
+      text={text}
+      className={className}
+      footnotesByMarker={footnotesForVerse}
+    />
+  )
 }

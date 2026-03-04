@@ -459,3 +459,55 @@ BEGIN
     CREATE POLICY "Bible verses delete by admins" ON bible_verses FOR DELETE USING (public.is_admin(auth.uid()));
   END IF;
 END $$;
+
+-- Bible footnotes: one row per footnote, keyed by translation, book, chapter, verse, marker (e.g. [a] -> marker 'a').
+CREATE TABLE IF NOT EXISTS bible_footnotes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  translation_slug TEXT NOT NULL,
+  book_slug TEXT NOT NULL,
+  chapter_number INT NOT NULL,
+  verse_number INT NOT NULL,
+  marker TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(translation_slug, book_slug, chapter_number, verse_number, marker)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bible_footnotes_lookup ON bible_footnotes(translation_slug, book_slug, chapter_number, verse_number);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_bible_footnotes_updated_at') THEN
+    CREATE TRIGGER update_bible_footnotes_updated_at
+      BEFORE UPDATE ON bible_footnotes
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;
+
+ALTER TABLE bible_footnotes ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_footnotes' AND policyname = 'Bible footnotes viewable by everyone') THEN
+    CREATE POLICY "Bible footnotes viewable by everyone" ON bible_footnotes FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_footnotes' AND policyname = 'Bible footnotes insert by admins') THEN
+    CREATE POLICY "Bible footnotes insert by admins" ON bible_footnotes FOR INSERT WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_footnotes' AND policyname = 'Bible footnotes update by admins') THEN
+    CREATE POLICY "Bible footnotes update by admins" ON bible_footnotes FOR UPDATE USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bible_footnotes' AND policyname = 'Bible footnotes delete by admins') THEN
+    CREATE POLICY "Bible footnotes delete by admins" ON bible_footnotes FOR DELETE USING (public.is_admin(auth.uid()));
+  END IF;
+END $$;

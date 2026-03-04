@@ -150,6 +150,8 @@ export type BibleChapterShellProps = {
   errorMessage: string | null
   translations: BibleTranslation[]
   activeKey: string | null
+  /** HCSB (and other local) footnotes: verse number, marker (a,b,c), text. Used to show tooltips on [a] in verse text. */
+  footnotes?: { verseNumber: number; marker: string; text: string }[]
 }
 
 export function BibleChapterShell({
@@ -166,6 +168,7 @@ export function BibleChapterShell({
   errorMessage,
   translations,
   activeKey,
+  footnotes,
 }: BibleChapterShellProps) {
   const [selectedStrongsCode, setSelectedStrongsCode] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -242,6 +245,7 @@ export function BibleChapterShell({
             highlightRange={highlightRange}
             strongsWordsByVerse={strongsWordsByVerse}
             onSelectStrongs={onSelectStrongs}
+            footnotes={footnotes}
           />
         )}
 

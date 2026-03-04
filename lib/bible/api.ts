@@ -4,7 +4,9 @@ import { getBookTestament } from "@/lib/bible/constants"
 import {
   getLocalHcsbBookBySlug,
   getLocalHcsbBooks,
+  getLocalHcsbChapterFootnotes,
   getLocalHcsbChapterVerses,
+  type BibleFootnote,
   getLocalHcsbChapters,
   LOCAL_HCSB_BIBLE_ID,
 } from "@/lib/bible/local-hcsb"
@@ -244,7 +246,11 @@ function escapeHtml(s: string): string {
 export async function getChapterVerses(
   input: { chapterId: string; bookId?: string } | { bookId: string; chapterNumber: number },
   bibleId?: string
-): Promise<{ chapter: BibleChapterContent; verses: BibleVerse[] }> {
+): Promise<{
+  chapter: BibleChapterContent
+  verses: BibleVerse[]
+  footnotes?: BibleFootnote[]
+}> {
   const resolvedBibleId = resolveBibleId(bibleId)
   if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
     let bookId: string
@@ -258,7 +264,10 @@ export async function getChapterVerses(
       bookId = match[1]
       chapterNumber = parseInt(match[2], 10)
     }
-    const result = await getLocalHcsbChapterVerses(bookId, chapterNumber)
+    const [result, footnotes] = await Promise.all([
+      getLocalHcsbChapterVerses(bookId, chapterNumber),
+      getLocalHcsbChapterFootnotes(bookId, chapterNumber),
+    ])
     const chapterId = "chapterId" in input ? input.chapterId : `${bookId}-${chapterNumber}`
     return {
       chapter: {
@@ -269,6 +278,7 @@ export async function getChapterVerses(
         content: "",
       },
       verses: result.verses,
+      footnotes: footnotes.length > 0 ? footnotes : undefined,
     }
   }
   const chapter = await getChapterText(input, bibleId)
