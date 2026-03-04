@@ -8,6 +8,11 @@ import type { BibleBook, BibleChapter, BibleVerse } from "@/lib/bible/types"
 export const LOCAL_HCSB_BIBLE_ID = "local-HCSB"
 const TRANSLATION_SLUG = "HCSB"
 
+/** Remove HTML tags from verse text (e.g. <em>, <strong> from imports). */
+function stripVerseHtml(raw: string): string {
+  return raw.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+}
+
 export function getLocalHcsbBooks(): BibleBook[] {
   return BIBLE_BOOKS_WITH_CHAPTER_COUNTS.map((book) => ({
     id: book.id,
@@ -57,7 +62,7 @@ export async function getLocalHcsbChapterVerses(
 
   const verses: BibleVerse[] = (data ?? []).map((row) => ({
     number: row.verse_number as number,
-    text: row.text as string,
+    text: stripVerseHtml((row.text as string) ?? ""),
   }))
 
   return {
