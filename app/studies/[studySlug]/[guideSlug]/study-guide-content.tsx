@@ -40,8 +40,18 @@ function preprocessVerseRefsInContent(content: string): string {
     return refs.map((r) => `[${r.raw}](ref:${encodeRefUrl(r.raw)})`).join("; ")
   })
   // Bare verse refs like "Leviticus 23:5-8" or "John 3:16" not already in links/parens
-  // Also captures trailing comma continuations like ", 43-49" after the main ref
-  out = out.replace(BARE_VERSE_RE, (match, ref) => {
+  // Skip refs inside existing markdown links [text](url)
+  out = out.replace(BARE_VERSE_RE, (match, ref, offset) => {
+    // Check if we're inside a markdown link's text portion [...]
+    const before = out.slice(Math.max(0, offset - 200), offset)
+    const openBracket = before.lastIndexOf("[")
+    const closeBracket = before.lastIndexOf("]")
+    if (openBracket > closeBracket) return match // inside [link text]
+    // Check if inside a markdown link's URL portion (...)
+    const openParen = before.lastIndexOf("](")
+    const closeParen = before.lastIndexOf(")")
+    if (openParen > closeParen) return match // inside (url)
+
     const parsed = parsePassageReference(ref)
     if (!parsed) return match
     return `[${ref}](ref:${encodeRefUrl(ref)})`
@@ -204,6 +214,7 @@ export function StudyGuideContent({
         )
       }
     }
+    // Parse link text for verse refs (handles external Bible links too)
     const list = text.includes(",") || text.includes(";") ? parsePassageList(text) : null
     const refsForThisLink: string[] = list && list.length > 0 ? list.map((p) => p.raw) : []
     const single = !refsForThisLink.length ? parsePassageReference(text) : null
@@ -226,6 +237,10 @@ export function StudyGuideContent({
           ))}
         </span>
       )
+    }
+    // Hide raw external Bible site URLs — just show the link text
+    if (href && /stepbible\.org|biblegateway\.com|bible\.com/i.test(href)) {
+      return <span className="text-white/90">{children}</span>
     }
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-200/90 hover:text-amber-200 underline underline-offset-2">
