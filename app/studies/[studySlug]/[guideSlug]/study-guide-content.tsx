@@ -40,11 +40,29 @@ function preprocessVerseRefsInContent(content: string): string {
     return refs.map((r) => `[${r.raw}](ref:${encodeRefUrl(r.raw)})`).join("; ")
   })
   // Bare verse refs like "Leviticus 23:5-8" or "John 3:16" not already in links/parens
+  // Also captures trailing comma continuations like ", 43-49" after the main ref
   out = out.replace(BARE_VERSE_RE, (match, ref) => {
     const parsed = parsePassageReference(ref)
     if (!parsed) return match
     return `[${ref}](ref:${encodeRefUrl(ref)})`
   })
+  // Comma continuations: "[Ex. 12:1-28](ref:...), 43-49" → also link the "43-49" part
+  // Matches a ref-link followed by ", digits(-digits)"
+  out = out.replace(
+    /\]\(ref:[^)]+\)(,\s*)(\d+(?:\s*[-–—]\s*\d+)?)/g,
+    (match, comma, verseRange) => {
+      // Find the preceding ref link to get book + chapter
+      const linkEnd = match.indexOf(")")
+      const refUrlRaw = match.slice(match.indexOf("ref:") + 4, linkEnd)
+      const decoded = decodeURIComponent(refUrlRaw)
+      const parsed = parsePassageReference(decoded)
+      if (!parsed) return match
+      const contRef = `${parsed.book} ${parsed.chapterNumber}:${verseRange.replace(/[–—]/g, "-")}`
+      const contParsed = parsePassageReference(contRef)
+      if (!contParsed) return match
+      return `](ref:${refUrlRaw})${comma}[${contRef}](ref:${encodeRefUrl(contRef)})`
+    }
+  )
   return out
 }
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
