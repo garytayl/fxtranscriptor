@@ -10,12 +10,20 @@ import {
   type PanInfo,
 } from "framer-motion"
 import { X, ChevronDown, BookOpen } from "lucide-react"
-import { StudyGuideContent } from "./study-guide-content"
+import { StudyGuideContent, VersePill } from "./study-guide-content"
 import { InlinePassage } from "./inline-passage"
 
 type StudyGuideShellProps = {
   content: string
   defaultPassageRef: string | null
+  /** Optional title above content (e.g. for devotions topical study) */
+  title?: string
+  /** Optional description below title */
+  description?: string
+  /** Optional verse refs to show as pills above content (e.g. bible_references) */
+  refs?: string[]
+  /** CSS value for sidebar top offset when embedded (e.g. "52px" in devotions). Defaults to var(--navbar-offset). */
+  sidebarTopOffset?: string
 }
 
 const sidebarPassageClasses =
@@ -170,7 +178,14 @@ function MobileVerseIndicator({
   )
 }
 
-export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellProps) {
+export function StudyGuideShell({
+  content,
+  defaultPassageRef,
+  title,
+  description,
+  refs: refsProp,
+  sidebarTopOffset,
+}: StudyGuideShellProps) {
   const [selectedPassageRef, setSelectedPassageRef] = useState<string | null>(defaultPassageRef)
   const [sheetOpen, setSheetOpen] = useState(!!defaultPassageRef)
 
@@ -189,18 +204,53 @@ export function StudyGuideShell({ content, defaultPassageRef }: StudyGuideShellP
     setSheetOpen(true)
   }, [])
 
+  const refs = refsProp ?? []
+
   return (
     <>
       <div className="pb-32 lg:pb-24 lg:flex lg:gap-12 lg:items-start">
         <main className="min-w-0 flex-1 lg:min-w-0">
+          {(title ?? description ?? refs.length > 0) && (
+            <header className="mb-6 sm:mb-8">
+              {title && (
+                <h1 className="font-sans text-2xl sm:text-3xl font-light text-white mb-2">
+                  {title}
+                </h1>
+              )}
+              {description && (
+                <p className="font-sans text-sm text-white/70 mb-4">
+                  {description}
+                </p>
+              )}
+              {refs.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {refs.map((ref) => (
+                    <VersePill
+                      key={ref}
+                      passageRef={ref}
+                      label={ref}
+                      onSelect={handleSelectPassage}
+                    />
+                  ))}
+                </div>
+              )}
+            </header>
+          )}
           <article className="study-guide study-guide-resonates">
-            <StudyGuideContent content={content} onSelectPassage={handleSelectPassage} />
+            {content?.trim() ? (
+              <StudyGuideContent content={content} onSelectPassage={handleSelectPassage} />
+            ) : title ? (
+              <p className="font-sans text-sm text-white/50 italic">No content for this topic yet.</p>
+            ) : (
+              <StudyGuideContent content={content} onSelectPassage={handleSelectPassage} />
+            )}
           </article>
         </main>
 
-        {/* Sidebar — desktop only, full height so it meets the navbar */}
+        {/* Sidebar — desktop only; top offset when embedded (e.g. devotions) */}
         <aside
-          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-0 lg:w-[22rem] lg:h-screen lg:min-h-screen border-l border-white/10 bg-[#050505] z-10 lg:pt-[var(--navbar-offset)]"
+          className={`hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-0 lg:w-[22rem] lg:h-screen lg:min-h-screen border-l border-white/10 bg-[#050505] z-10 ${sidebarTopOffset ? "" : "lg:pt-[var(--navbar-offset)]"}`}
+          style={sidebarTopOffset ? { paddingTop: sidebarTopOffset } : undefined}
           aria-label="Verses"
         >
           <div className="shrink-0 px-6 pb-2 pt-6">

@@ -45,6 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import ReactMarkdown from "react-markdown"
+import { StudyGuideShell } from "@/app/studies/[studySlug]/[guideSlug]/study-guide-shell"
 import { toast } from "sonner"
 import {
   supportsNotifications,
@@ -1260,7 +1261,7 @@ export function DevotionsClient() {
               </motion.div>
             )}
 
-            {/* Step: Topic reading — single topical study content */}
+            {/* Step: Topic reading — same verse sidebar & popup as studies */}
             {step === "topicReading" && selectedTopic && (
               <motion.div
                 key="topicReading"
@@ -1270,40 +1271,22 @@ export function DevotionsClient() {
                 exit="exit"
                 variants={slide}
                 transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border"
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border lg:pr-[22rem]"
+                style={{ ["--navbar-offset" as string]: "52px" }}
               >
-                <div className="w-full max-w-lg md:max-w-2xl mx-auto">
-                  <h2 className="font-sans text-2xl sm:text-3xl font-light text-white/95 mb-2">
-                    {selectedTopic.title}
-                  </h2>
-                  {selectedTopic.description && (
-                    <p className="font-sans text-sm text-white/70 mb-6">
-                      {selectedTopic.description}
-                    </p>
-                  )}
-                  {(selectedTopic.bible_references?.length ?? 0) > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {(selectedTopic.bible_references as string[]).map((ref) => (
-                        <a
-                          key={ref}
-                          href={getReaderUrlFromReference(ref) ?? "/bible"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3 py-2 font-mono text-[11px] tracking-wider text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                        >
-                          <BookOpen className="w-3.5 h-3.5" />
-                          {ref}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                  {selectedTopic.body ? (
-                    <div className="devotion-topic-prose prose prose-invert max-w-none font-sans text-white/90 text-base leading-relaxed [&_h1]:text-xl [&_h2]:text-lg [&_h3]:text-base [&_h1]:mt-6 [&_h2]:mt-5 [&_h3]:mt-4 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_a]:text-amber-400 [&_a]:underline">
-                      <ReactMarkdown>{selectedTopic.body}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="font-sans text-sm text-white/50 italic">No content for this topic yet.</p>
-                  )}
+                <div className="w-full max-w-4xl mx-auto lg:max-w-none">
+                  <StudyGuideShell
+                    content={selectedTopic.body ?? ""}
+                    defaultPassageRef={
+                      (selectedTopic.bible_references?.length ?? 0) > 0
+                        ? (selectedTopic.bible_references as string[])[0]
+                        : null
+                    }
+                    title={selectedTopic.title}
+                    description={selectedTopic.description ?? undefined}
+                    refs={selectedTopic.bible_references as string[] | undefined}
+                    sidebarTopOffset="52px"
+                  />
                 </div>
               </motion.div>
             )}

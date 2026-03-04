@@ -4,10 +4,25 @@ import React from "react"
 import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 
-/** Replace parenthetical verse refs like (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) with markdown links so they show in the Bible reader. */
+/** Replace parenthetical verse refs with markdown links so they become interactive (hover + sidebar).
+ * Handles: (Jn 1:14), (Rom 15:15; 1 Cor 3:10), and (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10). */
 function preprocessVerseRefsInContent(content: string): string {
-  return content.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
+  let out = content
+  // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:ref)
+  out = out.replace(/\(ref:\s*([^)]+)\)/gi, (_, inner) => {
     const trimmed = inner.trim()
+    if (!trimmed) return `(ref:${inner})`
+    const list = parsePassageList(trimmed)
+    const single = list.length === 0 ? parsePassageReference(trimmed) : null
+    const refs = list.length > 0 ? list : single ? [single] : []
+    if (refs.length === 0) return `(ref:${inner})`
+    const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
+    return `[${trimmed}](ref:${escaped})`
+  })
+  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:ref)
+  out = out.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
+    const trimmed = inner.trim()
+    if (/^ref:/i.test(trimmed)) return `(${inner})` // already handled above
     const list = parsePassageList(trimmed)
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
@@ -15,6 +30,7 @@ function preprocessVerseRefsInContent(content: string): string {
     const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
     return `[${trimmed}](ref:${escaped})`
   })
+  return out
 }
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { InlinePassage } from "./inline-passage"
@@ -119,18 +135,28 @@ export function StudyGuideContent({
         </WordStudy>
       )
     }
-    // Parenthetical verse refs rewritten as [text](ref:Jn 1:14) or ref:Rom 15:15; 1 Cor 3:10
+    // Verse refs: [Jn 1:14](ref:Jn 1:14) or [Rom 15:15; 1 Cor 3:10](ref:Rom 15:15; 1 Cor 3:10) — hover = preview, click = sidebar/sheet
     const refPrefix = "ref:"
-    if (href?.startsWith(refPrefix)) {
-      const refStr = decodeURIComponent(href.slice(refPrefix.length))
-      const list = parsePassageList(refStr)
-      const single = list.length === 0 ? parsePassageReference(refStr) : null
-      const refsForThisLink = list.length > 0 ? list.map((p) => p.raw) : single ? [single.raw] : []
+    if (href?.toLowerCase().startsWith(refPrefix)) {
+      const rawRefStr = decodeURIComponent(href.slice(refPrefix.length)).trim()
+      let refsForThisLink: string[] = []
+      if (rawRefStr) {
+        const list = parsePassageList(rawRefStr)
+        const single = list.length === 0 ? parsePassageReference(rawRefStr) : null
+        refsForThisLink = list.length > 0 ? list.map((p) => p.raw) : single ? [single.raw] : []
+      }
+      // Fallback: parse link text (e.g. "Jn 1:14" or "Eph 2:8-9") when href didn't parse
+      if (refsForThisLink.length === 0 && text) {
+        const listFromText = text.includes(",") || text.includes(";") ? parsePassageList(text) : null
+        const singleFromText = listFromText?.length ? listFromText.map((p) => p.raw) : []
+        refsForThisLink = singleFromText.length > 0 ? singleFromText : parsePassageReference(text) ? [parsePassageReference(text)!.raw] : []
+      }
+      const label = text?.trim() || refsForThisLink[0] || ""
       if (refsForThisLink.length > 0 && onSelectPassage) {
         return (
           <span className="inline-flex flex-wrap items-center gap-1.5 my-0.5">
             {refsForThisLink.map((ref, i) => (
-              <VersePill key={`${ref}-${i}`} passageRef={ref} label={ref} onSelect={onSelectPassage} />
+              <VersePill key={`${ref}-${i}`} passageRef={ref} label={refsForThisLink.length > 1 ? ref : label || ref} onSelect={onSelectPassage} />
             ))}
           </span>
         )
