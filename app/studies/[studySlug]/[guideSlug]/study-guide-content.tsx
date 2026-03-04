@@ -4,9 +4,27 @@ import React from "react"
 import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList, isKnownBookName } from "@/lib/bible/reference"
 
-/** Replace parenthetical verse refs with markdown links so they become interactive (hover + sidebar).
- * Handles: (Jn 1:14), (Rom 15:15; 1 Cor 3:10), and (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10).
- * Uses encoded destinations (ref:Jn%201%3A14) so CommonMark doesn't truncate at space. */
+/** Normalize a ref candidate for parsing: trim, strip trailing punctuation, normalize dashes. */
+function normalizeRefCandidate(s: string): string {
+  let t = s.trim().replace(/\u2013/g, "-").replace(/\u2014/g, "-")
+  t = t.replace(/[.,;:\s]+$/, "").trim()
+  return t
+}
+
+/** Return true if the string parses as at least one passage ref (verse or chapter-only known book). */
+function parseAsRef(normalized: string): { ok: true; ref: string } | { ok: false } {
+  if (!normalized) return { ok: false }
+  const list = parsePassageList(normalized)
+  if (list.length > 0) return { ok: true, ref: normalized }
+  const single = parsePassageReference(normalized)
+  if (!single) return { ok: false }
+  if (single.verseRange) return { ok: true, ref: normalized }
+  if (isKnownBookName(single.book)) return { ok: true, ref: normalized }
+  return { ok: false }
+}
+
+/** Replace parenthetical and bracketed verse refs with markdown links (hover + sidebar).
+ * Handles: (Jn 1:14), (Genesis 3)., [Genesis 3], (ref:Jn 1:14), chapter-only (Gen 3). Encoded URLs. */
 function preprocessVerseRefsInContent(content: string): string {
   let out = content
   // Rewrite existing [text](ref:Jn 1:14) links to encoded URL so CommonMark doesn't truncate at space
@@ -15,34 +33,38 @@ function preprocessVerseRefsInContent(content: string): string {
     if (!raw) return `](${refRest})`
     return `](ref:${encodeURIComponent(raw)})`
   })
-  // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:encoded)
+  // (ref:Jn 1:14) or (ref: Genesis 3). -> [ref](ref:encoded)
   out = out.replace(/\(ref:\s*([^)]+)\)/gi, (_, inner) => {
-    const trimmed = inner.trim()
-    if (!trimmed) return `(ref:${inner})`
-    const list = parsePassageList(trimmed)
-    const single = list.length === 0 ? parsePassageReference(trimmed) : null
-    const refs = list.length > 0 ? list : single ? [single] : []
-    if (refs.length === 0) return `(ref:${inner})`
-    return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
+    const normalized = normalizeRefCandidate(inner)
+    if (!normalized) return `(ref:${inner})`
+    const result = parseAsRef(normalized)
+    if (!result.ok) return `(ref:${inner})`
+    return `[${result.ref}](ref:${encodeURIComponent(result.ref)})`
   })
-  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:encoded)
+  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10). -> [ref](ref:encoded)
   out = out.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
-    const trimmed = inner.trim()
-    if (/^ref:/i.test(trimmed)) return `(${inner})` // already handled above
-    const list = parsePassageList(trimmed)
-    const single = list.length === 0 ? parsePassageReference(trimmed) : null
-    const refs = list.length > 0 ? list : single ? [single] : []
-    if (refs.length === 0) return `(${inner})`
-    return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
+    const normalized = normalizeRefCandidate(inner)
+    if (!normalized || /^ref:/i.test(normalized)) return `(${inner})`
+    const result = parseAsRef(normalized)
+    if (!result.ok) return `(${inner})`
+    return `[${result.ref}](ref:${encodeURIComponent(result.ref)})`
   })
-  // (Genesis 3) or (Gen 3) — chapter-only refs (no verse number)
+  // (Genesis 3) or (Gen 3). — chapter-only
   out = out.replace(/\(([^)]+)\)/g, (_, inner) => {
-    const trimmed = inner.trim()
-    if (!trimmed || /^ref:/i.test(trimmed)) return `(${inner})`
-    if (/\d+:\d+/.test(trimmed)) return `(${inner})` // already handled above
-    const parsed = parsePassageReference(trimmed)
-    if (!parsed || !isKnownBookName(parsed.book)) return `(${inner})`
-    return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
+    const normalized = normalizeRefCandidate(inner)
+    if (!normalized || /^ref:/i.test(normalized)) return `(${inner})`
+    if (/\d+:\d+/.test(normalized)) return `(${inner})`
+    const result = parseAsRef(normalized)
+    if (!result.ok) return `(${inner})`
+    return `[${result.ref}](ref:${encodeURIComponent(result.ref)})`
+  })
+  // [Genesis 3] or [Jn 1:14] — bracketed refs (not already [text](ref:...))
+  out = out.replace(/\[([^\]]+)\](?!\s*\(ref:)/g, (_, inner) => {
+    const normalized = normalizeRefCandidate(inner)
+    if (!normalized) return `[${inner}]`
+    const result = parseAsRef(normalized)
+    if (!result.ok) return `[${inner}]`
+    return `[${result.ref}](ref:${encodeURIComponent(result.ref)})`
   })
   return out
 }
