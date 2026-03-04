@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add email column for existing installs that created profiles before this column existed
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 

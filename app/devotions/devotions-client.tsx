@@ -658,14 +658,20 @@ export function DevotionsClient() {
     setDir(-1)
     if (step === "landing") return
     if (step === "planPicker" || step === "topicPicker" || step === "journalHistory") setStep("landing")
-    else if (step === "topicReading") setStep("topicPicker")
+    else if (step === "topicReading") {
+      setStep("topicPicker")
+      setSelectedTopic(null)
+    }
     else if (step === "testament") setStep("landing")
     else if (step === "book") setStep("testament")
     else if (step === "chapter") setStep("book")
     else if (step === "verses") setStep("chapter")
-    else if (step === "reading") setStep("verses")
+    else if (step === "reading") {
+      if (selectedBook != null) setStep("verses")
+      else setStep("landing")
+    }
     else if (step === "reflection") setStep("reading")
-  }, [step])
+  }, [step, selectedBook])
 
   const goToBook = useCallback(() => {
     setStep("testament")
@@ -853,37 +859,8 @@ export function DevotionsClient() {
     <div className="fixed inset-0 z-[60] flex flex-col h-screen max-h-[100dvh] bg-[#050505] text-white overflow-x-hidden">
       {/* Header: back/leave + title + menu (reading only) */}
       <header className="shrink-0 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:px-6 md:px-12 border-b border-white/5">
-        <div className="min-w-[80px] flex justify-start">
-          {step === "landing" || step === "testament" || step === "planPicker" || step === "topicPicker" ? (
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
-              aria-label="Leave devotions"
-            >
-              <LogOut className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Leave</span>
-            </Link>
-          ) : step === "topicReading" ? (
-            <button
-              type="button"
-              onClick={() => { setDir(-1); setStep("topicPicker"); setSelectedTopic(null); }}
-              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
-              aria-label="Back to topics"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Topics</span>
-            </button>
-          ) : step === "reflection" ? (
-            <button
-              type="button"
-              onClick={closeReflection}
-              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
-              aria-label="Back to passage"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Passage</span>
-            </button>
-          ) : step === "reading" ? (
+        <div className="min-w-[80px] flex justify-start items-center gap-3">
+          {step === "landing" ? (
             <Link
               href="/"
               className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
@@ -893,15 +870,27 @@ export function DevotionsClient() {
               <span className="hidden sm:inline">Leave</span>
             </Link>
           ) : (
-            <button
-              type="button"
-              onClick={goBack}
-              className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Back</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={step === "reflection" ? closeReflection : goBack}
+                className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/40 hover:text-white/70 min-h-[44px]"
+                aria-label={step === "topicReading" ? "Back to topics" : step === "reflection" ? "Back to passage" : "Back"}
+              >
+                <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">
+                  {step === "topicReading" ? "Topics" : step === "reflection" ? "Passage" : "Back"}
+                </span>
+              </button>
+              <Link
+                href="/"
+                className="flex items-center gap-1 font-mono text-[10px] tracking-wider text-white/35 hover:text-white/60 min-h-[44px]"
+                aria-label="Leave devotions"
+              >
+                <LogOut className="w-3 h-3 shrink-0" />
+                <span className="hidden sm:inline">Leave</span>
+              </Link>
+            </>
           )}
         </div>
         <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 truncate max-w-[45vw] text-center">
