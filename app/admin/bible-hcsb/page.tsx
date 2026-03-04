@@ -243,6 +243,7 @@ export default function AdminBibleHcsbPage() {
   const [clearing, setClearing] = useState(false);
   const [clearBookSlug, setClearBookSlug] = useState("");
   const [clearChapter, setClearChapter] = useState<number | "all">("all");
+  const [startChapterInput, setStartChapterInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleClear = async () => {
@@ -324,6 +325,10 @@ export default function AdminBibleHcsbPage() {
           );
           return;
         }
+      }
+      const startCh = parseInt(startChapterInput.trim(), 10);
+      if (Number.isFinite(startCh) && startCh >= 1) {
+        chapters = chapters.map((c, i) => ({ ...c, chapterNumber: startCh + i }));
       }
       setParsedChapters(chapters);
       setStep("multi-summary");
@@ -638,6 +643,24 @@ export default function AdminBibleHcsbPage() {
                   ))}
                 </select>
               </div>
+              {importMode === "multi" && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
+                    Starting chapter
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={startChapterInput}
+                    onChange={(e) => setStartChapterInput(e.target.value)}
+                    placeholder="e.g. 21 (if pasting ch 21–34)"
+                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Leave blank if pasting from chapter 1. Set to 21 if your paste is chapters 21–34, etc.
+                  </p>
+                </div>
+              )}
               {importMode === "single" && (
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
