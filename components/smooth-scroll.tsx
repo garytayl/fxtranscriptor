@@ -20,6 +20,7 @@ function shouldSkipLenis(pathname: string | null): boolean {
   if (!pathname) return false
   if (pathname === "/bible" || pathname.startsWith("/bible/")) return true
   if (pathname === "/devotions" || pathname.startsWith("/devotions/")) return true
+  if (pathname === "/studies" || pathname.startsWith("/studies/")) return true
   if (pathname.startsWith("/admin/")) return true
   return false
 }
@@ -33,7 +34,7 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
     if (isTouchPrimaryDevice()) {
       return
     }
-    // Skip Lenis on Bible (reader + picker) and devotions so native scroll works and zoom+pan is usable
+    // Skip Lenis on Bible, devotions, and studies so native scroll works and zoom stays anchored (no shift to sidebar)
     if (shouldSkipLenis(pathname ?? null)) {
       return
     }
