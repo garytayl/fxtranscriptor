@@ -247,10 +247,16 @@ export function StudyGuideShell({
           </article>
         </main>
 
-        {/* Sidebar — desktop only; top offset when embedded (e.g. devotions) */}
+        {/* Sidebar — desktop only; in-flow + sticky so zoom keeps main content on the left */}
         <aside
-          className={`hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-0 lg:w-[22rem] lg:h-screen lg:min-h-screen border-l border-white/10 bg-[#050505] z-10 ${sidebarTopOffset ? "" : "lg:pt-[var(--navbar-offset)]"}`}
-          style={sidebarTopOffset ? { paddingTop: sidebarTopOffset } : undefined}
+          className={`hidden lg:flex lg:flex-col lg:sticky lg:w-[22rem] lg:shrink-0 lg:self-start lg:min-h-0 lg:overflow-hidden border-l border-white/10 bg-[#050505] z-10 ${sidebarTopOffset ? "" : "lg:pt-[var(--navbar-offset)]"}`}
+          style={{
+            ...(sidebarTopOffset ? { paddingTop: sidebarTopOffset } : {}),
+            top: sidebarTopOffset ?? "var(--navbar-offset)",
+            maxHeight: sidebarTopOffset
+              ? `calc(100vh - ${sidebarTopOffset})`
+              : "calc(100vh - var(--navbar-offset, 0px))",
+          }}
           aria-label="Verses"
         >
           <div className="shrink-0 px-6 pb-2 pt-6">
