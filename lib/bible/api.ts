@@ -260,7 +260,6 @@ export async function getChapterVerses(
     }
     const result = await getLocalHcsbChapterVerses(bookId, chapterNumber)
     const chapterId = "chapterId" in input ? input.chapterId : `${bookId}-${chapterNumber}`
-    const book = BIBLE_BOOKS_WITH_CHAPTER_COUNTS.find((b) => b.id === bookId)
     return {
       chapter: {
         id: chapterId,
