@@ -39,7 +39,7 @@ function stripFootnoteMarkers(text: string): string {
 }
 
 const VERSE_START_REGEX = /^\s*(\d+)[.)\s]+(.*)$/;
-/** Line that is only a verse number (e.g. "24" with verse text on the next line). */
+/** Line that is only a verse number (e.g. "2" or "3" on its own line); verse text follows on next line(s). */
 const STANDALONE_VERSE_NUMBER_REGEX = /^\s*(\d{1,3})\s*$/;
 /** Matches verse number at line start or after space (e.g. "2 ... 3 Then" on one line). Allows "3 " or "3. " or "3) ". */
 const INLINE_VERSE_REGEX = /(?:^|\s)(\d{1,3})(?:[.)]\s+|\s+)([\s\S]*?)(?=\s\d{1,3}(?:[.)]\s+|\s+)|$)/g;
@@ -76,7 +76,7 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
     if (inlineVerses.length > 0) {
       seenFirstVerse = true;
       for (const v of inlineVerses) {
-        verses.push(v);
+        if (v.text.length > 0) verses.push(v);
       }
       continue;
     }
@@ -85,19 +85,15 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
       seenFirstVerse = true;
       const num = parseInt(match[1], 10);
       const text = stripFootnoteMarkers(match[2].trim());
-      if (Number.isFinite(num) && num >= 1) {
+      if (Number.isFinite(num) && num >= 1 && text.length > 0) {
         verses.push({ number: num, text });
       }
       continue;
     }
-    // Verse number on its own line (text follows on next line) — start new verse so next line appends to it
     const standaloneNum = line.match(STANDALONE_VERSE_NUMBER_REGEX);
-    if (standaloneNum) {
-      const num = parseInt(standaloneNum[1], 10);
-      if (Number.isFinite(num) && num >= 1 && num <= 176) {
-        seenFirstVerse = true;
-        verses.push({ number: num, text: "" });
-      }
+    if (standaloneNum && parseInt(standaloneNum[1], 10) >= 1) {
+      seenFirstVerse = true;
+      verses.push({ number: parseInt(standaloneNum[1], 10), text: "" });
       continue;
     }
     if (verses.length > 0) {
