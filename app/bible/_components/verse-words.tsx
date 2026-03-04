@@ -23,6 +23,11 @@ type VerseWordsProps = {
 const buttonClasses =
   "cursor-pointer border-b border-dashed border-amber-500/50 font-medium text-amber-200/90 hover:border-amber-500/80 hover:text-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500/50 rounded-sm"
 
+/** Strip any HTML tags so we never show raw <em> etc. when displaying a word. */
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, "").trim()
+}
+
 /**
  * Clickable word with Strong's code. Definition loads in sidebar on click. If already in cache, hover shows definition.
  */
@@ -97,7 +102,7 @@ export function VerseWords({
                   : undefined
               }
             >
-              {word}
+              {stripHtml(word)}
             </StrongsClickableWord>
           </span>
         ))}
