@@ -3,6 +3,7 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { WordStudyEntryContent } from "@/components/word-study"
 import { useLexiconCache } from "@/app/bible/_components/lexicon-cache-context"
+import { VerseText } from "@/lib/bible/verse-text"
 import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 type VerseWordsProps = {
@@ -101,5 +102,5 @@ export function VerseWords({
     )
   }
 
-  return <span className={className}>{text}</span>
+  return <VerseText text={text} className={className} />
 }

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react"
 import { PassageSearch } from "@/app/bible/_components/passage-search"
 import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { getBookBySlug, getBooksWithSlugs, getChapterVerses, listChapters } from "@/lib/bible/api"
+import { VerseText } from "@/lib/bible/verse-text"
 import { parsePassageList, isVerseInRange } from "@/lib/bible/reference"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
@@ -182,7 +183,7 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
                         <span className="mr-1.5 sm:mr-2 align-super text-[10px] sm:text-xs font-bold text-muted-foreground">
                           {verse.number}
                         </span>
-                        <span>{verse.text}</span>
+                        <VerseText text={verse.text} />
                       </li>
                     ))}
                   </ol>

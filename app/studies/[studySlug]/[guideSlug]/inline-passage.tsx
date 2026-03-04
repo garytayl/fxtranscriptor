@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { getReaderUrlFromReference } from "@/lib/bible/reference"
+import { VerseText } from "@/lib/bible/verse-text"
 import { BookOpen, Loader2 } from "lucide-react"
 
 interface InlinePassageProps {
@@ -84,7 +85,7 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
           {state.verses.map((v) => (
             <li key={v.number} className="flex gap-2">
               <span className="shrink-0 font-mono text-[10px] font-bold text-muted-foreground mt-1 select-none">{v.number}</span>
-              <span className="leading-[1.7]">{v.text}</span>
+              <VerseText text={v.text} className="leading-[1.7]" />
             </li>
           ))}
         </ol>

@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { getReaderUrlFromReference } from "@/lib/bible/reference";
+import { VerseText } from "@/lib/bible/verse-text";
 import { BookOpen, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -167,7 +168,7 @@ function VerseBadgeComponent({
                   <span className="mr-2 align-super text-[10px] font-semibold text-muted-foreground">
                     {item.number}
                   </span>
-                  <span>{item.text}</span>
+                  <VerseText text={item.text} />
                 </li>
               ))}
             </ol>
