@@ -44,12 +44,56 @@ function splitBlockIntoMainAndFootnotes(block: string): { mainText: string; foot
 /** Footnote line format: "BookName 1:1 Note text" or "1 Samuel 2:3 Note text". */
 const FOOTNOTE_LINE_REGEX = /^(.+?)\s+(\d+):(\d+)\s+(.+)$/;
 
-export type ParsedFootnote = { chapterNumber: number; verseNumber: number; marker: string; text: string };
+/** Cross-reference in footnote text: "See John 3:16", "Cf. Genesis 1:1", "Compare Rom 8:28". */
+const CROSS_REF_TARGET = /^(?:See|Cf\.?|Compare)\s+(.+?)\s+(\d+):(\d+)(?:-(\d+))?/i;
+/** Alternate reading: "Or created the universe", "Or, lit. the expanse". */
+const ALTERNATE_READING_PREFIX = /^Or,?\s+/i;
+
+export type ParsedFootnote = {
+  chapterNumber: number;
+  verseNumber: number;
+  marker: string;
+  text: string;
+  kind?: "cross_reference" | "alternate_reading" | "explanatory" | "textual" | null;
+  targetBookSlug?: string | null;
+  targetChapter?: number | null;
+  targetVerse?: number | null;
+};
+
+function inferFootnoteKindAndTarget(
+  text: string
+): {
+  kind: ParsedFootnote["kind"];
+  targetBookSlug: string | null;
+  targetChapter: number | null;
+  targetVerse: number | null;
+} {
+  const trimmed = text.trim();
+  const crossMatch = trimmed.match(CROSS_REF_TARGET);
+  if (crossMatch) {
+    const [, bookPart, chStr, vsStr] = crossMatch;
+    const ch = parseInt(chStr ?? "0", 10);
+    const vs = parseInt(vsStr ?? "0", 10);
+    if (Number.isFinite(ch) && Number.isFinite(vs) && (bookPart ?? "").trim()) {
+      return {
+        kind: "cross_reference",
+        targetBookSlug: slugifyBookName((bookPart ?? "").trim()),
+        targetChapter: ch,
+        targetVerse: vs,
+      };
+    }
+  }
+  if (ALTERNATE_READING_PREFIX.test(trimmed)) {
+    return { kind: "alternate_reading", targetBookSlug: null, targetChapter: null, targetVerse: null };
+  }
+  return { kind: null, targetBookSlug: null, targetChapter: null, targetVerse: null };
+}
 
 /**
  * Parse the Footnotes section into entries keyed by book/chapter/verse.
  * Only includes lines for the given bookSlug (book name in line is normalized to slug).
  * Assigns marker a, b, c, ... by order of appearance per (chapter, verse).
+ * Infers kind (cross_reference, alternate_reading, etc.) and parses target for cross-refs.
  */
 function parseFootnoteSection(footnotesText: string, bookSlug: string): ParsedFootnote[] {
   const lines = footnotesText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -74,7 +118,17 @@ function parseFootnoteSection(footnotesText: string, bookSlug: string): ParsedFo
     const idx = orderByVerse.get(k) ?? 0;
     orderByVerse.set(k, idx + 1);
     const marker = String.fromCharCode(97 + idx);
-    return { chapterNumber: r.chapterNumber, verseNumber: r.verseNumber, marker, text: r.text };
+    const { kind, targetBookSlug, targetChapter, targetVerse } = inferFootnoteKindAndTarget(r.text);
+    return {
+      chapterNumber: r.chapterNumber,
+      verseNumber: r.verseNumber,
+      marker,
+      text: r.text,
+      kind: kind ?? null,
+      targetBookSlug: targetBookSlug ?? null,
+      targetChapter: targetChapter ?? null,
+      targetVerse: targetVerse ?? null,
+    };
   });
 }
 
@@ -566,12 +620,20 @@ export default function AdminBibleHcsbPage() {
               Add the Holman Christian Standard Bible to your Supabase database. Paste a block of text, organize into verses, revise, then save. Track progress by book and chapter below.
             </p>
           </div>
-          <Link
-            href="/bible?t=hcsb"
-            className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground border border-border hover:border-foreground/30 px-3 py-2 rounded-md transition-colors"
-          >
-            View HCSB in Bible reader →
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/bible?t=hcsb"
+              className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground border border-border hover:border-foreground/30 px-3 py-2 rounded-md transition-colors"
+            >
+              View HCSB in Bible reader →
+            </Link>
+            <Link
+              href={bookSlug ? `/admin/bible-hcsb/footnotes?book=${encodeURIComponent(bookSlug)}` : "/admin/bible-hcsb/footnotes"}
+              className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground border border-border hover:border-foreground/30 px-3 py-2 rounded-md transition-colors"
+            >
+              Footnotes
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -861,16 +923,13 @@ export default function AdminBibleHcsbPage() {
                     return (
                       <React.Fragment key={c.chapterNumber}>
                         <tr
-                          key={c.chapterNumber}
-                          className={`border-b border-border/50 ${isShort ? "bg-amber-500/10" : ""} ${hasProblems ? "cursor-pointer hover:bg-muted/50" : ""}`}
-                          onClick={() => hasProblems && setExpandedChapterSummary((x) => (x === c.chapterNumber ? null : c.chapterNumber))}
+                          className={`border-b border-border/50 ${isShort ? "bg-amber-500/10" : ""} cursor-pointer hover:bg-muted/50`}
+                          onClick={() => setExpandedChapterSummary((x) => (x === c.chapterNumber ? null : c.chapterNumber))}
                         >
                           <td className="py-1.5 pl-2 pr-1">
-                            {hasProblems ? (
-                              <span className="text-muted-foreground" aria-hidden>
-                                {isExpanded ? "▼" : "▶"}
-                              </span>
-                            ) : null}
+                            <span className="text-muted-foreground" aria-hidden>
+                              {isExpanded ? "▼" : "▶"}
+                            </span>
                           </td>
                           <td className="py-1.5 px-3 font-mono">{c.chapterNumber}</td>
                           <td className="py-1.5 px-3">
@@ -887,25 +946,59 @@ export default function AdminBibleHcsbPage() {
                             )}
                           </td>
                         </tr>
-                        {isExpanded && hasProblems && (
+                        {isExpanded && (
                           <tr key={`${c.chapterNumber}-detail`} className="border-b border-border/50 bg-muted/30">
                             <td colSpan={3} className="py-2 px-3 text-xs text-muted-foreground">
-                              <div className="flex flex-col gap-1">
-                                <span>
-                                  <strong className="text-foreground">Present:</strong> verses 1–{c.verses.length}
-                                </span>
-                                {missingRange && (
-                                  <span>
-                                    <strong className="text-amber-600 dark:text-amber-400">Missing from paste:</strong> verses {missingRange}
-                                    {" — add these verses to your pasted text and parse again."}
-                                  </span>
+                              <div className="flex flex-col gap-3">
+                                {hasProblems && (
+                                  <div className="flex flex-col gap-1">
+                                    <span>
+                                      <strong className="text-foreground">Present:</strong> verses 1–{c.verses.length}
+                                    </span>
+                                    {missingRange && (
+                                      <span>
+                                        <strong className="text-amber-600 dark:text-amber-400">Missing from paste:</strong> verses {missingRange}
+                                        {" — add these verses to your pasted text and parse again."}
+                                      </span>
+                                    )}
+                                    {emptyVerses.length > 0 && (
+                                      <span>
+                                        <strong className="text-foreground">Empty (no text):</strong> verses {emptyVerses.slice(0, 20).join(", ")}
+                                        {emptyVerses.length > 20 ? ` … +${emptyVerses.length - 20} more` : ""}
+                                        {" — parser saw the verse number but no content (e.g. number on its own line)."}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                                {emptyVerses.length > 0 && (
-                                  <span>
-                                    <strong className="text-foreground">Empty (no text):</strong> verses {emptyVerses.slice(0, 20).join(", ")}
-                                    {emptyVerses.length > 20 ? ` … +${emptyVerses.length - 20} more` : ""}
-                                    {" — parser saw the verse number but no content (e.g. number on its own line)."}
-                                  </span>
+                                <div>
+                                  <strong className="text-foreground">Preview — verses:</strong>
+                                  <ul className="mt-1 list-inside list-disc space-y-0.5">
+                                    {c.verses.slice(0, 5).map((v) => (
+                                      <li key={v.number}>
+                                        <span className="font-mono">{v.number}</span>{" "}
+                                        {(v.text.length > 80 ? v.text.slice(0, 80) + "…" : v.text) || "(empty)"}
+                                      </li>
+                                    ))}
+                                    {c.verses.length > 5 && (
+                                      <li className="text-muted-foreground">… and {c.verses.length - 5} more</li>
+                                    )}
+                                  </ul>
+                                </div>
+                                {parsedFootnotes.filter((f) => f.chapterNumber === c.chapterNumber).length > 0 && (
+                                  <div>
+                                    <strong className="text-foreground">Preview — footnotes:</strong>
+                                    <ul className="mt-1 list-inside list-disc space-y-0.5">
+                                      {parsedFootnotes
+                                        .filter((f) => f.chapterNumber === c.chapterNumber)
+                                        .map((f) => (
+                                          <li key={`${f.verseNumber}-${f.marker}`}>
+                                            <span className="font-mono">[{f.marker}]</span> v{f.verseNumber}:{" "}
+                                            {(f.text.length > 60 ? f.text.slice(0, 60) + "…" : f.text)}
+                                            {f.kind ? ` (${f.kind})` : ""}
+                                          </li>
+                                        ))}
+                                    </ul>
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -983,6 +1076,21 @@ export default function AdminBibleHcsbPage() {
                 </tbody>
               </table>
             </div>
+            {parsedFootnotes.filter((f) => f.chapterNumber === parseInt(chapterNumber, 10)).length > 0 && (
+              <div className="rounded-md border border-border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground mb-2">Parsed footnotes (will be saved with chapter)</p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-none">
+                  {parsedFootnotes
+                    .filter((f) => f.chapterNumber === parseInt(chapterNumber, 10))
+                    .map((f) => (
+                      <li key={`${f.verseNumber}-${f.marker}`}>
+                        <span className="font-mono text-foreground">[{f.marker}]</span> v{f.verseNumber}: {f.text}
+                        {f.kind ? ` (${f.kind})` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button onClick={handleSave} disabled={saving} className="gap-2 font-mono text-xs uppercase tracking-widest">
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}

@@ -5,6 +5,8 @@ import { isVerseInRange } from "@/lib/bible/reference"
 import type { VerseRange } from "@/lib/bible/reference"
 import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
+export type FootnoteEntry = string | { text: string; href?: string }
+
 type ChapterVerseListProps = {
   verses: { number: number; text: string }[]
   highlightRange: VerseRange | null
@@ -12,17 +14,32 @@ type ChapterVerseListProps = {
   strongsWordsByVerse: Record<number, StrongsWordAndCode[]>
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
   onSelectStrongs?: (code: string) => void
-  /** Footnote text by verse and marker (e.g. [a] -> text) for tooltips on HCSB/local. */
-  footnotes?: { verseNumber: number; marker: string; text: string }[]
+  /** Footnote by verse and marker; may include kind/target for cross-ref links. */
+  footnotes?: {
+    verseNumber: number
+    marker: string
+    text: string
+    kind?: string | null
+    targetBookSlug?: string | null
+    targetChapter?: number | null
+    targetVerse?: number | null
+  }[]
 }
 
 function buildFootnotesByVerse(
-  footnotes: { verseNumber: number; marker: string; text: string }[]
-): Record<number, Record<string, string>> {
-  const byVerse: Record<number, Record<string, string>> = {}
+  footnotes: NonNullable<ChapterVerseListProps["footnotes"]>
+): Record<number, Record<string, FootnoteEntry>> {
+  const byVerse: Record<number, Record<string, FootnoteEntry>> = {}
   for (const f of footnotes) {
     if (!byVerse[f.verseNumber]) byVerse[f.verseNumber] = {}
-    byVerse[f.verseNumber][f.marker] = f.text
+    const isCrossRef =
+      f.kind === "cross_reference" &&
+      f.targetBookSlug != null &&
+      f.targetChapter != null &&
+      f.targetVerse != null
+    byVerse[f.verseNumber][f.marker] = isCrossRef
+      ? { text: f.text, href: `/bible/${f.targetBookSlug}/${f.targetChapter}?v=${f.targetVerse}` }
+      : f.text
   }
   return byVerse
 }

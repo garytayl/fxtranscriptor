@@ -13,36 +13,49 @@ export async function GET(request: NextRequest) {
   const bookSlug = searchParams.get("book");
   const chapterParam = searchParams.get("chapter");
 
-  if (!bookSlug || !chapterParam) {
-    return NextResponse.json({ error: "book and chapter are required" }, { status: 400 });
+  if (!bookSlug) {
+    return NextResponse.json({ error: "book is required" }, { status: 400 });
   }
 
-  const chapterNumber = parseInt(chapterParam, 10);
-  if (!Number.isFinite(chapterNumber) || chapterNumber < 1) {
-    return NextResponse.json({ error: "chapter must be a positive integer" }, { status: 400 });
-  }
-
+  const slug = bookSlug.toLowerCase().trim();
   const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
+
+  let query = supabase
     .from("bible_footnotes")
-    .select("verse_number, marker, text")
+    .select("id, chapter_number, verse_number, marker, text, kind, target_book_slug, target_chapter, target_verse")
     .eq("translation_slug", TRANSLATION_SLUG)
-    .eq("book_slug", bookSlug.toLowerCase().trim())
-    .eq("chapter_number", chapterNumber)
+    .eq("book_slug", slug)
+    .order("chapter_number", { ascending: true })
     .order("verse_number", { ascending: true })
     .order("marker", { ascending: true });
+
+  if (chapterParam != null && chapterParam !== "") {
+    const chapterNumber = parseInt(chapterParam, 10);
+    if (!Number.isFinite(chapterNumber) || chapterNumber < 1) {
+      return NextResponse.json({ error: "chapter must be a positive integer" }, { status: 400 });
+    }
+    query = query.eq("chapter_number", chapterNumber);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   const footnotes = (data ?? []).map((row) => ({
+    id: row.id as string,
+    chapterNumber: row.chapter_number as number,
     verseNumber: row.verse_number as number,
     marker: row.marker as string,
     text: row.text as string,
+    kind: row.kind as string | null,
+    targetBookSlug: row.target_book_slug as string | null,
+    targetChapter: row.target_chapter as number | null,
+    targetVerse: row.target_verse as number | null,
   }));
 
-  return NextResponse.json({ bookSlug, chapterNumber, footnotes });
+  return NextResponse.json({ bookSlug: slug, footnotes });
 }
 
 /** Admin: upsert HCSB footnotes for a book (one or more chapters). */
@@ -52,7 +65,16 @@ export async function POST(request: NextRequest) {
 
   let body: {
     bookSlug?: string;
-    footnotes?: Array<{ chapterNumber: number; verseNumber: number; marker: string; text: string }>;
+    footnotes?: Array<{
+      chapterNumber: number;
+      verseNumber: number;
+      marker: string;
+      text: string;
+      kind?: string | null;
+      targetBookSlug?: string | null;
+      targetChapter?: number | null;
+      targetVerse?: number | null;
+    }>;
   };
   try {
     body = await request.json();
@@ -70,6 +92,22 @@ export async function POST(request: NextRequest) {
             typeof f.verseNumber === "number" ? f.verseNumber : parseInt(String(f?.verseNumber), 10),
           marker: typeof f.marker === "string" ? f.marker.trim() : "",
           text: typeof f.text === "string" ? f.text.trim() : "",
+          kind:
+            f.kind === null || f.kind === undefined
+              ? null
+              : ["cross_reference", "alternate_reading", "explanatory", "textual"].includes(String(f.kind))
+                ? String(f.kind)
+                : null,
+          targetBookSlug:
+            f.targetBookSlug != null && typeof f.targetBookSlug === "string"
+              ? f.targetBookSlug.trim().toLowerCase() || null
+              : null,
+          targetChapter:
+            f.targetChapter != null && Number.isFinite(Number(f.targetChapter))
+              ? Number(f.targetChapter)
+              : null,
+          targetVerse:
+            f.targetVerse != null && Number.isFinite(Number(f.targetVerse)) ? Number(f.targetVerse) : null,
         }))
         .filter(
           (f) =>
@@ -99,6 +137,10 @@ export async function POST(request: NextRequest) {
     verse_number: f.verseNumber,
     marker: f.marker,
     text: f.text,
+    kind: f.kind ?? null,
+    target_book_slug: f.targetBookSlug ?? null,
+    target_chapter: f.targetChapter ?? null,
+    target_verse: f.targetVerse ?? null,
   }));
 
   const { error: upsertError } = await supabase.from("bible_footnotes").upsert(rows, {

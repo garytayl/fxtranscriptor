@@ -461,6 +461,7 @@ BEGIN
 END $$;
 
 -- Bible footnotes: one row per footnote, keyed by translation, book, chapter, verse, marker (e.g. [a] -> marker 'a').
+-- kind: cross_reference | alternate_reading | explanatory | textual | null. target_* for cross-ref links.
 CREATE TABLE IF NOT EXISTS bible_footnotes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   translation_slug TEXT NOT NULL,
@@ -469,10 +470,30 @@ CREATE TABLE IF NOT EXISTS bible_footnotes (
   verse_number INT NOT NULL,
   marker TEXT NOT NULL,
   text TEXT NOT NULL,
+  kind TEXT,
+  target_book_slug TEXT,
+  target_chapter INT,
+  target_verse INT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(translation_slug, book_slug, chapter_number, verse_number, marker)
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bible_footnotes' AND column_name = 'kind') THEN
+    ALTER TABLE bible_footnotes ADD COLUMN kind TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bible_footnotes' AND column_name = 'target_book_slug') THEN
+    ALTER TABLE bible_footnotes ADD COLUMN target_book_slug TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bible_footnotes' AND column_name = 'target_chapter') THEN
+    ALTER TABLE bible_footnotes ADD COLUMN target_chapter INT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bible_footnotes' AND column_name = 'target_verse') THEN
+    ALTER TABLE bible_footnotes ADD COLUMN target_verse INT;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_bible_footnotes_lookup ON bible_footnotes(translation_slug, book_slug, chapter_number, verse_number);
 

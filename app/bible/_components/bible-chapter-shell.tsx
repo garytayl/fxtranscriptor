@@ -150,8 +150,16 @@ export type BibleChapterShellProps = {
   errorMessage: string | null
   translations: BibleTranslation[]
   activeKey: string | null
-  /** HCSB (and other local) footnotes: verse number, marker (a,b,c), text. Used to show tooltips on [a] in verse text. */
-  footnotes?: { verseNumber: number; marker: string; text: string }[]
+  /** HCSB (and other local) footnotes: verse number, marker, text; optional kind/target for cross-ref links. */
+  footnotes?: {
+    verseNumber: number
+    marker: string
+    text: string
+    kind?: string | null
+    targetBookSlug?: string | null
+    targetChapter?: number | null
+    targetVerse?: number | null
+  }[]
 }
 
 export function BibleChapterShell({

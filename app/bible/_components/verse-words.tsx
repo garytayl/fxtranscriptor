@@ -16,8 +16,8 @@ type VerseWordsProps = {
   highlightStrongs?: boolean
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). Definition is fetched on click only. */
   onSelectStrongs?: (code: string) => void
-  /** Map marker letter -> footnote text for this verse (e.g. [a] tooltip). Used when no wordsWithCodes. */
-  footnotesForVerse?: Record<string, string>
+  /** Map marker -> text or { text, href } for tooltips and optional cross-ref link. Used when no wordsWithCodes. */
+  footnotesForVerse?: Record<string, string | { text: string; href?: string }>
 }
 
 const buttonClasses =

@@ -66,7 +66,15 @@ export async function getLocalHcsbChapterVerses(
   }
 }
 
-export type BibleFootnote = { verseNumber: number; marker: string; text: string }
+export type BibleFootnote = {
+  verseNumber: number
+  marker: string
+  text: string
+  kind?: string | null
+  targetBookSlug?: string | null
+  targetChapter?: number | null
+  targetVerse?: number | null
+}
 
 export async function getLocalHcsbChapterFootnotes(
   bookId: string,
@@ -80,7 +88,7 @@ export async function getLocalHcsbChapterFootnotes(
   const supabase = createSupabaseAdminClient()
   const { data, error } = await supabase
     .from("bible_footnotes")
-    .select("verse_number, marker, text")
+    .select("verse_number, marker, text, kind, target_book_slug, target_chapter, target_verse")
     .eq("translation_slug", TRANSLATION_SLUG)
     .eq("book_slug", bookSlug)
     .eq("chapter_number", chapterNumber)
@@ -95,5 +103,9 @@ export async function getLocalHcsbChapterFootnotes(
     verseNumber: row.verse_number as number,
     marker: row.marker as string,
     text: row.text as string,
+    kind: row.kind as string | null,
+    targetBookSlug: row.target_book_slug as string | null,
+    targetChapter: row.target_chapter as number | null,
+    targetVerse: row.target_verse as number | null,
   }))
 }
