@@ -101,3 +101,46 @@ export async function POST(request: NextRequest) {
     count: verses.length,
   });
 }
+
+/** Admin: delete HCSB verses for a chapter or entire book. */
+export async function DELETE(request: NextRequest) {
+  const auth = await requireAdmin();
+  if ("response" in auth) return auth.response;
+
+  const { searchParams } = new URL(request.url);
+  const bookSlug = searchParams.get("book")?.trim().toLowerCase();
+  const chapterParam = searchParams.get("chapter");
+
+  if (!bookSlug) {
+    return NextResponse.json({ error: "book is required" }, { status: 400 });
+  }
+
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from("bible_verses")
+    .delete()
+    .eq("translation_slug", TRANSLATION_SLUG)
+    .eq("book_slug", bookSlug);
+
+  if (chapterParam != null && chapterParam !== "") {
+    const chapterNumber = parseInt(chapterParam, 10);
+    if (!Number.isFinite(chapterNumber) || chapterNumber < 1) {
+      return NextResponse.json({ error: "chapter must be a positive integer" }, { status: 400 });
+    }
+    query = query.eq("chapter_number", chapterNumber);
+  }
+
+  const { error } = await query;
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    bookSlug,
+    ...(chapterParam != null && chapterParam !== ""
+      ? { clearedChapter: parseInt(chapterParam, 10) }
+      : { clearedBook: true }),
+  });
+}

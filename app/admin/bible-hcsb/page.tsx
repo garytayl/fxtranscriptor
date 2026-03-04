@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Save, Loader2, FileText, ChevronDown, ChevronRight, Upload } from "lucide-react";
+import { Save, Loader2, FileText, ChevronDown, ChevronRight, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -236,7 +236,42 @@ export default function AdminBibleHcsbPage() {
   const [saving, setSaving] = useState(false);
   const [savingBulk, setSavingBulk] = useState(false);
   const [loadingChapter, setLoadingChapter] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearBookSlug, setClearBookSlug] = useState("");
+  const [clearChapter, setClearChapter] = useState<number | "all">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClear = async () => {
+    if (!clearBookSlug) {
+      toast.error("Select a book to clear.");
+      return;
+    }
+    if (clearChapter !== "all" && (typeof clearChapter !== "number" || clearChapter < 1)) {
+      toast.error("Select a chapter or Entire book.");
+      return;
+    }
+    if (!confirm(clearChapter === "all" ? `Remove all HCSB verses for this book? This cannot be undone.` : `Remove HCSB verses for this chapter? This cannot be undone.`)) {
+      return;
+    }
+    setClearing(true);
+    try {
+      const url =
+        clearChapter === "all"
+          ? `/api/admin/bible-hcsb/verses?book=${encodeURIComponent(clearBookSlug)}`
+          : `/api/admin/bible-hcsb/verses?book=${encodeURIComponent(clearBookSlug)}&chapter=${clearChapter}`;
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Clear failed");
+      toast.success(clearChapter === "all" ? `Cleared entire book.` : `Cleared chapter ${clearChapter}.`);
+      setClearBookSlug("");
+      setClearChapter("all");
+      loadProgress();
+    } catch (err) {
+      toast.error("Clear failed", { description: err instanceof Error ? err.message : "Unknown error" });
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const loadProgress = useCallback(async () => {
     setLoadingProgress(true);
@@ -488,6 +523,62 @@ export default function AdminBibleHcsbPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+        {!loadingProgress && books.some((b) => b.completedChapters.length > 0) && (
+          <div className="mt-6 pt-4 border-t border-border">
+            <h3 className="text-sm font-medium mb-2">Clear data</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Remove HCSB verses for a chapter or entire book. This cannot be undone.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Book</span>
+                <select
+                  value={clearBookSlug}
+                  onChange={(e) => { setClearBookSlug(e.target.value); setClearChapter("all"); }}
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm min-w-[140px]"
+                >
+                  <option value="">Select book</option>
+                  {books.filter((b) => b.completedChapters.length > 0).map((b) => (
+                    <option key={b.slug} value={b.slug}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Chapter</span>
+                <select
+                  value={clearChapter === "all" ? "" : clearChapter}
+                  onChange={(e) => setClearChapter(e.target.value === "" ? "all" : parseInt(e.target.value, 10))}
+                  className="rounded-md border border-border bg-background px-3 py-2 text-sm min-w-[120px]"
+                >
+                  <option value="">Entire book</option>
+                  {clearBookSlug &&
+                    books
+                      .find((b) => b.slug === clearBookSlug)
+                      ?.completedChapters.slice()
+                      .sort((a, b) => a - b)
+                      .map((ch) => (
+                        <option key={ch} value={ch}>
+                          {ch}
+                        </option>
+                      ))}
+                </select>
+              </label>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleClear}
+                disabled={clearing || !clearBookSlug}
+                className="gap-2 font-mono text-xs uppercase tracking-widest"
+              >
+                {clearing ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                {clearing ? "Clearing…" : "Clear"}
+              </Button>
+            </div>
           </div>
         )}
       </div>
