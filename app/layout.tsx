@@ -60,7 +60,6 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
-  interactiveWidget: "resizes-visual",
 }
 
 export default function RootLayout({

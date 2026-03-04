@@ -5,6 +5,18 @@ import React from "react"
 
 export type FootnoteByMarker = Record<string, string | { text: string; href?: string }>
 
+/** Decode HTML entities so we can parse <em>/<strong> (e.g. API or SSR may send &lt;em&gt;). */
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_m, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+}
+
 /** Remove only tags we don't render; keep <em> and <strong> so we can show italic/bold. */
 function stripUnsafeTags(html: string): string {
   return html.replace(/<(?!\/?em\b|\/?strong\b)[^>]+>/gi, "").replace(/\s+/g, " ").trim()
@@ -26,7 +38,8 @@ export function VerseText({
 }) {
   if (!text) return null
 
-  const cleaned = stripUnsafeTags(text)
+  const decoded = decodeHtmlEntities(text)
+  const cleaned = stripUnsafeTags(decoded)
   const segments = cleaned.split(/(<\/?em>|<\/?strong>)/gi)
 
   let inEm = false
