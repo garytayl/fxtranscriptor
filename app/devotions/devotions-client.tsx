@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence, useReducedMotion, useMotionValue, useTransform, useDragControls, type PanInfo } from "framer-motion"
 import {
@@ -31,11 +31,14 @@ import {
 import { getPassageRefForDate, getLandingComboForDate } from "@/lib/devotions-passages"
 import { getSection, getPredefinedSections, getSectionBookNames } from "@/lib/devotions-sections"
 import {
+  getActiveReadingPlan,
+  listReadingPlans,
   getReadingPlan,
+  setActiveReadingPlan,
   setReadingPlan as persistReadingPlan,
-  clearReadingPlan,
   getNextChapter,
   advanceReadingPlan,
+  isReadingPlanComplete,
   type ReadingPlanState,
 } from "@/lib/devotions-plan"
 import { getReaderUrlFromReference } from "@/lib/bible/reference"
@@ -249,6 +252,10 @@ type PassageData = {
 
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
+type SectionMeta = {
+  totalChapters: number
+  books: { bookId: string; chapterCount: number }[]
+}
 
 type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "studyPicker" | "studyGuide" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
@@ -271,6 +278,26 @@ const slide = {
   exit: (dir: number) => ({ x: dir > 0 ? -24 : 24, opacity: 0 }),
 }
 
+function getCompletedPlanChapters(plan: ReadingPlanState, meta: SectionMeta | null): number {
+  if (!meta || meta.totalChapters <= 0) return 0
+  if (isReadingPlanComplete(plan)) return meta.totalChapters
+  let completed = 0
+  for (const book of meta.books) {
+    if (book.bookId === plan.lastBookId) {
+      completed += Math.min(Math.max(0, plan.lastChapter), book.chapterCount)
+      break
+    }
+    completed += book.chapterCount
+  }
+  return Math.min(completed, meta.totalChapters)
+}
+
+function getPlanCompletionPercent(plan: ReadingPlanState, meta: SectionMeta | null): number {
+  if (!meta || meta.totalChapters <= 0) return 0
+  const completed = getCompletedPlanChapters(plan, meta)
+  return Math.min(100, Math.round((completed / meta.totalChapters) * 100))
+}
+
 export function DevotionsClient() {
   const [step, setStep] = useState<Step>("landing")
   const [dir, setDir] = useState(0) // 1 = forward, -1 = back
@@ -286,18 +313,16 @@ export function DevotionsClient() {
   const [notificationRequesting, setNotificationRequesting] = useState(false)
   const [settings, setSettings] = useState(() => getDevotionsSettings())
   const [tracking, setTracking] = useState(() => getDevotionsTracking())
-  const [readingPlan, setReadingPlanState] = useState<ReadingPlanState | null>(() => getReadingPlan())
+  const [readingPlans, setReadingPlans] = useState<ReadingPlanState[]>(() => listReadingPlans())
+  const [activePlanId, setActivePlanId] = useState<string | null>(() => getActiveReadingPlan()?.sectionId ?? null)
+  const [planMetaBySectionId, setPlanMetaBySectionId] = useState<Record<string, SectionMeta>>({})
   /** When we loaded a passage from a reading plan, track for progress + Next. */
   const [activePlanSession, setActivePlanSession] = useState<{
+    sectionId: string
     bookId: string
     chapterNumber: number
     sectionLabel: string
     maxChapterInBook: number
-  } | null>(null)
-  /** Section meta for progress (total chapters, books) when in plan mode. */
-  const [sectionMeta, setSectionMeta] = useState<{
-    totalChapters: number
-    books: { bookId: string; chapterCount: number }[]
   } | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -339,6 +364,49 @@ export function DevotionsClient() {
 
   const passageRef = passage?.reference ?? ""
   const reduced = useReducedMotion()
+
+  const activeReadingPlan = useMemo(() => {
+    if (readingPlans.length === 0) return null
+    if (!activePlanId) return readingPlans[0] ?? null
+    return (
+      readingPlans.find((p) => p.sectionId.toLowerCase() === activePlanId.toLowerCase()) ??
+      readingPlans[0] ??
+      null
+    )
+  }, [activePlanId, readingPlans])
+
+  const orderedReadingPlans = useMemo(() => {
+    return [...readingPlans].sort((a, b) => {
+      const aDone = isReadingPlanComplete(a)
+      const bDone = isReadingPlanComplete(b)
+      if (aDone !== bDone) return aDone ? 1 : -1
+      const aTime = a.startedAt ? new Date(a.startedAt).getTime() : 0
+      const bTime = b.startedAt ? new Date(b.startedAt).getTime() : 0
+      return bTime - aTime
+    })
+  }, [readingPlans])
+
+  const refreshReadingPlanState = useCallback(() => {
+    const plans = listReadingPlans()
+    setReadingPlans(plans)
+    const active = getActiveReadingPlan()
+    setActivePlanId(active?.sectionId ?? plans[0]?.sectionId ?? null)
+  }, [])
+
+  const getPlanProgress = useCallback(
+    (plan: ReadingPlanState) => {
+      const meta = planMetaBySectionId[plan.sectionId] ?? null
+      const completedChapters = getCompletedPlanChapters(plan, meta)
+      const totalChapters = meta?.totalChapters ?? 0
+      const completion = getPlanCompletionPercent(plan, meta)
+      return { meta, completedChapters, totalChapters, completion }
+    },
+    [planMetaBySectionId],
+  )
+
+  const activePlanMeta = activePlanSession
+    ? (planMetaBySectionId[activePlanSession.sectionId] ?? null)
+    : null
 
   // Load verse notes when passage changes
   useEffect(() => {
@@ -449,33 +517,40 @@ export function DevotionsClient() {
   }, [step])
 
   useEffect(() => {
-    if (!activePlanSession || !readingPlan) {
-      setSectionMeta(null)
+    if (readingPlans.length === 0) {
+      setPlanMetaBySectionId((prev) => (Object.keys(prev).length === 0 ? prev : {}))
       return
     }
     let cancelled = false
-    fetch(`/api/bible/section/${encodeURIComponent(readingPlan.sectionId)}/meta`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled || data.error) return
-        setSectionMeta({
-          totalChapters: data.totalChapters ?? 0,
-          books: (data.books ?? []).map((b: { bookId: string; chapterCount: number }) => ({
-            bookId: b.bookId,
-            chapterCount: b.chapterCount ?? 0,
-          })),
+    for (const plan of readingPlans) {
+      if (planMetaBySectionId[plan.sectionId]) continue
+      fetch(`/api/bible/section/${encodeURIComponent(plan.sectionId)}/meta`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled || data.error) return
+          const nextMeta: SectionMeta = {
+            totalChapters: data.totalChapters ?? 0,
+            books: (data.books ?? []).map((b: { bookId: string; chapterCount: number }) => ({
+              bookId: b.bookId,
+              chapterCount: b.chapterCount ?? 0,
+            })),
+          }
+          setPlanMetaBySectionId((prev) => {
+            if (prev[plan.sectionId]) return prev
+            return { ...prev, [plan.sectionId]: nextMeta }
+          })
         })
-      })
-      .catch(() => {})
+        .catch(() => {})
+    }
     return () => { cancelled = true }
-  }, [activePlanSession, readingPlan?.sectionId])
+  }, [readingPlans, planMetaBySectionId])
 
   // Sync settings, tracking, and reading plan from storage
   useEffect(() => {
     setSettings(getDevotionsSettings())
     setTracking(getDevotionsTracking())
-    setReadingPlanState(getReadingPlan())
-  }, [settingsOpen, moreOpen, step])
+    refreshReadingPlanState()
+  }, [settingsOpen, moreOpen, step, refreshReadingPlanState])
 
   const scheduleSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -576,12 +651,13 @@ export function DevotionsClient() {
 
   /** Load a passage by book id + chapter (for reading plan). Uses bookIdToName for ref. */
   const loadPlanPassage = useCallback(
-    (bookId: string, chapterNumber: number, sectionLabel: string) => {
+    (bookId: string, chapterNumber: number, sectionLabel: string, sectionId: string) => {
       const name = bookIdToName().get(bookId) ?? bookId
       const ref = `${name} ${chapterNumber}`
       setLoading(true)
       setError(null)
       setActivePlanSession(null)
+      setActiveReadingPlan(sectionId)
       fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}`)
         .then((res) => res.json())
         .then((data) => {
@@ -597,6 +673,7 @@ export function DevotionsClient() {
           const chList = (chaptersData.chapters ?? []) as { number: number }[]
           const maxChapter = chList.length > 0 ? Math.max(...chList.map((c) => c.number)) : chapterNumber
           setActivePlanSession({
+            sectionId,
             bookId,
             chapterNumber,
             sectionLabel,
@@ -613,21 +690,34 @@ export function DevotionsClient() {
   )
 
   /** Continue reading plan: load next chapter. */
-  const continueReadingPlan = useCallback(() => {
-    const plan = getReadingPlan()
+  const continueReadingPlan = useCallback((sectionId?: string) => {
+    const plan = sectionId ? getReadingPlan(sectionId) : getActiveReadingPlan() ?? getReadingPlan()
     if (!plan) return
+    setActiveReadingPlan(plan.sectionId)
+    refreshReadingPlanState()
+    if (isReadingPlanComplete(plan)) return
     const next = getNextChapter(plan)
     if (!next) return
     const section = getSection(plan.sectionId)
     if (!section) return
-    loadPlanPassage(next.bookId, next.chapterNumber, section.label)
-  }, [loadPlanPassage])
+    loadPlanPassage(next.bookId, next.chapterNumber, section.label, plan.sectionId)
+  }, [loadPlanPassage, refreshReadingPlanState])
 
   /** Start a new reading plan and load first chapter. */
   const startReadingPlan = useCallback(
     (sectionId: string) => {
       const section = getSection(sectionId)
       if (!section || section.bookIds.length === 0) return
+      const existing = getReadingPlan(sectionId)
+      if (existing && !isReadingPlanComplete(existing)) {
+        const next = getNextChapter(existing)
+        if (next) {
+          setActiveReadingPlan(sectionId)
+          refreshReadingPlanState()
+          loadPlanPassage(next.bookId, next.chapterNumber, section.label, sectionId)
+          return
+        }
+      }
       const plan: ReadingPlanState = {
         sectionId,
         lastBookId: section.bookIds[0],
@@ -635,43 +725,38 @@ export function DevotionsClient() {
         chaptersPerDay: settings.chaptersPerDay,
         startedAt: new Date().toISOString(),
       }
-      persistReadingPlan(plan)
-      setReadingPlanState(plan)
-      loadPlanPassage(section.bookIds[0], 1, section.label)
+      persistReadingPlan(plan, { setActive: true })
+      refreshReadingPlanState()
+      loadPlanPassage(section.bookIds[0], 1, section.label, sectionId)
     },
-    [loadPlanPassage, settings.chaptersPerDay]
+    [loadPlanPassage, refreshReadingPlanState, settings.chaptersPerDay]
   )
 
   /** Advance plan after reading current chapter and go to next (or finish). */
   const advancePlanAndNext = useCallback(() => {
-    const plan = getReadingPlan()
-    if (!plan || !activePlanSession) return
+    if (!activePlanSession) return
+    const plan = getReadingPlan(activePlanSession.sectionId)
+    if (!plan) return
     const nextPlan = advanceReadingPlan(
       plan,
       activePlanSession.bookId,
       activePlanSession.chapterNumber,
       activePlanSession.maxChapterInBook
     )
-    if (nextPlan) {
-      persistReadingPlan(nextPlan)
-      setReadingPlanState(nextPlan)
-      const next = getNextChapter(nextPlan)
-      if (next) {
-        const section = getSection(nextPlan.sectionId)
-        if (section) loadPlanPassage(next.bookId, next.chapterNumber, section.label)
-      } else {
-        setActivePlanSession(null)
-      }
+    if (!nextPlan) return
+    persistReadingPlan(nextPlan, { setActive: true })
+    refreshReadingPlanState()
+    const next = getNextChapter(nextPlan)
+    if (next) {
+      const section = getSection(nextPlan.sectionId)
+      if (section) loadPlanPassage(next.bookId, next.chapterNumber, section.label, nextPlan.sectionId)
     } else {
-      clearReadingPlan()
-      setReadingPlanState(null)
       setActivePlanSession(null)
-      setPassage(null)
-      setStep("landing")
       setDir(-1)
-      toast.success("You finished this plan!")
+      setStep("landing")
+      toast.success(`You finished ${activePlanSession.sectionLabel}!`)
     }
-  }, [activePlanSession, loadPlanPassage])
+  }, [activePlanSession, loadPlanPassage, refreshReadingPlanState])
 
   const goBack = useCallback(() => {
     setDir(-1)
@@ -879,6 +964,7 @@ export function DevotionsClient() {
           setMoreOpen(false)
           setSettings(getDevotionsSettings())
           setTracking(getDevotionsTracking())
+          refreshReadingPlanState()
           if (passageRef) {
             const entry = getPassageEntry(passageRef)
             setPrayer(entry.prayer)
@@ -890,7 +976,7 @@ export function DevotionsClient() {
       reader.readAsText(file)
     }
     input.click()
-  }, [passageRef])
+  }, [passageRef, refreshReadingPlanState])
 
   const handleExportJournal = useCallback(() => {
     const entries = listPassageEntries()
@@ -1090,15 +1176,79 @@ export function DevotionsClient() {
                     </motion.div>
                   )}
                   <div className="flex flex-col gap-3 sm:gap-4 pt-2">
-                    {readingPlan && (
+                    {activeReadingPlan && !isReadingPlanComplete(activeReadingPlan) && (
                       <button
                         type="button"
-                        onClick={continueReadingPlan}
+                        onClick={() => continueReadingPlan(activeReadingPlan.sectionId)}
                         disabled={loading || booksLoading}
                         className="w-full min-h-[56px] rounded-xl font-sans text-lg font-light text-white/95 bg-white/15 border border-white/25 hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                       >
-                        {loading ? "Loading…" : booksLoading ? "Preparing…" : `Continue in ${getSection(readingPlan.sectionId)?.label ?? readingPlan.sectionId}`}
+                        {loading ? "Loading…" : booksLoading ? "Preparing…" : `Continue in ${getSection(activeReadingPlan.sectionId)?.label ?? activeReadingPlan.sectionId}`}
                       </button>
+                    )}
+                    {orderedReadingPlans.length > 0 && (
+                      <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-3 text-left sm:p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-white/55">
+                            Reading plan progress
+                          </p>
+                          <span className="font-mono text-[10px] tracking-wider text-white/45">
+                            {orderedReadingPlans.filter((p) => !isReadingPlanComplete(p)).length} active
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-2.5">
+                          {orderedReadingPlans.map((plan) => {
+                            const section = getSection(plan.sectionId)
+                            const isDone = isReadingPlanComplete(plan)
+                            const isActive = activePlanId?.toLowerCase() === plan.sectionId.toLowerCase()
+                            const progress = getPlanProgress(plan)
+                            const pct = isDone ? 100 : progress.completion
+                            return (
+                              <button
+                                key={plan.sectionId}
+                                type="button"
+                                disabled={loading || booksLoading}
+                                onClick={() => {
+                                  if (isDone) startReadingPlan(plan.sectionId)
+                                  else continueReadingPlan(plan.sectionId)
+                                }}
+                                className="w-full rounded-xl border border-white/12 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="font-sans text-sm text-white/90 text-left truncate">
+                                    {section?.label ?? plan.sectionId}
+                                  </span>
+                                  <span className={`font-mono text-[10px] tracking-wider uppercase shrink-0 ${
+                                    isDone ? "text-emerald-300/80" : "text-white/55"
+                                  }`}>
+                                    {isDone ? "Completed" : `${pct}%`}
+                                  </span>
+                                </div>
+                                <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      isDone
+                                        ? "bg-gradient-to-r from-emerald-400/80 to-emerald-300/80"
+                                        : "bg-gradient-to-r from-sky-400/80 to-indigo-400/80"
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                  <span className="font-mono text-[10px] tracking-wider text-white/45">
+                                    {progress.totalChapters > 0
+                                      ? `${progress.completedChapters}/${progress.totalChapters} chapters`
+                                      : "Loading plan size…"}
+                                  </span>
+                                  <span className="font-mono text-[10px] tracking-wider text-white/55">
+                                    {isDone ? "Restart" : isActive ? "Continue" : "Resume"}
+                                  </span>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
                     )}
                     <button
                       type="button"
@@ -1247,11 +1397,17 @@ export function DevotionsClient() {
                   <ul className="space-y-0 md:max-h-[50vh] md:overflow-y-auto md:pr-1">
                     {getPredefinedSections().map((sec) => {
                       const bookNames = getSectionBookNames(sec)
+                      const existingPlan = readingPlans.find((p) => p.sectionId.toLowerCase() === sec.id.toLowerCase()) ?? null
+                      const isDone = existingPlan ? isReadingPlanComplete(existingPlan) : false
+                      const progress = existingPlan ? getPlanProgress(existingPlan) : null
                       return (
                         <li key={sec.id}>
                           <button
                             type="button"
-                            onClick={() => startReadingPlan(sec.id)}
+                            onClick={() => {
+                              if (existingPlan && !isDone) continueReadingPlan(sec.id)
+                              else startReadingPlan(sec.id)
+                            }}
                             disabled={loading || booksLoading}
                             className="w-full flex items-center justify-between gap-3 py-4 sm:py-5 text-left border-b border-white/10 font-sans text-base sm:text-lg text-white/90 hover:text-white hover:bg-white/5 transition-colors min-h-[56px] disabled:opacity-50"
                           >
@@ -1260,10 +1416,23 @@ export function DevotionsClient() {
                               <span className="block font-sans text-xs text-white/55 mt-0.5 leading-snug">
                                 {bookNames.join(", ")}
                               </span>
+                              {existingPlan && (
+                                <span className="block font-mono text-[10px] tracking-wider text-white/50 mt-1">
+                                  {isDone
+                                    ? "Completed · tap to restart"
+                                    : progress && progress.totalChapters > 0
+                                      ? `${progress.completedChapters}/${progress.totalChapters} chapters (${progress.completion}%)`
+                                      : "In progress"}
+                                </span>
+                              )}
                             </span>
                             <span className="flex items-center gap-2 shrink-0 self-center">
                               <span className="font-mono text-[11px] tracking-wider text-white/60 tabular-nums">
-                                {sec.bookIds.length} book{sec.bookIds.length !== 1 ? "s" : ""}
+                                {existingPlan && !isDone
+                                  ? "Resume"
+                                  : existingPlan && isDone
+                                    ? "Restart"
+                                    : `${sec.bookIds.length} book${sec.bookIds.length !== 1 ? "s" : ""}`}
                               </span>
                               <ChevronRight className="w-5 h-5 text-white/40" aria-hidden />
                             </span>
@@ -1730,21 +1899,31 @@ export function DevotionsClient() {
                 <div className="w-full max-w-2xl mx-auto lg:max-w-none">
                   {activePlanSession && (
                     <div className="mb-6 flex flex-col gap-3">
-                      <p className="font-mono text-[11px] tracking-wider text-white/55">
-                        {sectionMeta
-                          ? (() => {
-                              let current = 0
-                              for (const b of sectionMeta.books) {
-                                if (b.bookId === activePlanSession.bookId) {
-                                  current += activePlanSession.chapterNumber
-                                  break
-                                }
-                                current += b.chapterCount
-                              }
-                              return `${passageRef} · ${current} of ${sectionMeta.totalChapters} in ${activePlanSession.sectionLabel}`
-                            })()
-                          : `${passageRef} · ${activePlanSession.sectionLabel}`}
-                      </p>
+                      {(() => {
+                        const sessionPlan =
+                          readingPlans.find((p) => p.sectionId.toLowerCase() === activePlanSession.sectionId.toLowerCase()) ??
+                          null
+                        const completed = sessionPlan ? getCompletedPlanChapters(sessionPlan, activePlanMeta) : 0
+                        const total = activePlanMeta?.totalChapters ?? 0
+                        const pct = sessionPlan ? getPlanCompletionPercent(sessionPlan, activePlanMeta) : 0
+                        return (
+                          <>
+                            <p className="font-mono text-[11px] tracking-wider text-white/55">
+                              {total > 0
+                                ? `${passageRef} · ${completed} of ${total} in ${activePlanSession.sectionLabel}`
+                                : `${passageRef} · ${activePlanSession.sectionLabel}`}
+                            </p>
+                            {total > 0 && (
+                              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-indigo-400/80 transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                       <button
                         type="button"
                         onClick={advancePlanAndNext}

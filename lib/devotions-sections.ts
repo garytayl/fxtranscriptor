@@ -28,8 +28,13 @@ const SECTIONS: DevotionSection[] = [
   },
   {
     id: "wisdom",
-    label: "Wisdom & Poetry",
-    bookIds: ["JOB", "PSA", "PRO", "ECC", "SNG"],
+    label: "Wisdom Literature",
+    bookIds: ["JOB", "PRO", "ECC", "SNG"],
+  },
+  {
+    id: "psalms",
+    label: "Psalms",
+    bookIds: ["PSA"],
   },
   {
     id: "major-prophets",
