@@ -244,7 +244,7 @@ export function normalizeBookName(raw: string): string {
   const byExact = BOOK_NAME_ALIASES[trimmed]
   if (byExact) return byExact
 
-  const key = trimmed.toLowerCase().replace(/\s+/g, " ")
+  const key = trimmed.toLowerCase().replace(/\s+/g, " ").replace(/\.+$/, "")
   const byAbbrev = BOOK_ABBREVIATIONS[key]
   if (byAbbrev) return byAbbrev
 
@@ -294,17 +294,18 @@ export function parseVerseRange(raw?: string | null): VerseRange | null {
 }
 
 export function parsePassageReference(raw: string): PassageReference | null {
-  const normalized = raw.trim().replace(/\s*:\s*/g, ":")
+  const normalized = raw.trim().replace(/\s*:\s*/g, ":").replace(/[–—]/g, "-")
   if (!normalized) {
     return null
   }
 
-  const match = normalized.match(/^(.+?)\s+(\d+)(?::(\d+(?:-\d+)?))?$/)
+  const match = normalized.match(/^(.+?)\.\s+(\d+)(?::(\d+(?:-\d+)?))?$/) ??
+    normalized.match(/^(.+?)\s+(\d+)(?::(\d+(?:-\d+)?))?$/)
   if (!match) {
     return null
   }
 
-  const bookRaw = normalizeBookName(match[1])
+  const bookRaw = normalizeBookName(match[1].replace(/\.+$/, ""))
   const chapterNumber = Number.parseInt(match[2], 10)
   if (!Number.isFinite(chapterNumber)) {
     return null
