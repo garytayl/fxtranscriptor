@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Save, Loader2, FileText, ChevronDown, ChevronRight, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,16 +22,21 @@ const TRANSLATION_SLUG = "HCSB";
 
 /**
  * Split pasted block into main text (verses) and the Footnotes section.
- * The same letter in the footnote block (e.g. [a]) corresponds to markers in the verse text.
+ * Uses the *last* line that is "Footnotes" / "Footnote" so we don't truncate when the source
+ * has an earlier "Footnotes" heading (e.g. mid-book); only the real footnote block at the end is split off.
  */
 function splitBlockIntoMainAndFootnotes(block: string): { mainText: string; footnotesText: string } {
   const lines = block.split(/\r?\n/);
+  let lastFootnotesIndex = -1;
   for (let i = 0; i < lines.length; i++) {
     if (/^Footnotes?$/i.test(lines[i].trim())) {
-      const mainText = lines.slice(0, i).join("\n").trim();
-      const footnotesText = lines.slice(i + 1).join("\n").trim();
-      return { mainText, footnotesText };
+      lastFootnotesIndex = i;
     }
+  }
+  if (lastFootnotesIndex >= 0) {
+    const mainText = lines.slice(0, lastFootnotesIndex).join("\n").trim();
+    const footnotesText = lines.slice(lastFootnotesIndex + 1).join("\n").trim();
+    return { mainText, footnotesText };
   }
   return { mainText: block.trim(), footnotesText: "" };
 }
@@ -283,6 +288,8 @@ export default function AdminBibleHcsbPage() {
   const [clearChapter, setClearChapter] = useState<number | "all">("all");
   const [startChapterInput, setStartChapterInput] = useState("");
   const [parsedFootnotes, setParsedFootnotes] = useState<ParsedFootnote[]>([]);
+  /** Which chapter (number) has its problem details expanded in multi-summary. */
+  const [expandedChapterSummary, setExpandedChapterSummary] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleClear = async () => {
@@ -513,6 +520,7 @@ export default function AdminBibleHcsbPage() {
       setStep("paste");
       setParsedChapters([]);
       setExpectedVerseCounts(null);
+      setExpandedChapterSummary(null);
       setParsedFootnotes([]);
       loadProgress();
     } catch (err) {
@@ -826,12 +834,13 @@ export default function AdminBibleHcsbPage() {
           <>
             <p className="text-sm text-muted-foreground">
               Detected {parsedChapters.length} chapter(s). Save all to the database (existing verses for these
-              chapters will be overwritten).
+              chapters will be overwritten). Expand a row to see which verses are present, missing, or empty.
             </p>
-            <div className="admin-scroll max-h-[320px] overflow-y-auto rounded-md border border-border">
+            <div className="admin-scroll max-h-[380px] overflow-y-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/80 border-b border-border">
                   <tr>
+                    <th className="text-left py-2 px-3 font-mono w-0" />
                     <th className="text-left py-2 px-3 font-mono">Chapter</th>
                     <th className="text-left py-2 px-3">Verses</th>
                   </tr>
@@ -840,21 +849,69 @@ export default function AdminBibleHcsbPage() {
                   {parsedChapters.map((c, i) => {
                     const expected = expectedVerseCounts?.[i];
                     const isShort = expected != null && c.verses.length < expected;
+                    const emptyVerses = c.verses.filter((v) => !v.text.trim()).map((v) => v.number);
+                    const hasProblems = isShort || emptyVerses.length > 0;
+                    const isExpanded = expandedChapterSummary === c.chapterNumber;
+                    const missingRange =
+                      expected != null && c.verses.length < expected
+                        ? c.verses.length + 1 <= expected
+                          ? `${c.verses.length + 1}–${expected}`
+                          : ""
+                        : "";
                     return (
-                      <tr
-                        key={c.chapterNumber}
-                        className={`border-b border-border/50 ${isShort ? "bg-amber-500/10" : ""}`}
-                      >
-                        <td className="py-1.5 px-3 font-mono">{c.chapterNumber}</td>
-                        <td className="py-1.5 px-3">
-                          {c.verses.length}
-                          {isShort && (
-                            <span className="ml-1.5 text-amber-600 dark:text-amber-400 text-xs">
-                              (expected {expected} — paste may be incomplete)
-                            </span>
-                          )}
-                        </td>
-                      </tr>
+                      <React.Fragment key={c.chapterNumber}>
+                        <tr
+                          key={c.chapterNumber}
+                          className={`border-b border-border/50 ${isShort ? "bg-amber-500/10" : ""} ${hasProblems ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                          onClick={() => hasProblems && setExpandedChapterSummary((x) => (x === c.chapterNumber ? null : c.chapterNumber))}
+                        >
+                          <td className="py-1.5 pl-2 pr-1">
+                            {hasProblems ? (
+                              <span className="text-muted-foreground" aria-hidden>
+                                {isExpanded ? "▼" : "▶"}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-1.5 px-3 font-mono">{c.chapterNumber}</td>
+                          <td className="py-1.5 px-3">
+                            {c.verses.length}
+                            {isShort && (
+                              <span className="ml-1.5 text-amber-600 dark:text-amber-400 text-xs">
+                                (expected {expected})
+                              </span>
+                            )}
+                            {emptyVerses.length > 0 && (
+                              <span className="ml-1.5 text-muted-foreground text-xs">
+                                ({emptyVerses.length} empty)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && hasProblems && (
+                          <tr key={`${c.chapterNumber}-detail`} className="border-b border-border/50 bg-muted/30">
+                            <td colSpan={3} className="py-2 px-3 text-xs text-muted-foreground">
+                              <div className="flex flex-col gap-1">
+                                <span>
+                                  <strong className="text-foreground">Present:</strong> verses 1–{c.verses.length}
+                                </span>
+                                {missingRange && (
+                                  <span>
+                                    <strong className="text-amber-600 dark:text-amber-400">Missing from paste:</strong> verses {missingRange}
+                                    {" — add these verses to your pasted text and parse again."}
+                                  </span>
+                                )}
+                                {emptyVerses.length > 0 && (
+                                  <span>
+                                    <strong className="text-foreground">Empty (no text):</strong> verses {emptyVerses.slice(0, 20).join(", ")}
+                                    {emptyVerses.length > 20 ? ` … +${emptyVerses.length - 20} more` : ""}
+                                    {" — parser saw the verse number but no content (e.g. number on its own line)."}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -879,6 +936,7 @@ export default function AdminBibleHcsbPage() {
                   setStep("paste");
                   setParsedChapters([]);
                   setExpectedVerseCounts(null);
+                  setExpandedChapterSummary(null);
                 }}
               >
                 Back to paste
