@@ -255,7 +255,7 @@ export function StudyGuideShell({
             top: sidebarTopOffset ?? "var(--navbar-offset)",
             maxHeight: sidebarTopOffset
               ? `calc(100vh - ${sidebarTopOffset})`
-              : "calc(100vh - var(--navbar-offset, 0px))",
+              : "calc(100dvh - var(--navbar-offset, 0px))",
           }}
           aria-label="Verses"
         >

@@ -37,7 +37,8 @@ export default async function StudyGuidePage({ params }: Props) {
   return (
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="grid-bg fixed inset-0 opacity-20 pointer-events-none" aria-hidden="true" />
-      <div className="relative z-10 pt-[var(--navbar-offset)]">
+      {/* Explicit scroll container so sticky sidebar has a scrolling ancestor (body overflow-x breaks sticky) */}
+      <div className="relative z-10 pt-[var(--navbar-offset)] h-[calc(100dvh-var(--navbar-offset))] overflow-y-auto overflow-x-hidden">
         <div className="px-4 sm:px-8 md:px-12 max-w-4xl mx-auto lg:max-w-none">
           <header className="mb-8 sm:mb-12 pb-8 sm:pb-10 border-b border-white/10">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
