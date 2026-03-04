@@ -186,8 +186,8 @@ export function StudyGuideShell({
   refs: refsProp,
   sidebarTopOffset,
 }: StudyGuideShellProps) {
-  const [selectedPassageRef, setSelectedPassageRef] = useState<string | null>(defaultPassageRef)
-  const [sheetOpen, setSheetOpen] = useState(!!defaultPassageRef)
+  const [selectedPassageRef, setSelectedPassageRef] = useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const displayRef = selectedPassageRef ?? defaultPassageRef
 
