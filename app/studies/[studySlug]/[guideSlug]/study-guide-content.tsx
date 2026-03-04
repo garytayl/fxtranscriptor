@@ -5,10 +5,17 @@ import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 
 /** Replace parenthetical verse refs with markdown links so they become interactive (hover + sidebar).
- * Handles: (Jn 1:14), (Rom 15:15; 1 Cor 3:10), and (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10). */
+ * Handles: (Jn 1:14), (Rom 15:15; 1 Cor 3:10), and (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10).
+ * Uses encoded destinations (ref:Jn%201%3A14) so CommonMark doesn't truncate at space. */
 function preprocessVerseRefsInContent(content: string): string {
   let out = content
-  // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:ref)
+  // Rewrite existing [text](ref:Jn 1:14) links to encoded URL so CommonMark doesn't truncate at space
+  out = out.replace(/\]\((ref:[^)]+)\)/g, (_, refRest) => {
+    const raw = refRest.slice(4).trim()
+    if (!raw) return `](${refRest})`
+    return `](ref:${encodeURIComponent(raw)})`
+  })
+  // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:encoded)
   out = out.replace(/\(ref:\s*([^)]+)\)/gi, (_, inner) => {
     const trimmed = inner.trim()
     if (!trimmed) return `(ref:${inner})`
@@ -16,10 +23,9 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(ref:${inner})`
-    const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
-    return `[${trimmed}](ref:${escaped})`
+    return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
   })
-  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:ref)
+  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:encoded)
   out = out.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
     const trimmed = inner.trim()
     if (/^ref:/i.test(trimmed)) return `(${inner})` // already handled above
@@ -27,8 +33,7 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(${inner})`
-    const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
-    return `[${trimmed}](ref:${escaped})`
+    return `[${trimmed}](ref:${encodeURIComponent(trimmed)})`
   })
   return out
 }
