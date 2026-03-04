@@ -273,6 +273,8 @@ export default function AdminBibleHcsbPage() {
   const [blockText, setBlockText] = useState("");
   const [verses, setVerses] = useState<{ number: number; text: string }[]>([]);
   const [parsedChapters, setParsedChapters] = useState<ParsedChapter[]>([]);
+  /** When splitting by verse counts, expected count per chapter (index = chapterNumber - 1). Used to warn if paste is incomplete. */
+  const [expectedVerseCounts, setExpectedVerseCounts] = useState<number[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingBulk, setSavingBulk] = useState(false);
   const [loadingChapter, setLoadingChapter] = useState(false);
@@ -357,8 +359,10 @@ export default function AdminBibleHcsbPage() {
           toast.error("Could not split into chapters.");
           return;
         }
+        setExpectedVerseCounts(verseCounts.slice(0, chapters.length));
       } else {
         chapters = parseBlockToChapters(mainText);
+        setExpectedVerseCounts(null);
         if (chapters.length === 0) {
           toast.error(
             "No chapters detected. Add chapter boundaries: lines like 'Chapter 1', 'Chapter 2', or a line with only the chapter number (e.g. '1' then '2')."
@@ -508,6 +512,7 @@ export default function AdminBibleHcsbPage() {
       }
       setStep("paste");
       setParsedChapters([]);
+      setExpectedVerseCounts(null);
       setParsedFootnotes([]);
       loadProgress();
     } catch (err) {
@@ -832,12 +837,26 @@ export default function AdminBibleHcsbPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {parsedChapters.map((c) => (
-                    <tr key={c.chapterNumber} className="border-b border-border/50">
-                      <td className="py-1.5 px-3 font-mono">{c.chapterNumber}</td>
-                      <td className="py-1.5 px-3">{c.verses.length}</td>
-                    </tr>
-                  ))}
+                  {parsedChapters.map((c, i) => {
+                    const expected = expectedVerseCounts?.[i];
+                    const isShort = expected != null && c.verses.length < expected;
+                    return (
+                      <tr
+                        key={c.chapterNumber}
+                        className={`border-b border-border/50 ${isShort ? "bg-amber-500/10" : ""}`}
+                      >
+                        <td className="py-1.5 px-3 font-mono">{c.chapterNumber}</td>
+                        <td className="py-1.5 px-3">
+                          {c.verses.length}
+                          {isShort && (
+                            <span className="ml-1.5 text-amber-600 dark:text-amber-400 text-xs">
+                              (expected {expected} — paste may be incomplete)
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -854,7 +873,14 @@ export default function AdminBibleHcsbPage() {
                 )}
                 {savingBulk ? "Saving…" : "Save all chapters"}
               </Button>
-              <Button variant="ghost" onClick={() => { setStep("paste"); setParsedChapters([]); }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setStep("paste");
+                  setParsedChapters([]);
+                  setExpectedVerseCounts(null);
+                }}
+              >
                 Back to paste
               </Button>
             </div>
