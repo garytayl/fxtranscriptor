@@ -12,6 +12,11 @@ import {
 } from "@/lib/bible/local-hcsb"
 import { parseChapterHtmlToVerses, sanitizeChapterHtml } from "@/lib/bible/parse"
 import { slugifyBookName } from "@/lib/bible/reference"
+
+/** Strip HTML tags from verse text (API.Bible returns <em>, <span class="nd">, etc.). */
+function stripVerseHtml(text: string): string {
+  return text.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+}
 import { getDefaultBibleId } from "@/lib/bible/translations"
 import type { BibleBook, BibleChapter, BibleChapterContent, BibleVerse } from "@/lib/bible/types"
 
@@ -283,7 +288,8 @@ export async function getChapterVerses(
   }
   const chapter = await getChapterText(input, bibleId)
   const sanitized = sanitizeChapterHtml(chapter.content)
-  const verses = parseChapterHtmlToVerses(sanitized)
+  const parsed = parseChapterHtmlToVerses(sanitized)
+  const verses: BibleVerse[] = parsed.map((v) => ({ number: v.number, text: stripVerseHtml(v.text) }))
   return { chapter: { ...chapter, content: sanitized }, verses }
 }
 
