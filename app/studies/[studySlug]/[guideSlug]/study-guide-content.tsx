@@ -19,7 +19,7 @@ function encodeRefUrl(ref: string): string {
 
 function preprocessVerseRefsInContent(content: string): string {
   let out = content
-  // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:ref)
+  // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> individual [ref](ref:ref) per verse
   out = out.replace(/\(ref:\s*([^)]+)\)/gi, (_, inner) => {
     const trimmed = inner.trim()
     if (!trimmed) return `(ref:${inner})`
@@ -27,9 +27,9 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(ref:${inner})`
-    return `[${trimmed}](ref:${encodeRefUrl(trimmed)})`
+    return refs.map((r) => `[${r.raw}](ref:${encodeRefUrl(r.raw)})`).join("; ")
   })
-  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:ref)
+  // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> individual [ref](ref:ref) per verse
   out = out.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
     const trimmed = inner.trim()
     if (/^ref:/i.test(trimmed)) return `(${inner})`
@@ -37,7 +37,7 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(${inner})`
-    return `[${trimmed}](ref:${encodeRefUrl(trimmed)})`
+    return refs.map((r) => `[${r.raw}](ref:${encodeRefUrl(r.raw)})`).join("; ")
   })
   // Bare verse refs like "Leviticus 23:5-8" or "John 3:16" not already in links/parens
   out = out.replace(BARE_VERSE_RE, (match, ref) => {
