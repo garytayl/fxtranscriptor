@@ -249,7 +249,7 @@ export function StudyGuideShell({
 
         {/* Sidebar — desktop only; in-flow + sticky so zoom keeps main content on the left */}
         <aside
-          className={`hidden lg:flex lg:flex-col lg:sticky lg:w-[22rem] lg:shrink-0 lg:self-start lg:min-h-0 lg:overflow-hidden border-l border-white/10 bg-[#050505] z-10 ${sidebarTopOffset ? "" : "lg:pt-[var(--navbar-offset)]"}`}
+          className={`hidden lg:flex lg:flex-col lg:sticky lg:w-[22rem] lg:shrink-0 lg:self-start lg:min-h-0 lg:overflow-hidden bg-[#050505] z-10 ${sidebarTopOffset ? "" : "lg:pt-[var(--navbar-offset)]"}`}
           style={{
             ...(sidebarTopOffset ? { paddingTop: sidebarTopOffset } : {}),
             top: sidebarTopOffset ?? "var(--navbar-offset)",

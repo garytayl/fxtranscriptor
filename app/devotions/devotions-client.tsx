@@ -1583,7 +1583,7 @@ export function DevotionsClient() {
 
               {/* Desktop: right sidebar — verse notes + journal */}
               <aside
-                className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] border-l border-white/10 bg-[#050505] z-10"
+                className="hidden lg:flex lg:flex-col lg:shrink-0 lg:w-[22rem] bg-[#050505] z-10"
                 aria-label="Journal & Notes"
               >
                 <div

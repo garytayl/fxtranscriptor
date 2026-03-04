@@ -286,7 +286,7 @@ export function BibleChapterShell({
 
         {/* Sidebar — desktop: Greek & Hebrew, fixed so it stays visible when scrolling */}
         <aside
-          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-[var(--navbar-offset)] lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] border-l border-white/10 bg-[#050505] z-10 pt-6"
+          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-[var(--navbar-offset)] lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] bg-[#050505] z-10 pt-6"
           aria-label="Greek & Hebrew"
         >
           <div className="shrink-0 px-6 pb-2">
