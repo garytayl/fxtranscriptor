@@ -3,6 +3,19 @@
 import React from "react"
 import ReactMarkdown from "react-markdown"
 import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
+
+/** Replace parenthetical verse refs like (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) with markdown links so they show in the Bible reader. */
+function preprocessVerseRefsInContent(content: string): string {
+  return content.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
+    const trimmed = inner.trim()
+    const list = parsePassageList(trimmed)
+    const single = list.length === 0 ? parsePassageReference(trimmed) : null
+    const refs = list.length > 0 ? list : single ? [single] : []
+    if (refs.length === 0) return `(${inner})`
+    const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
+    return `[${trimmed}](ref:${escaped})`
+  })
+}
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { InlinePassage } from "./inline-passage"
 import { WordStudy } from "@/components/word-study"
@@ -15,24 +28,23 @@ function getLinkText(children: React.ReactNode): string {
   return ""
 }
 
-/** Resonates-style prose: mobile-first with generous spacing */
+/** Resonates-style prose: mobile-first with generous spacing (no left bars on lists) */
 const prose = `
 .study-guide-resonates.study-guide.prose h1 { font-size: 1.25rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 0.75rem; color: white; }
 .study-guide-resonates.study-guide.prose h2 { font-size: 1.0625rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 0.75rem; letter-spacing: 0.02em; color: white; border-color: rgba(255,255,255,0.15); }
 .study-guide-resonates.study-guide.prose h3 { font-size: 0.9375rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.625rem; color: rgba(255,255,255,0.7); }
 .study-guide-resonates.study-guide.prose p { margin-bottom: 1rem; line-height: 1.75; color: rgba(255,255,255,0.9); white-space: normal; word-spacing: normal; }
 .study-guide-resonates.study-guide.prose ul, .study-guide-resonates.study-guide.prose ol { margin-bottom: 1.5rem; }
-/* Numbered list */
 .study-guide-resonates.study-guide.prose ol { list-style-type: decimal; list-style-position: outside; padding-left: 1.5rem; margin-left: 0; }
-/* Each numbered item = one question block with breathing room */
-.study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.5rem; padding: 0.875rem 0.75rem 0.625rem 0.75rem; margin-left: 0; line-height: 1.7; border-left: 2px solid rgba(251,191,36,0.25); background: rgba(255,255,255,0.03); border-radius: 0 8px 8px 0; }
+.study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.5rem; padding: 0.75rem 0; margin-left: 0; line-height: 1.7; background: transparent; }
 .study-guide-resonates.study-guide.prose ol li:last-child { margin-bottom: 0; }
-.study-guide-resonates.study-guide.prose ol li > p:first-of-type { color: white; font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.625rem; }
-.study-guide-resonates.study-guide.prose ol li > p:not(:first-of-type) { color: rgba(255,255,255,0.8); font-weight: 400; margin-bottom: 0.625rem; }
+.study-guide-resonates.study-guide.prose ol li > p:first-of-type { color: white; font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.5rem; }
+.study-guide-resonates.study-guide.prose ol li > p:not(:first-of-type) { color: rgba(255,255,255,0.8); font-weight: 400; margin-bottom: 0.5rem; }
 .study-guide-resonates.study-guide.prose ol li:not(:has(> p)) { color: white; font-weight: 600; }
-.study-guide-resonates.study-guide.prose ul li { margin-bottom: 0.5rem; }
-.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; list-style-position: outside; padding-left: 1.25rem; margin-top: 0.625rem; margin-bottom: 0.625rem; margin-left: 0; }
-.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.5rem; margin-left: 0; color: rgba(255,255,255,0.9); padding-left: 0.25rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.study-guide-resonates.study-guide.prose ul { padding-left: 1.25rem; margin-top: 0.5rem; margin-bottom: 1rem; list-style-type: disc; }
+.study-guide-resonates.study-guide.prose ul li { margin-bottom: 0.35rem; margin-left: 0; color: rgba(255,255,255,0.9); padding-left: 0.25rem; }
+.study-guide-resonates.study-guide.prose ol li ul { list-style-type: lower-alpha; list-style-position: outside; padding-left: 1.25rem; margin-top: 0.5rem; margin-bottom: 0.5rem; margin-left: 0; }
+.study-guide-resonates.study-guide.prose ol li ul li { margin-bottom: 0.35rem; margin-left: 0; color: rgba(255,255,255,0.9); padding-left: 0.25rem; }
 .study-guide-resonates.study-guide.prose ol li ul li > p { font-weight: 500; color: rgba(255,255,255,0.95); }
 .study-guide-resonates.study-guide.prose li::marker { color: rgba(251,191,36,0.9); font-weight: 700; }
 .study-guide-resonates.study-guide.prose a { color: rgba(251,191,36,0.9); text-decoration: underline; }
@@ -45,16 +57,16 @@ const prose = `
   .study-guide-resonates.study-guide.prose h1 { font-size: 1.5rem; margin-top: 2.5rem; margin-bottom: 0.75rem; }
   .study-guide-resonates.study-guide.prose h2 { font-size: 1.125rem; margin-top: 2.5rem; }
   .study-guide-resonates.study-guide.prose h3 { font-size: 1rem; margin-top: 2rem; }
-  .study-guide-resonates.study-guide.prose ol { padding-left: 2.25rem; }
-  .study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.75rem; padding: 1rem 1rem 0.75rem 0.875rem; }
+  .study-guide-resonates.study-guide.prose ol { padding-left: 2rem; }
+  .study-guide-resonates.study-guide.prose ol li { margin-bottom: 1.5rem; padding: 0.875rem 0; }
   .study-guide-resonates.study-guide.prose ol li > p:first-of-type { font-size: 1rem; }
-  .study-guide-resonates.study-guide.prose ol li ul { padding-left: 2rem; }
+  .study-guide-resonates.study-guide.prose ol li ul { padding-left: 1.75rem; }
   .study-guide-resonates.study-guide.prose hr { margin: 2rem 0; }
 }
 `
 
-/** Verse ref pill: hover = preview in HoverCard (desktop), tap = open bottom sheet (mobile) */
-function VersePill({
+/** Verse ref pill: hover = preview in HoverCard (desktop), tap = open bottom sheet (mobile). Exported for use in StudyGuideShell (e.g. refs row). */
+export function VersePill({
   passageRef,
   label,
   onSelect,
@@ -107,7 +119,33 @@ export function StudyGuideContent({
         </WordStudy>
       )
     }
-    const list = text.includes(",") ? parsePassageList(text) : null
+    // Parenthetical verse refs rewritten as [text](ref:Jn 1:14) or ref:Rom 15:15; 1 Cor 3:10
+    const refPrefix = "ref:"
+    if (href?.startsWith(refPrefix)) {
+      const refStr = decodeURIComponent(href.slice(refPrefix.length))
+      const list = parsePassageList(refStr)
+      const single = list.length === 0 ? parsePassageReference(refStr) : null
+      const refsForThisLink = list.length > 0 ? list.map((p) => p.raw) : single ? [single.raw] : []
+      if (refsForThisLink.length > 0 && onSelectPassage) {
+        return (
+          <span className="inline-flex flex-wrap items-center gap-1.5 my-0.5">
+            {refsForThisLink.map((ref, i) => (
+              <VersePill key={`${ref}-${i}`} passageRef={ref} label={ref} onSelect={onSelectPassage} />
+            ))}
+          </span>
+        )
+      }
+      if (refsForThisLink.length > 0) {
+        return (
+          <span className="inline-flex flex-wrap items-center gap-1.5 my-0.5 font-mono text-[11px] uppercase tracking-wider text-amber-200/90">
+            {refsForThisLink.map((ref, i) => (
+              <span key={`${ref}-${i}`}>{ref}</span>
+            ))}
+          </span>
+        )
+      }
+    }
+    const list = text.includes(",") || text.includes(";") ? parsePassageList(text) : null
     const refsForThisLink: string[] = list && list.length > 0 ? list.map((p) => p.raw) : []
     const single = !refsForThisLink.length ? parsePassageReference(text) : null
     if (single) refsForThisLink.push(single.raw)
@@ -144,6 +182,7 @@ export function StudyGuideContent({
         <ReactMarkdown
           components={{
             a: linkComponent,
+            p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
             h2: ({ children }) => (
               <h2 className="border-b border-white/15 pb-2 font-semibold tracking-wide">{children}</h2>
             ),
@@ -151,11 +190,14 @@ export function StudyGuideContent({
               <h3 className="text-white/70">{children}</h3>
             ),
             ol: ({ children }) => (
-              <ol className="border-l border-white/15 pl-5 sm:pl-8 py-3 mt-4 mb-6 sm:mb-8 list-decimal list-outside">{children}</ol>
+              <ol className="pl-5 sm:pl-8 mt-4 mb-6 sm:mb-8 list-decimal list-outside">{children}</ol>
+            ),
+            ul: ({ children }) => (
+              <ul className="list-disc list-outside pl-5 sm:pl-6">{children}</ul>
             ),
           }}
         >
-          {content}
+          {preprocessVerseRefsInContent(content)}
         </ReactMarkdown>
       </div>
     </>

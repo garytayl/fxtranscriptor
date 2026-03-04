@@ -81,6 +81,7 @@ const BOOK_ABBREVIATIONS: Record<string, string> = {
   psa: "Psalms",
   psalms: "Psalms",
   psalm: "Psalms",
+  pr: "Proverbs",
   prov: "Proverbs",
   proverbs: "Proverbs",
   eccl: "Ecclesiastes",
@@ -163,13 +164,16 @@ const BOOK_ABBREVIATIONS: Record<string, string> = {
   "1th": "1 Thessalonians",
   "2thess": "2 Thessalonians",
   "2 thessalonians": "2 Thessalonians",
+  "2 thes": "2 Thessalonians",
   "2th": "2 Thessalonians",
   "1tim": "1 Timothy",
   "1 timothy": "1 Timothy",
   "1ti": "1 Timothy",
   "2tim": "2 Timothy",
   "2 timothy": "2 Timothy",
+  "2 tim": "2 Timothy",
   "2ti": "2 Timothy",
+  ti: "Titus",
   tit: "Titus",
   titus: "Titus",
   philem: "Philemon",
@@ -177,13 +181,16 @@ const BOOK_ABBREVIATIONS: Record<string, string> = {
   phlm: "Philemon",
   heb: "Hebrews",
   hebrews: "Hebrews",
+  jam: "James",
   jas: "James",
   james: "James",
   "1pet": "1 Peter",
   "1 peter": "1 Peter",
+  "1 pt": "1 Peter",
   "1pe": "1 Peter",
   "2pet": "2 Peter",
   "2 peter": "2 Peter",
+  "2 pt": "2 Peter",
   "2pe": "2 Peter",
   "1jn": "1 John",
   "1 john": "1 John",
@@ -263,7 +270,7 @@ export function parseVerseRange(raw?: string | null): VerseRange | null {
     return null
   }
 
-  const normalized = raw.trim()
+  const normalized = raw.trim().replace(/\u2013/g, "-").replace(/\u2014/g, "-") // en-dash, em-dash → hyphen
   if (!normalized) {
     return null
   }
