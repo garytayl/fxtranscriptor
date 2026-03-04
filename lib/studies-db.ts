@@ -1,4 +1,4 @@
-import type { BibleStudy, StudyGuideLink } from "./studies"
+import type { BibleStudy, StudyGuideLink, StudyLeader } from "./studies"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -14,6 +14,7 @@ type DbStudy = {
   tags: string[]
   year: number | null
   is_current: boolean
+  leader: string | null
   study_guides: DbGuide[]
 }
 
@@ -28,6 +29,8 @@ type DbGuide = {
 }
 
 function mapDbStudy(row: DbStudy): BibleStudy {
+  const leader =
+    row.leader === "mat" || row.leader === "jason" ? (row.leader as StudyLeader) : undefined
   return {
     id: row.id,
     slug: row.slug,
@@ -48,6 +51,7 @@ function mapDbStudy(row: DbStudy): BibleStudy {
     vaultUrl: row.vault_url ?? undefined,
     tags: row.tags ?? [],
     year: row.year ?? undefined,
+    leader,
   }
 }
 
@@ -92,6 +96,24 @@ async function fetchStudiesFromDb(): Promise<{ studies: BibleStudy[]; currentId:
 
 export async function getStudiesFromDb() {
   return fetchStudiesFromDb()
+}
+
+/** Returns Mat's and Jason's studies for the two-card studies page. Mat fallback: is_current study. */
+export async function getStudiesByLeaderAsync(): Promise<{
+  matStudy: BibleStudy | null
+  jasonStudy: BibleStudy | null
+}> {
+  const db = await fetchStudiesFromDb()
+  if (!db || db.studies.length === 0) {
+    return { matStudy: null, jasonStudy: null }
+  }
+  const matStudy =
+    db.studies.find((s) => s.leader === "mat") ??
+    db.studies.find((s) => s.id === db.currentId) ??
+    db.studies[0] ??
+    null
+  const jasonStudy = db.studies.find((s) => s.leader === "jason") ?? null
+  return { matStudy, jasonStudy }
 }
 
 export async function getGuideContentFromDb(

@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
   }
-  const { title, slug, notion_url, summary, podcast_url, vault_url, tags, year, is_current, guides } = body
+  const { title, slug, notion_url, summary, podcast_url, vault_url, tags, year, is_current, leader, guides } = body
 
   const titleStr = typeof title === "string" ? title.trim() : ""
   const slugRaw = typeof slug === "string" ? slug.trim() : ""
@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
     await supabase.from("bible_studies").update({ is_current: false }).eq("is_current", true)
   }
 
+  const leaderVal =
+    leader === "mat" || leader === "jason" ? leader : null
+
   const { data: study, error: studyError } = await supabase
     .from("bible_studies")
     .insert({
@@ -66,6 +69,7 @@ export async function POST(req: NextRequest) {
       tags: tagsArray,
       year: typeof year === "number" && Number.isFinite(year) ? year : null,
       is_current: !!is_current,
+      leader: leaderVal,
     })
     .select()
     .single()

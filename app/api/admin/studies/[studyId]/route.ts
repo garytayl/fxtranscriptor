@@ -37,6 +37,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ st
   if (typeof rest.year === "number" && Number.isFinite(rest.year)) studyFields.year = rest.year
   else if (rest.year === null) studyFields.year = null
   if (typeof rest.is_current === "boolean") studyFields.is_current = rest.is_current
+  if (rest.leader === "mat" || rest.leader === "jason") studyFields.leader = rest.leader
+  else if (rest.leader === null || rest.leader === "") studyFields.leader = null
 
   if (studyFields.is_current) {
     await supabase.from("bible_studies").update({ is_current: false }).eq("is_current", true)

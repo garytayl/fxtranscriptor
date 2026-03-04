@@ -3,6 +3,8 @@
  * Shown on the studies page so users can identify their group.
  */
 
+export type StudyTrack = "mat" | "jason"
+
 export interface SmallGroup {
   name: string
   schedule: string
@@ -10,6 +12,8 @@ export interface SmallGroup {
   location: string
   /** Optional link (e.g. Zoom) */
   link?: { label: string; url: string }
+  /** Which study track this group uses (default: mat) */
+  studyTrack?: StudyTrack
 }
 
 /** Spring 2026 re:groups */
@@ -19,6 +23,7 @@ export const REGROUPS_SPRING_2026: SmallGroup[] = [
     schedule: "Sundays - 1:00PM",
     contact: "Jason - (812) 606-7151",
     location: "Snyder's House (Spencer)",
+    studyTrack: "jason",
   },
   {
     name: "Bilotta's",
@@ -70,3 +75,10 @@ export const OTHER_GROUPS: SmallGroup[] = [
 ]
 
 export const SIGN_UP_URL = "https://fxchurch.notion.site" // or replace with actual sign-up link if you have one
+
+/** All groups (re:groups + other) for filtering by study track. */
+export const ALL_GROUPS: SmallGroup[] = [...REGROUPS_SPRING_2026, ...OTHER_GROUPS]
+
+export function getGroupsByTrack(track: StudyTrack): SmallGroup[] {
+  return ALL_GROUPS.filter((g) => (g.studyTrack ?? "mat") === track)
+}

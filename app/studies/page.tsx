@@ -1,18 +1,203 @@
 import Link from "next/link"
-import { getCurrentStudyAsync, getAllStudiesAsync } from "@/lib/studies"
-import { REGROUPS_SPRING_2026, OTHER_GROUPS } from "@/lib/small-groups"
+import type { BibleStudy } from "@/lib/studies"
+import { getStudiesByLeaderAsync, getAllStudiesAsync } from "@/lib/studies"
+import { getGroupsByTrack, type SmallGroup } from "@/lib/small-groups"
 import { ExternalLink, Headphones, BookOpen, FileText, ChevronRight } from "lucide-react"
 
 export const revalidate = 3600
 
 export const metadata = {
   title: "Bible Studies",
-  description: "fxchurch Bible studies and small group guides. Study guides hosted on Notion.",
+  description: "fxchurch Bible studies and small group guides. Mat's and Jason's studies.",
+}
+
+function studyPrimaryHref(study: BibleStudy): { href: string; isExternal: boolean; label: string } {
+  const firstGuide = study.guideLinks.find((g) => g.slug)
+  if (firstGuide?.slug) {
+    return { href: `/studies/${study.slug}/${firstGuide.slug}`, isExternal: false, label: "Open study guides" }
+  }
+  if (study.notionUrl) {
+    return { href: study.notionUrl, isExternal: true, label: "Open full study on Notion" }
+  }
+  return { href: "#", isExternal: false, label: "Study guides" }
+}
+
+function StudyCard({
+  leaderLabel,
+  study,
+  groups,
+}: {
+  leaderLabel: string
+  study: BibleStudy | null
+  groups: SmallGroup[]
+}) {
+  if (!study) {
+    return (
+      <article className="border border-border bg-card/30 rounded-lg overflow-hidden">
+        <div className="p-4 sm:p-6 md:p-8">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{leaderLabel}</span>
+          <h2 className="font-display text-xl sm:text-2xl tracking-tight text-foreground mt-2">
+            {leaderLabel}
+          </h2>
+          <p className="mt-2 font-mono text-xs text-muted-foreground">
+            {leaderLabel === "Jason's study"
+              ? "Snyder's uses Jason's discussion questions. Same series material."
+              : "No study assigned yet."}
+          </p>
+          {groups.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+                Groups using this study
+              </p>
+              <ul className="font-mono text-sm text-muted-foreground space-y-1">
+                {groups.map((g) => (
+                  <li key={g.name}>{g.name} — {g.schedule}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </article>
+    )
+  }
+
+  const primary = studyPrimaryHref(study)
+  const PrimaryLink = primary.isExternal ? "a" : Link
+
+  return (
+    <article className="border border-border bg-card/50 rounded-lg overflow-hidden">
+      <div className="p-4 sm:p-6 md:p-8">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-accent">{leaderLabel}</span>
+          {study.tags?.length ? (
+            <span className="font-mono text-[10px] text-muted-foreground">#{study.tags.join(" #")}</span>
+          ) : null}
+        </div>
+        <h2 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-tight text-foreground">
+          {study.title}
+        </h2>
+        <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed">
+          {study.summary}
+        </p>
+
+        <PrimaryLink
+          href={primary.href}
+          {...(primary.isExternal && { target: "_blank", rel: "noopener noreferrer" })}
+          className="mt-5 sm:mt-6 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-accent hover:underline min-h-[44px] sm:min-h-0"
+        >
+          <BookOpen className="size-4" />
+          {primary.label}
+          {primary.isExternal ? <ExternalLink className="size-3" /> : <ChevronRight className="size-3" />}
+        </PrimaryLink>
+
+        <div className="mt-6 sm:mt-8">
+          <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3 sm:mb-4">
+            Study guides
+          </h3>
+          <ul className="grid gap-2.5 sm:gap-3 sm:grid-cols-2">
+            {study.guideLinks.map((guide, i) => {
+              const href = guide.slug ? `/studies/${study.slug}/${guide.slug}` : guide.url
+              const isLocal = !!guide.slug
+              const Wrapper = isLocal ? Link : "a"
+              return (
+                <li key={guide.url}>
+                  <Wrapper
+                    href={href}
+                    {...(!isLocal && { target: "_blank", rel: "noopener noreferrer" })}
+                    className="group flex items-center gap-3 border border-border bg-background/50 hover:border-accent/50 active:border-accent/70 rounded-lg px-3 sm:px-4 py-3.5 sm:py-3 font-mono text-sm transition-colors min-h-[52px]"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm leading-snug group-hover:text-accent transition-colors">
+                      {guide.label}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:text-accent transition-colors" />
+                  </Wrapper>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+
+        {groups.length > 0 && (
+          <div className="mt-6 pt-5 border-t border-border">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+              Groups using this study
+            </p>
+            <ul className="font-mono text-xs text-muted-foreground space-y-1">
+              {groups.map((g) => (
+                <li key={g.name}>
+                  {g.name} — {g.schedule}
+                  {g.link ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={g.link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent hover:underline inline-flex items-center gap-0.5"
+                      >
+                        {g.link.label}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-border flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+          {study.podcastUrl ? (
+            <a
+              href={study.podcastUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors min-h-[44px] sm:min-h-0"
+            >
+              <Headphones className="size-4" />
+              Series podcast
+            </a>
+          ) : null}
+          {study.vaultUrl ? (
+            <a
+              href={study.vaultUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors min-h-[44px] sm:min-h-0"
+            >
+              <FileText className="size-4" />
+              re:group vault
+            </a>
+          ) : null}
+          {study.notionUrl && study.guideLinks.some((g) => g.slug) ? (
+            <a
+              href={study.notionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors min-h-[44px] sm:min-h-0"
+            >
+              <BookOpen className="size-4" />
+              Open on Notion
+              <ExternalLink className="size-3" />
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  )
 }
 
 export default async function StudiesPage() {
-  const current = await getCurrentStudyAsync()
+  const { matStudy, jasonStudy } = await getStudiesByLeaderAsync()
   const all = await getAllStudiesAsync()
+  const matGroups = getGroupsByTrack("mat")
+  const jasonGroups = getGroupsByTrack("jason")
+
+  const leaderIds = [matStudy?.id, jasonStudy?.id].filter(Boolean) as string[]
+  const otherStudies = all.filter((s) => !leaderIds.includes(s.id))
 
   return (
     <main className="relative min-h-screen">
@@ -30,192 +215,55 @@ export default async function StudiesPage() {
             Study Guides
           </h1>
           <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-xl">
-            Small group and personal study guides from fxchurch. Hosted on Notion — open any link to read or print.
+            Two studies this term. Find your group below and open the right study.
           </p>
         </header>
 
-        {/* Small group intro */}
-        <section className="max-w-3xl mb-8 sm:mb-10">
-          <h2 className="font-display text-xl sm:text-2xl tracking-tight text-foreground mb-2">
-            What small group are you a part of?
+        <section className="max-w-3xl space-y-8 sm:space-y-10">
+          <h2 className="font-display text-xl sm:text-2xl tracking-tight text-foreground sr-only">
+            Which study does your group use?
           </h2>
-          <p className="font-mono text-xs sm:text-sm text-muted-foreground mb-4">
-            The study guides below are from Mat&apos;s re:group (Shockney&apos;s). Find your group here:
-          </p>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="border border-border bg-card/30 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-muted/30">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-accent">re:groups</span>
-                <span className="font-mono text-[10px] text-muted-foreground ml-2">Spring 2026</span>
-              </div>
-              <ul className="divide-y divide-border">
-                {REGROUPS_SPRING_2026.map((g) => (
-                  <li key={g.name} className="px-4 py-3">
-                    <p className="font-semibold text-sm text-foreground">{g.name}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground mt-0.5">{g.schedule}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">Contact: {g.contact}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">Location: {g.location}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="border border-border bg-card/30 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-muted/30">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-accent">Other groups</span>
-              </div>
-              <ul className="divide-y divide-border">
-                {OTHER_GROUPS.map((g) => (
-                  <li key={g.name} className="px-4 py-3">
-                    <p className="font-semibold text-sm text-foreground">{g.name}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground mt-0.5">{g.schedule}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">Contact: {g.contact}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">Location: {g.location}</p>
-                    {g.link ? (
-                      <a
-                        href={g.link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-1 font-mono text-[11px] text-accent hover:underline"
+
+          <StudyCard leaderLabel="Mat's study" study={matStudy} groups={matGroups} />
+          <StudyCard leaderLabel="Jason's study" study={jasonStudy} groups={jasonGroups} />
+
+          {otherStudies.length > 0 ? (
+            <div>
+              <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3 sm:mb-4">
+                Other studies
+              </h3>
+              <ul className="space-y-2.5 sm:space-y-3">
+                {otherStudies.map((study) => {
+                  const firstGuide = study.guideLinks.find((g) => g.slug)
+                  const href = firstGuide?.slug
+                    ? `/studies/${study.slug}/${firstGuide.slug}`
+                    : study.notionUrl || "#"
+                  const isExternal = !firstGuide?.slug
+                  const Wrapper = isExternal && study.notionUrl ? "a" : Link
+                  return (
+                    <li key={study.id}>
+                      <Wrapper
+                        href={href}
+                        {...(isExternal && study.notionUrl && { target: "_blank", rel: "noopener noreferrer" })}
+                        className="block border border-border bg-card/30 hover:border-accent/40 active:border-accent/60 rounded-lg px-4 py-3.5 sm:py-3 font-mono text-sm transition-colors min-h-[48px]"
                       >
-                        {g.link.label}
-                        <ExternalLink className="size-3" />
-                      </a>
-                    ) : null}
-                  </li>
-                ))}
+                        <span className="text-foreground">{study.title}</span>
+                        {study.year ? (
+                          <span className="ml-2 text-muted-foreground">({study.year})</span>
+                        ) : null}
+                        {isExternal && study.notionUrl ? (
+                          <ExternalLink className="inline-block size-3 ml-2 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="inline-block size-3 ml-2 text-muted-foreground" />
+                        )}
+                      </Wrapper>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
-          </div>
+          ) : null}
         </section>
-
-        {current ? (
-          <section className="max-w-3xl space-y-8 sm:space-y-10">
-            {/* Current study card */}
-            <article className="border border-border bg-card/50 rounded-lg overflow-hidden">
-              <div className="p-4 sm:p-6 md:p-8">
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-accent">Current study</span>
-                  {current.tags?.length ? (
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      #{current.tags.join(" #")}
-                    </span>
-                  ) : null}
-                </div>
-                <h2 className="font-display text-2xl sm:text-3xl md:text-4xl tracking-tight text-foreground">
-                  {current.title}
-                </h2>
-                <p className="mt-3 sm:mt-4 font-mono text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  {current.summary}
-                </p>
-
-                {/* Notion main page */}
-                <a
-                  href={current.notionUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-5 sm:mt-6 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-accent hover:underline min-h-[44px] sm:min-h-0"
-                >
-                  <BookOpen className="size-4" />
-                  Open full study on Notion
-                  <ExternalLink className="size-3" />
-                </a>
-
-                {/* Study guides by week */}
-                <div className="mt-6 sm:mt-8">
-                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3 sm:mb-4">
-                    Study guides
-                  </h3>
-                  <ul className="grid gap-2.5 sm:gap-3 sm:grid-cols-2">
-                    {current.guideLinks.map((guide, i) => {
-                      const href = guide.slug ? `/studies/${current.slug}/${guide.slug}` : guide.url
-                      const isLocal = !!guide.slug
-                      const Wrapper = isLocal ? Link : "a"
-                      return (
-                        <li key={guide.url}>
-                          <Wrapper
-                            href={href}
-                            {...(!isLocal && { target: "_blank", rel: "noopener noreferrer" })}
-                            className="group flex items-center gap-3 border border-border bg-background/50 hover:border-accent/50 active:border-accent/70 rounded-lg px-3 sm:px-4 py-3.5 sm:py-3 font-mono text-sm transition-colors min-h-[52px]"
-                          >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
-                              {i + 1}
-                            </span>
-                            <span className="flex-1 min-w-0 text-sm leading-snug group-hover:text-accent transition-colors">
-                              {guide.label}
-                            </span>
-                            <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:text-accent transition-colors" />
-                          </Wrapper>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-
-                {/* Podcast + Vault */}
-                <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-border flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
-                  {current.podcastUrl ? (
-                    <a
-                      href={current.podcastUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors min-h-[44px] sm:min-h-0"
-                    >
-                      <Headphones className="size-4" />
-                      Series podcast
-                    </a>
-                  ) : null}
-                  {current.vaultUrl ? (
-                    <a
-                      href={current.vaultUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors min-h-[44px] sm:min-h-0"
-                    >
-                      <FileText className="size-4" />
-                      re:group vault
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            </article>
-
-            {/* Archive: other studies */}
-            {all.length > 1 ? (
-              <div>
-                <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3 sm:mb-4">
-                  Other studies
-                </h3>
-                <ul className="space-y-2.5 sm:space-y-3">
-                  {all
-                    .filter((s) => s.id !== current.id)
-                    .map((study) => (
-                      <li key={study.id}>
-                        <a
-                          href={study.notionUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block border border-border bg-card/30 hover:border-accent/40 active:border-accent/60 rounded-lg px-4 py-3.5 sm:py-3 font-mono text-sm transition-colors min-h-[48px]"
-                        >
-                          <span className="text-foreground">{study.title}</span>
-                          {study.year ? (
-                            <span className="ml-2 text-muted-foreground">({study.year})</span>
-                          ) : null}
-                          <ExternalLink className="inline-block size-3 ml-2 text-muted-foreground" />
-                        </a>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ) : null}
-          </section>
-        ) : (
-          <div className="max-w-xl">
-            <p className="font-mono text-sm text-muted-foreground">
-              No studies configured yet. Add entries to <code className="text-accent">lib/studies.ts</code> to list
-              Notion study guides here.
-            </p>
-          </div>
-        )}
       </div>
     </main>
   )

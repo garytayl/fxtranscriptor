@@ -16,6 +16,8 @@ type Guide = {
   content_md: string
 }
 
+type StudyLeader = "mat" | "jason" | null
+
 type Study = {
   id: string
   slug: string
@@ -27,6 +29,7 @@ type Study = {
   tags: string[]
   year: number | null
   is_current: boolean
+  leader: StudyLeader
   study_guides: Guide[]
 }
 
@@ -93,6 +96,7 @@ export default function AdminStudiesPage() {
     tags: [],
     year: new Date().getFullYear(),
     is_current: false,
+    leader: null,
     study_guides: [{ ...emptyGuide, slug: "wk-1", label: "Week 1" }],
   })
 
@@ -114,6 +118,7 @@ export default function AdminStudiesPage() {
       tags: Array.isArray(editStudy.tags) ? editStudy.tags.map((t) => String(t).trim()).filter(Boolean) : [],
       year: editStudy.year ?? null,
       is_current: !!editStudy.is_current,
+      leader: editStudy.leader === "mat" || editStudy.leader === "jason" ? editStudy.leader : null,
       guides: editStudy.study_guides.map((g, i) => ({
         slug: (g.slug || "").trim() || `wk-${i + 1}`,
         label: (g.label || "").trim() || `Week ${i + 1}`,
@@ -262,11 +267,12 @@ export default function AdminStudiesPage() {
       const raw = sessionStorage.getItem("admin_study_draft")
       if (!raw) return
       const draft = JSON.parse(raw) as Study
-      if (draft && Array.isArray(draft.study_guides)) {
+        if (draft && Array.isArray(draft.study_guides)) {
         setEditStudy({
           ...draft,
           podcast_url: draft.podcast_url ?? "",
           vault_url: draft.vault_url ?? "",
+          leader: draft.leader === "mat" || draft.leader === "jason" ? draft.leader : null,
           study_guides: draft.study_guides.map((g) => ({
             ...g,
             notion_url: g.notion_url ?? "",
@@ -345,6 +351,16 @@ export default function AdminStudiesPage() {
                       Current
                     </span>
                   )}
+                  {study.leader === "mat" && (
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground bg-muted/50 border border-border px-2 py-0.5 rounded">
+                      Mat&apos;s
+                    </span>
+                  )}
+                  {study.leader === "jason" && (
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground bg-muted/50 border border-border px-2 py-0.5 rounded">
+                      Jason&apos;s
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 font-mono">/{study.slug}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -362,6 +378,7 @@ export default function AdminStudiesPage() {
                       ...study,
                       podcast_url: study.podcast_url ?? "",
                       vault_url: study.vault_url ?? "",
+                      leader: study.leader === "mat" || study.leader === "jason" ? study.leader : null,
                       study_guides: (study.study_guides ?? []).map((g) => ({
                         ...g,
                         notion_url: g.notion_url ?? "",
@@ -475,6 +492,19 @@ export default function AdminStudiesPage() {
                 className="rounded"
               />
               <label htmlFor="is-current" className="text-sm text-foreground">Mark as current study</label>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Leader (studies page card)</label>
+              <select
+                value={editStudy.leader ?? ""}
+                onChange={(e) => setEditStudy({ ...editStudy, leader: (e.target.value || null) as StudyLeader })}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                <option value="">None</option>
+                <option value="mat">Mat&apos;s study</option>
+                <option value="jason">Jason&apos;s study</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground">Shows this study on the public studies page under the matching card.</p>
             </div>
           </div>
 

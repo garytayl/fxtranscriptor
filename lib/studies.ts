@@ -34,6 +34,8 @@ export interface StudyGuideLink {
   defaultPassageRef?: string
 }
 
+export type StudyLeader = "mat" | "jason"
+
 export interface BibleStudy {
   id: string
   title: string
@@ -52,6 +54,8 @@ export interface BibleStudy {
   tags?: string[]
   /** When this study is "current" (for ordering/display) */
   year?: number
+  /** Study track for Mat's vs Jason's cards on studies page */
+  leader?: StudyLeader
 }
 
 /** All studies: current first, then archive. */
@@ -121,6 +125,20 @@ export async function getStudyBySlugAsync(slug: string): Promise<BibleStudy | nu
     }
   } catch {}
   return getStudyBySlug(slug)
+}
+
+/** For the studies page: Mat's and Jason's study cards. Mat fallback: current study. */
+export async function getStudiesByLeaderAsync(): Promise<{
+  matStudy: BibleStudy | null
+  jasonStudy: BibleStudy | null
+}> {
+  try {
+    const { getStudiesByLeaderAsync: getByLeader } = await import("./studies-db")
+    return getByLeader()
+  } catch {
+    const current = getCurrentStudy()
+    return { matStudy: current, jasonStudy: null }
+  }
 }
 
 /**
