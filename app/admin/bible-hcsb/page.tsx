@@ -47,10 +47,13 @@ const INLINE_VERSE_REGEX = /(?:^|\s)(\d{1,3})(?:[.)]\s+|\s+)([\s\S]*?)(?=\s\d{1,
 /** Captured text that looks like a cross-reference (e.g. "Cor 5:17", "John 3:16") — don't treat as new verse. */
 const BOOK_ABBREV_PREFIX = /^(?:1\s?)?(?:Cor|John|Sam|Kgs|Chr|Tim|Pet|Thess|Jas|Jude|Rom|Phil|Col|Heb|Rev|Gen|Exod|Lev|Num|Deut|Josh|Judg|Ruth|Est|Job|Ps|Prov|Eccl|Song|Isa|Jer|Lam|Ezek|Dan|Hos|Joel|Amos|Obad|Jon|Mic|Nah|Hab|Zeph|Hag|Zech|Mal|Matt?|Mark|Luke|Acts)\b/i;
 
+/** Inline verse text must start with capital or quote (avoids "the 2 great lights" → false verse 2). */
+const VERSE_TEXT_STARTS_LIKE = /^[A-Z"'\u201C\u2018\u00AB]/;
+
 /**
  * Split a line that may contain multiple verses (e.g. "2 Now the earth... 3 Then God said") into [num, text] pairs.
  * Returns [] if the line doesn't start with a verse number.
- * Skips false positives like "2 Cor 5:17" (cross-reference).
+ * Skips false positives like "2 Cor 5:17" (cross-reference) and "the 2 great lights" (number in sentence).
  */
 function splitLineIntoVerses(line: string): { number: number; text: string }[] {
   const results: { number: number; text: string }[] = [];
@@ -60,6 +63,7 @@ function splitLineIntoVerses(line: string): { number: number; text: string }[] {
     const text = m[2] != null ? m[2].trim() : "";
     if (!Number.isFinite(num) || num < 1) continue;
     if (BOOK_ABBREV_PREFIX.test(text)) continue;
+    if (text.length > 0 && !VERSE_TEXT_STARTS_LIKE.test(text)) continue;
     results.push({ number: num, text: stripFootnoteMarkers(text) });
   }
   return results;
