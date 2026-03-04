@@ -249,7 +249,7 @@ type PassageData = {
 type BibleBook = { id: string; name: string; slug: string; testament?: string }
 type BibleChapter = { id: string; number: number }
 
-type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "studyGuide" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
+type Step = "landing" | "planPicker" | "topicPicker" | "topicReading" | "studyPicker" | "studyGuide" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
 type DevotionTopicListItem = { id: string; title: string; slug: string; description: string | null; bible_references: string[]; sort_order: number; is_current?: boolean; featured_at?: string | null }
 type DevotionTopicFull = DevotionTopicListItem & { body: string | null }
@@ -319,6 +319,12 @@ export function DevotionsClient() {
   const [topicsLoading, setTopicsLoading] = useState(false)
   const [selectedTopic, setSelectedTopic] = useState<DevotionTopicFull | null>(null)
 
+  const [studyList, setStudyList] = useState<{
+    title: string
+    slug: string
+    summary: string
+    guides: { label: string; slug: string | undefined; url: string; defaultPassageRef: string | null }[]
+  }[]>([])
   const [currentStudy, setCurrentStudy] = useState<{
     title: string
     slug: string
@@ -674,8 +680,11 @@ export function DevotionsClient() {
       setSelectedTopic(null)
     }
     else if (step === "studyGuide") {
-      setStep("landing")
+      setStep("studyPicker")
       setCurrentStudy(null)
+    }
+    else if (step === "studyPicker") {
+      setStep("landing")
     }
     else if (step === "testament") setStep("landing")
     else if (step === "book") setStep("testament")
@@ -741,27 +750,47 @@ export function DevotionsClient() {
       .finally(() => setLoading(false))
   }, [])
 
-  const openCurrentStudy = useCallback(async () => {
+  const openStudyPicker = useCallback(async () => {
     setStudyLoading(true)
     setError(null)
     try {
       const res = await fetch("/api/devotions/current-study")
       const data = await res.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+      setStudyList(data.studies ?? [])
+      setDir(1)
+      setStep("studyPicker")
+    } catch {
+      toast.error("Could not load studies")
+    } finally {
+      setStudyLoading(false)
+    }
+  }, [])
+
+  const openStudyGuide = useCallback(async (studySlug: string, guideSlug: string) => {
+    setStudyLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/devotions/current-study?study=${encodeURIComponent(studySlug)}&guide=${encodeURIComponent(guideSlug)}`)
+      const data = await res.json()
       if (data.error || !data.content) {
-        toast.error(data.error || "No study guide available right now")
+        toast.error(data.error || "Guide content not available yet")
         return
       }
       setCurrentStudy({
-        title: data.studyTitle ?? "Current Study",
-        slug: data.studySlug ?? "",
-        guideLabel: data.guideLabel ?? "Study Guide",
-        guideSlug: data.guideSlug ?? "",
+        title: data.studyTitle ?? "Study",
+        slug: data.studySlug ?? studySlug,
+        guideLabel: data.guideLabel ?? "Guide",
+        guideSlug: data.guideSlug ?? guideSlug,
         content: data.content,
         defaultPassageRef: data.defaultPassageRef ?? null,
       })
       setDir(1)
       setStep("studyGuide")
-    } catch (err) {
+    } catch {
       toast.error("Could not load study guide")
     } finally {
       setStudyLoading(false)
@@ -921,7 +950,7 @@ export function DevotionsClient() {
               >
                 <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
                 <span className="hidden sm:inline">
-                  {step === "topicReading" ? "Topics" : step === "reflection" ? "Passage" : "Back"}
+                  {step === "topicReading" ? "Topics" : step === "studyGuide" ? "Studies" : step === "reflection" ? "Passage" : "Back"}
                 </span>
               </button>
               <Link
@@ -940,7 +969,8 @@ export function DevotionsClient() {
           {step === "planPicker" && "Start a reading plan"}
           {step === "topicPicker" && "Topical study"}
           {step === "topicReading" && (selectedTopic?.title ?? "Topic")}
-          {step === "studyGuide" && (currentStudy?.title ?? "Study Guide")}
+          {step === "studyPicker" && "Study Guides"}
+          {step === "studyGuide" && (currentStudy?.guideLabel ?? "Study Guide")}
           {step === "journalHistory" && "Your journal"}
           {step === "testament" && "Choose testament"}
           {step === "book" && "Choose book"}
@@ -1085,12 +1115,12 @@ export function DevotionsClient() {
                     </button>
                     <button
                       type="button"
-                      onClick={openCurrentStudy}
+                      onClick={openStudyPicker}
                       disabled={studyLoading}
                       className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/15 hover:border-amber-500/40 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       <BookOpen className="w-5 h-5 text-amber-400/80" />
-                      {studyLoading ? "Loading…" : "This week's study guide"}
+                      {studyLoading ? "Loading…" : "Study guides"}
                     </button>
                     <button
                       type="button"
@@ -1308,6 +1338,74 @@ export function DevotionsClient() {
                       })}
                     </ul>
                   )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Study picker — show all studies and their guides */}
+            {step === "studyPicker" && (
+              <motion.div
+                key="studyPicker"
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={slide}
+                transition={{ duration: reduced ? 0.15 : 0.25 }}
+                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 lg:py-16 pb-12 box-border"
+              >
+                <div className="w-full max-w-lg md:max-w-2xl mx-auto">
+                  <p className="font-sans text-xl sm:text-2xl md:text-3xl font-light text-white/90 mb-2">
+                    Study Guides
+                  </p>
+                  <p className="font-mono text-[10px] tracking-wider text-white/60 mb-8">
+                    Pick a study and week to read.
+                  </p>
+
+                  {studyList.length === 0 && (
+                    <p className="font-mono text-sm text-white/50">No studies available.</p>
+                  )}
+
+                  <div className="space-y-8">
+                    {studyList.map((study) => (
+                      <div key={study.slug}>
+                        <h3 className="font-sans text-lg sm:text-xl font-medium text-white/95 mb-1">
+                          {study.title}
+                        </h3>
+                        {study.summary && (
+                          <p className="font-sans text-xs text-white/50 mb-4 line-clamp-2 leading-relaxed">
+                            {study.summary}
+                          </p>
+                        )}
+                        <ul className="space-y-0 border border-white/10 rounded-xl overflow-hidden divide-y divide-white/10">
+                          {study.guides.map((guide, i) => {
+                            const hasSlug = !!guide.slug
+                            return (
+                              <li key={guide.slug ?? guide.url ?? i}>
+                                <button
+                                  type="button"
+                                  disabled={!hasSlug || studyLoading}
+                                  onClick={() => hasSlug && openStudyGuide(study.slug, guide.slug!)}
+                                  className="w-full flex items-center gap-3 px-4 py-4 sm:px-5 text-left hover:bg-white/5 active:bg-white/8 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                                >
+                                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 font-mono text-[10px] font-bold text-white/60">
+                                    {i + 1}
+                                  </span>
+                                  <span className="flex-1 min-w-0">
+                                    <span className="block font-sans text-sm text-white/90 truncate">{guide.label}</span>
+                                    {!hasSlug && (
+                                      <span className="block font-mono text-[9px] text-white/40 mt-0.5">Notion only</span>
+                                    )}
+                                  </span>
+                                  <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
+                                </button>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
             )}
