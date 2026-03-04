@@ -56,6 +56,10 @@ export async function GET(req: NextRequest) {
       guideSlug: guide.slug,
       content,
       defaultPassageRef: guide.defaultPassageRef ?? null,
+      allGuides: study.guideLinks.map((g) => ({
+        label: g.label,
+        slug: g.slug,
+      })),
     })
   } catch (err) {
     return NextResponse.json(

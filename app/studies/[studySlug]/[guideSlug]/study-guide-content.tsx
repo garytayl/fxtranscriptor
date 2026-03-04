@@ -6,6 +6,13 @@ import { parsePassageReference, parsePassageList } from "@/lib/bible/reference"
 
 /** Replace parenthetical verse refs with markdown links so they become interactive (hover + sidebar).
  * Handles: (Jn 1:14), (Rom 15:15; 1 Cor 3:10), and (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10). */
+/** Bible book names for bare-text verse detection */
+const BOOK_NAMES = "Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|1 Samuel|2 Samuel|1 Kings|2 Kings|1 Chronicles|2 Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Song of Solomon|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|1 Corinthians|2 Corinthians|Galatians|Ephesians|Philippians|Colossians|1 Thessalonians|2 Thessalonians|1 Timothy|2 Timothy|Titus|Philemon|Hebrews|James|1 Peter|2 Peter|1 John|2 John|3 John|Jude|Revelation|Gen|Exod?|Lev|Num|Deut?|Josh|Judg|Ruth|1 Sam|2 Sam|1 Kgs|2 Kgs|1 Chr|2 Chr|Neh|Esth|Ps|Prov|Eccl|Isa|Jer|Lam|Ezek|Dan|Hos|Joel|Amos|Obad|Jon|Mic|Nah|Hab|Zeph|Hag|Zech|Mal|Matt?|Mk|Lk|Jn|Rom|1 Cor|2 Cor|Gal|Eph|Phil|Col|1 Thess|2 Thess|1 Tim|2 Tim|Tit|Phlm|Heb|Jas|1 Pet|2 Pet|1 Jn|2 Jn|3 Jn|Rev"
+const BARE_VERSE_RE = new RegExp(
+  `(?<![\\[\\(])\\b((?:${BOOK_NAMES})\\.?\\s+\\d+(?::\\d+(?:\\s*[-–—]\\s*\\d+)?)?)\\b(?![\\]\\)])`,
+  "g"
+)
+
 function preprocessVerseRefsInContent(content: string): string {
   let out = content
   // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:ref)
@@ -22,13 +29,20 @@ function preprocessVerseRefsInContent(content: string): string {
   // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:ref)
   out = out.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
     const trimmed = inner.trim()
-    if (/^ref:/i.test(trimmed)) return `(${inner})` // already handled above
+    if (/^ref:/i.test(trimmed)) return `(${inner})`
     const list = parsePassageList(trimmed)
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(${inner})`
     const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
     return `[${trimmed}](ref:${escaped})`
+  })
+  // Bare verse refs like "Leviticus 23:5-8" or "John 3:16" not already in links/parens
+  out = out.replace(BARE_VERSE_RE, (match, ref) => {
+    const parsed = parsePassageReference(ref)
+    if (!parsed) return match
+    const escaped = ref.replace(/\)/g, "%29").replace(/\]/g, "%5D")
+    return `[${ref}](ref:${escaped})`
   })
   return out
 }

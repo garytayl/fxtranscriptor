@@ -11,6 +11,7 @@ import {
   BookOpen,
   ArrowLeft,
   ChevronRight,
+  ChevronLeft,
   PenLine,
   X,
   ChevronDown,
@@ -332,6 +333,7 @@ export function DevotionsClient() {
     guideSlug: string
     content: string
     defaultPassageRef: string | null
+    allGuides: { label: string; slug: string | undefined }[]
   } | null>(null)
   const [studyLoading, setStudyLoading] = useState(false)
 
@@ -787,6 +789,7 @@ export function DevotionsClient() {
         guideSlug: data.guideSlug ?? guideSlug,
         content: data.content,
         defaultPassageRef: data.defaultPassageRef ?? null,
+        allGuides: data.allGuides ?? [],
       })
       setDir(1)
       setStep("studyGuide")
@@ -1411,29 +1414,92 @@ export function DevotionsClient() {
             )}
 
             {/* Step: Current study guide */}
-            {step === "studyGuide" && currentStudy && (
-              <motion.div
-                key="studyGuide"
-                custom={dir}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                variants={slide}
-                transition={{ duration: reduced ? 0.15 : 0.25 }}
-                className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border lg:pr-[22rem]"
-                style={{ ["--navbar-offset" as string]: "52px" }}
-              >
-                <div className="w-full max-w-4xl mx-auto lg:max-w-none">
-                  <StudyGuideShell
-                    content={currentStudy.content}
-                    defaultPassageRef={currentStudy.defaultPassageRef}
-                    title={currentStudy.guideLabel}
-                    description={currentStudy.title}
-                    sidebarTopOffset="52px"
-                  />
-                </div>
-              </motion.div>
-            )}
+            {step === "studyGuide" && currentStudy && (() => {
+              const guides = currentStudy.allGuides ?? []
+              const currentIdx = guides.findIndex((g) => g.slug === currentStudy.guideSlug)
+              const prevG = currentIdx > 0 ? guides[currentIdx - 1] : null
+              const nextG = currentIdx >= 0 && currentIdx < guides.length - 1 ? guides[currentIdx + 1] : null
+              return (
+                <motion.div
+                  key={`studyGuide-${currentStudy.guideSlug}`}
+                  custom={dir}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  variants={slide}
+                  transition={{ duration: reduced ? 0.15 : 0.25 }}
+                  className="w-full px-4 py-6 sm:px-6 md:px-12 md:py-12 pb-12 box-border lg:pr-[22rem]"
+                  style={{ ["--navbar-offset" as string]: "52px" }}
+                >
+                  <div className="w-full max-w-4xl mx-auto lg:max-w-none">
+                    {/* Guide pills */}
+                    {guides.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 mb-6">
+                        {guides.map((g, i) => {
+                          const isCurrent = g.slug === currentStudy.guideSlug
+                          const hasSlug = !!g.slug
+                          return (
+                            <button
+                              key={g.slug ?? i}
+                              type="button"
+                              disabled={!hasSlug || studyLoading}
+                              onClick={() => hasSlug && g.slug !== currentStudy.guideSlug && openStudyGuide(currentStudy.slug, g.slug!)}
+                              className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[10px] tracking-wider uppercase transition-colors min-h-[32px] disabled:opacity-40 ${
+                                isCurrent
+                                  ? "bg-amber-500/15 border border-amber-500/40 text-amber-200"
+                                  : "border border-white/10 text-white/50 hover:border-white/25 hover:text-white/80 active:bg-white/5"
+                              }`}
+                            >
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold">
+                                {i + 1}
+                              </span>
+                              <span className="hidden sm:inline max-w-[100px] truncate">{g.label.replace(/^Wk \d+:\s*/, "")}</span>
+                              <span className="sm:hidden">Wk {i + 1}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <StudyGuideShell
+                      content={currentStudy.content}
+                      defaultPassageRef={currentStudy.defaultPassageRef}
+                      title={currentStudy.guideLabel}
+                      description={currentStudy.title}
+                      sidebarTopOffset="52px"
+                    />
+
+                    {/* Prev / Next navigation */}
+                    {(prevG || nextG) && (
+                      <div className="flex items-center justify-between gap-3 border-t border-white/10 mt-10 pt-6 pb-8">
+                        {prevG?.slug ? (
+                          <button
+                            type="button"
+                            disabled={studyLoading}
+                            onClick={() => openStudyGuide(currentStudy.slug, prevG.slug!)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 active:bg-white/15 px-4 py-3 font-mono text-xs text-white/80 transition-colors min-h-[48px] disabled:opacity-50"
+                          >
+                            <ChevronLeft className="size-4 text-white/50" />
+                            <span className="truncate max-w-[120px] sm:max-w-none">{prevG.label}</span>
+                          </button>
+                        ) : <div />}
+                        {nextG?.slug ? (
+                          <button
+                            type="button"
+                            disabled={studyLoading}
+                            onClick={() => openStudyGuide(currentStudy.slug, nextG.slug!)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 hover:bg-amber-500/10 active:bg-amber-500/15 px-4 py-3 font-mono text-xs text-amber-200/90 transition-colors min-h-[48px] disabled:opacity-50"
+                          >
+                            <span className="truncate max-w-[120px] sm:max-w-none">{nextG.label}</span>
+                            <ChevronRight className="size-4 text-amber-400/60" />
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )
+            })()}
 
             {/* Step: Topic reading — same verse sidebar & popup as studies */}
             {step === "topicReading" && selectedTopic && (
