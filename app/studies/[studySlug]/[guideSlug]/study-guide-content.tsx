@@ -13,6 +13,10 @@ const BARE_VERSE_RE = new RegExp(
   "g"
 )
 
+function encodeRefUrl(ref: string): string {
+  return ref.replace(/\s/g, "%20").replace(/\)/g, "%29").replace(/\]/g, "%5D")
+}
+
 function preprocessVerseRefsInContent(content: string): string {
   let out = content
   // (ref:Jn 1:14) or (ref: Rom 15:15; 1 Cor 3:10) -> [ref text](ref:ref)
@@ -23,8 +27,7 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(ref:${inner})`
-    const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
-    return `[${trimmed}](ref:${escaped})`
+    return `[${trimmed}](ref:${encodeRefUrl(trimmed)})`
   })
   // (Jn 1:14) or (Rom 15:15; 1 Cor 3:10) -> [ref](ref:ref)
   out = out.replace(/\(([^)]*?\d+:\d+[^)]*)\)/g, (_, inner) => {
@@ -34,15 +37,13 @@ function preprocessVerseRefsInContent(content: string): string {
     const single = list.length === 0 ? parsePassageReference(trimmed) : null
     const refs = list.length > 0 ? list : single ? [single] : []
     if (refs.length === 0) return `(${inner})`
-    const escaped = trimmed.replace(/\)/g, "%29").replace(/\]/g, "%5D")
-    return `[${trimmed}](ref:${escaped})`
+    return `[${trimmed}](ref:${encodeRefUrl(trimmed)})`
   })
   // Bare verse refs like "Leviticus 23:5-8" or "John 3:16" not already in links/parens
   out = out.replace(BARE_VERSE_RE, (match, ref) => {
     const parsed = parsePassageReference(ref)
     if (!parsed) return match
-    const escaped = ref.replace(/\)/g, "%29").replace(/\]/g, "%5D")
-    return `[${ref}](ref:${escaped})`
+    return `[${ref}](ref:${encodeRefUrl(ref)})`
   })
   return out
 }
