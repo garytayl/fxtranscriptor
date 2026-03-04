@@ -95,12 +95,22 @@ export function getAllStudies(): BibleStudy[] {
   return [...STUDIES]
 }
 
-/** Async versions that check the database first, falling back to hardcoded data. */
+/**
+ * Merge DB studies with hardcoded STUDIES. DB versions win for matching slugs;
+ * hardcoded studies that don't exist in DB are appended so nothing is lost.
+ */
+function mergeStudies(dbStudies: BibleStudy[]): BibleStudy[] {
+  const dbSlugs = new Set(dbStudies.map((s) => s.slug))
+  const hardcodedOnly = STUDIES.filter((s) => !dbSlugs.has(s.slug))
+  return [...dbStudies, ...hardcodedOnly]
+}
+
+/** Async versions that merge database + hardcoded data. */
 export async function getAllStudiesAsync(): Promise<BibleStudy[]> {
   try {
     const { getStudiesFromDb } = await import("./studies-db")
     const db = await getStudiesFromDb()
-    if (db && db.studies.length > 0) return db.studies
+    if (db && db.studies.length > 0) return mergeStudies(db.studies)
   } catch {}
   return getAllStudies()
 }
@@ -110,7 +120,8 @@ export async function getCurrentStudyAsync(): Promise<BibleStudy | null> {
     const { getStudiesFromDb } = await import("./studies-db")
     const db = await getStudiesFromDb()
     if (db && db.studies.length > 0) {
-      return db.studies.find((s) => s.id === db.currentId) ?? db.studies[0] ?? null
+      const all = mergeStudies(db.studies)
+      return all.find((s) => s.id === db.currentId) ?? all[0] ?? null
     }
   } catch {}
   return getCurrentStudy()
@@ -121,20 +132,31 @@ export async function getStudyBySlugAsync(slug: string): Promise<BibleStudy | nu
     const { getStudiesFromDb } = await import("./studies-db")
     const db = await getStudiesFromDb()
     if (db && db.studies.length > 0) {
-      return db.studies.find((s) => s.slug === slug) ?? null
+      const all = mergeStudies(db.studies)
+      return all.find((s) => s.slug === slug) ?? null
     }
   } catch {}
   return getStudyBySlug(slug)
 }
 
-/** For the studies page: Mat's and Jason's study cards. Mat fallback: current study. */
+/** For the studies page: Mat's and Jason's study cards. Mat fallback: current study from merged list. */
 export async function getStudiesByLeaderAsync(): Promise<{
   matStudy: BibleStudy | null
   jasonStudy: BibleStudy | null
 }> {
   try {
-    const { getStudiesByLeaderAsync: getByLeader } = await import("./studies-db")
-    return getByLeader()
+    const { getStudiesFromDb } = await import("./studies-db")
+    const db = await getStudiesFromDb()
+    const all = db && db.studies.length > 0 ? mergeStudies(db.studies) : getAllStudies()
+
+    const matStudy =
+      all.find((s) => s.leader === "mat") ??
+      (db?.currentId ? all.find((s) => s.id === db.currentId) : null) ??
+      getCurrentStudy() ??
+      all[0] ??
+      null
+    const jasonStudy = all.find((s) => s.leader === "jason") ?? null
+    return { matStudy, jasonStudy }
   } catch {
     const current = getCurrentStudy()
     return { matStudy: current, jasonStudy: null }
