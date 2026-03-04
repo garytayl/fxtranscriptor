@@ -120,9 +120,7 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
     const inlineVerses = splitLineIntoVerses(line);
     if (inlineVerses.length > 0) {
       seenFirstVerse = true;
-      for (const v of inlineVerses) {
-        if (v.text.length > 0) verses.push(v);
-      }
+      for (const v of inlineVerses) verses.push(v);
       continue;
     }
     const match = line.match(VERSE_START_REGEX);
@@ -137,7 +135,7 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
       }
       seenFirstVerse = true;
       const text = norm(rawText);
-      if (Number.isFinite(num) && num >= 1 && text.length > 0) {
+      if (Number.isFinite(num) && num >= 1) {
         verses.push({ number: num, text });
       }
       continue;
@@ -158,7 +156,9 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
     }
   }
 
-  return verses.filter((v) => v.text.length > 0);
+  // Keep all verses including empty text — otherwise standalone verse numbers (e.g. "9" on its own line)
+  // followed by "10 Then..." get dropped and we lose verse count (e.g. Genesis 19 only 8 instead of 38).
+  return verses;
 }
 
 /** Chapter boundary: "Chapter 1", "CHAPTER 1", or a line that is only a number (e.g. "1" or "2"). */

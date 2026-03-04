@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
           number: typeof v.number === "number" ? v.number : parseInt(String(v?.number), 10),
           text: typeof v.text === "string" ? v.text.trim() : "",
         }))
-        .filter((v) => Number.isFinite(v.number) && v.number >= 1 && v.text.length > 0)
+        .filter((v) => Number.isFinite(v.number) && v.number >= 1)
     : [];
 
   if (!bookSlug || !Number.isFinite(chapterNumber) || chapterNumber < 1) {
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (verses.length === 0) {
-    return NextResponse.json({ error: "At least one verse (number + text) is required" }, { status: 400 });
+    return NextResponse.json({ error: "At least one verse (number) is required" }, { status: 400 });
   }
 
   const supabase = createSupabaseAdminClient();
