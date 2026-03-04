@@ -15,10 +15,13 @@ function isTouchPrimaryDevice() {
   return window.matchMedia("(pointer: coarse)").matches
 }
 
-/** Routes where we skip Lenis so native scroll works (zoom + pan, picker overlay scroll). */
+/** Routes where we skip Lenis so native scroll works (zoom + pan, picker overlay scroll, admin menus). */
 function shouldSkipLenis(pathname: string | null): boolean {
   if (!pathname) return false
-  return pathname === "/bible" || pathname.startsWith("/bible/") || pathname === "/devotions" || pathname.startsWith("/devotions/")
+  if (pathname === "/bible" || pathname.startsWith("/bible/")) return true
+  if (pathname === "/devotions" || pathname.startsWith("/devotions/")) return true
+  if (pathname.startsWith("/admin/")) return true
+  return false
 }
 
 export function SmoothScroll({ children }: { children: React.ReactNode }) {

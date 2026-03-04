@@ -171,6 +171,12 @@
   background-size: 60px 60px;
 }
 
+/* Admin: ensure scrollable panels and menus scroll (e.g. HCSB progress, verse table) */
+.admin-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: auto;
+}
+
 /* Custom selection color */
 ::selection {
   background: oklch(0.7 0.2 45);

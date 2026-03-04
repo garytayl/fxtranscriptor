@@ -17,7 +17,9 @@ export function AdminLayoutContent({ children }: { children: React.ReactNode }) 
 
   return (
     <main className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[240px_1fr]">
-      <AdminSidebar />
+      <aside className="admin-scroll lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:overflow-x-hidden">
+        <AdminSidebar />
+      </aside>
       <section className="min-w-0">{children}</section>
     </main>
   );

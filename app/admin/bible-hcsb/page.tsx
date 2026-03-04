@@ -439,7 +439,7 @@ export default function AdminBibleHcsbPage() {
         {loadingProgress ? (
           <p className="text-sm text-muted-foreground font-mono">Loading…</p>
         ) : (
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+          <div className="admin-scroll space-y-2 max-h-[400px] overflow-y-auto">
             {books.map((book) => {
               const completed = new Set(book.completedChapters);
               const isExpanded = expandedBook === book.slug;
@@ -617,7 +617,7 @@ export default function AdminBibleHcsbPage() {
               Detected {parsedChapters.length} chapter(s). Save all to the database (existing verses for these
               chapters will be overwritten).
             </p>
-            <div className="max-h-[320px] overflow-y-auto rounded-md border border-border">
+            <div className="admin-scroll max-h-[320px] overflow-y-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/80 border-b border-border">
                   <tr>
@@ -660,7 +660,7 @@ export default function AdminBibleHcsbPage() {
             <p className="text-sm text-muted-foreground">
               Review and edit verses below. Then save to store in the database.
             </p>
-            <div className="max-h-[420px] overflow-y-auto rounded-md border border-border">
+            <div className="admin-scroll max-h-[420px] overflow-y-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/80 border-b border-border">
                   <tr>
