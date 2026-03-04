@@ -44,18 +44,23 @@ const STANDALONE_VERSE_NUMBER_REGEX = /^\s*(\d{1,3})\s*$/;
 /** Matches verse number at line start or after space (e.g. "2 ... 3 Then" on one line). Allows "3 " or "3. " or "3) ". */
 const INLINE_VERSE_REGEX = /(?:^|\s)(\d{1,3})(?:[.)]\s+|\s+)([\s\S]*?)(?=\s\d{1,3}(?:[.)]\s+|\s+)|$)/g;
 
+/** Captured text that looks like a cross-reference (e.g. "Cor 5:17", "John 3:16") — don't treat as new verse. */
+const BOOK_ABBREV_PREFIX = /^(?:1\s?)?(?:Cor|John|Sam|Kgs|Chr|Tim|Pet|Thess|Jas|Jude|Rom|Phil|Col|Heb|Rev|Gen|Exod|Lev|Num|Deut|Josh|Judg|Ruth|Est|Job|Ps|Prov|Eccl|Song|Isa|Jer|Lam|Ezek|Dan|Hos|Joel|Amos|Obad|Jon|Mic|Nah|Hab|Zeph|Hag|Zech|Mal|Matt?|Mark|Luke|Acts)\b/i;
+
 /**
  * Split a line that may contain multiple verses (e.g. "2 Now the earth... 3 Then God said") into [num, text] pairs.
  * Returns [] if the line doesn't start with a verse number.
+ * Skips false positives like "2 Cor 5:17" (cross-reference).
  */
 function splitLineIntoVerses(line: string): { number: number; text: string }[] {
   const results: { number: number; text: string }[] = [];
   const matches = [...line.matchAll(INLINE_VERSE_REGEX)];
   for (const m of matches) {
     const num = parseInt(m[1], 10);
-    if (Number.isFinite(num) && num >= 1 && m[2] != null) {
-      results.push({ number: num, text: stripFootnoteMarkers(m[2].trim()) });
-    }
+    const text = m[2] != null ? m[2].trim() : "";
+    if (!Number.isFinite(num) || num < 1) continue;
+    if (BOOK_ABBREV_PREFIX.test(text)) continue;
+    results.push({ number: num, text: stripFootnoteMarkers(text) });
   }
   return results;
 }
@@ -82,9 +87,16 @@ function parseBlockToVerses(block: string): { number: number; text: string }[] {
     }
     const match = line.match(VERSE_START_REGEX);
     if (match) {
-      seenFirstVerse = true;
       const num = parseInt(match[1], 10);
-      const text = stripFootnoteMarkers(match[2].trim());
+      const rawText = match[2].trim();
+      if (BOOK_ABBREV_PREFIX.test(rawText)) {
+        if (verses.length > 0) verses[verses.length - 1].text += " " + stripFootnoteMarkers(line);
+        else if (!seenFirstVerse) continue;
+        else verses.push({ number: 1, text: stripFootnoteMarkers(line) });
+        continue;
+      }
+      seenFirstVerse = true;
+      const text = stripFootnoteMarkers(rawText);
       if (Number.isFinite(num) && num >= 1 && text.length > 0) {
         verses.push({ number: num, text });
       }
