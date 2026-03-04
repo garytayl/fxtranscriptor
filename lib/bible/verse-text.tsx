@@ -5,17 +5,14 @@ import React from "react"
 
 export type FootnoteByMarker = Record<string, string | { text: string; href?: string }>
 
-/**
- * Strip all HTML tags from verse text (e.g. <em>, <strong> from API/imports). Keeps plain text only.
- */
-function stripHtmlTags(html: string): string {
-  return html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+/** Remove only tags we don't render; keep <em> and <strong> so we can show italic/bold. */
+function stripUnsafeTags(html: string): string {
+  return html.replace(/<(?!\/?em\b|\/?strong\b)[^>]+>/gi, "").replace(/\s+/g, " ").trim()
 }
 
 /**
- * Renders verse text. All HTML tags (e.g. <em>, <strong>) are stripped so only plain text is shown.
- * Footnote markers like [a], [b] are preserved; when footnotesByMarker is provided, each marker
- * gets a title tooltip and optional cross-ref link.
+ * Renders verse text. <em> and <strong> are rendered as italic/bold (you see the styling, not the tags).
+ * All other HTML tags are stripped. Footnote markers [a], [b] get tooltips/links when footnotesByMarker is provided.
  */
 export function VerseText({
   text,
@@ -29,46 +26,74 @@ export function VerseText({
 }) {
   if (!text) return null
 
-  const plain = stripHtmlTags(text)
+  const cleaned = stripUnsafeTags(text)
+  const segments = cleaned.split(/(<\/?em>|<\/?strong>)/gi)
 
-  if (!footnotesByMarker) {
-    return <span className={className}>{plain}</span>
+  let inEm = false
+  let inStrong = false
+  let key = 0
+  const parts: React.ReactNode[] = []
+
+  function wrap(content: React.ReactNode): React.ReactNode {
+    let node: React.ReactNode = content
+    if (inStrong) node = <strong key={`s-${key++}`}>{node}</strong>
+    if (inEm) node = <em key={`e-${key++}`}>{node}</em>
+    return node
   }
 
-  const segments = plain.split(/(\[[a-z]\])/gi)
-  const parts: React.ReactNode[] = []
-  let key = 0
-  for (const seg of segments) {
-    const markerMatch = seg.match(/^\[([a-z])\]$/i)
-    if (markerMatch) {
-      const letter = markerMatch[1].toLowerCase()
-      const note = footnotesByMarker[letter]
-      if (note) {
-        const title = typeof note === "string" ? note : note.text
-        const href = typeof note === "string" ? undefined : note.href
-        const spanClass = "cursor-help border-b border-dotted border-muted-foreground/50"
-        if (href) {
-          parts.push(
-            <Link
-              key={key++}
-              href={href}
-              className={spanClass + " hover:text-accent"}
-              title={title}
-            >
-              {seg}
+  function renderTextSegment(seg: string): React.ReactNode[] {
+    if (!seg) return []
+    if (!footnotesByMarker) return [wrap(seg)]
+    const subSegments = seg.split(/(\[[a-z]\])/gi)
+    const nodes: React.ReactNode[] = []
+    for (const sub of subSegments) {
+      const markerMatch = sub.match(/^\[([a-z])\]$/i)
+      if (markerMatch) {
+        const letter = markerMatch[1].toLowerCase()
+        const note = footnotesByMarker[letter]
+        if (note) {
+          const title = typeof note === "string" ? note : note.text
+          const href = typeof note === "string" ? undefined : note.href
+          const spanClass = "cursor-help border-b border-dotted border-muted-foreground/50"
+          const markerNode = href ? (
+            <Link key={key++} href={href} className={spanClass + " hover:text-accent"} title={title}>
+              {sub}
             </Link>
-          )
-        } else {
-          parts.push(
+          ) : (
             <span key={key++} className={spanClass} title={title}>
-              {seg}
+              {sub}
             </span>
           )
+          nodes.push(wrap(markerNode))
+        } else {
+          nodes.push(wrap(sub))
         }
-        continue
+      } else {
+        nodes.push(wrap(sub))
       }
     }
-    parts.push(seg)
+    return nodes
+  }
+
+  for (const seg of segments) {
+    const lower = seg.toLowerCase()
+    if (lower === "<em>") {
+      inEm = true
+      continue
+    }
+    if (lower === "</em>") {
+      inEm = false
+      continue
+    }
+    if (lower === "<strong>") {
+      inStrong = true
+      continue
+    }
+    if (lower === "</strong>") {
+      inStrong = false
+      continue
+    }
+    parts.push(...renderTextSegment(seg))
   }
 
   return <span className={className}>{parts}</span>
