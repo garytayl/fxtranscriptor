@@ -33,6 +33,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ st
   else if (rest.podcast_url === null) studyFields.podcast_url = null
   if (typeof rest.vault_url === "string") studyFields.vault_url = rest.vault_url.trim() || null
   else if (rest.vault_url === null) studyFields.vault_url = null
+  if (typeof rest.substack_url === "string") studyFields.substack_url = rest.substack_url.trim() || null
+  else if (rest.substack_url === null) studyFields.substack_url = null
   if (Array.isArray(rest.tags)) studyFields.tags = rest.tags.map((t) => String(t).trim()).filter(Boolean)
   if (typeof rest.year === "number" && Number.isFinite(rest.year)) studyFields.year = rest.year
   else if (rest.year === null) studyFields.year = null

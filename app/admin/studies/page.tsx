@@ -26,6 +26,7 @@ type Study = {
   summary: string
   podcast_url: string
   vault_url: string
+  substack_url: string
   tags: string[]
   year: number | null
   is_current: boolean
@@ -93,6 +94,7 @@ export default function AdminStudiesPage() {
     summary: "",
     podcast_url: "",
     vault_url: "",
+    substack_url: "",
     tags: [],
     year: new Date().getFullYear(),
     is_current: false,
@@ -115,6 +117,7 @@ export default function AdminStudiesPage() {
       summary: (editStudy.summary || "").trim(),
       podcast_url: editStudy.podcast_url?.trim() || null,
       vault_url: editStudy.vault_url?.trim() || null,
+      substack_url: editStudy.substack_url?.trim() || null,
       tags: Array.isArray(editStudy.tags) ? editStudy.tags.map((t) => String(t).trim()).filter(Boolean) : [],
       year: editStudy.year ?? null,
       is_current: !!editStudy.is_current,
@@ -272,6 +275,7 @@ export default function AdminStudiesPage() {
           ...draft,
           podcast_url: draft.podcast_url ?? "",
           vault_url: draft.vault_url ?? "",
+          substack_url: draft.substack_url ?? "",
           leader: draft.leader === "mat" || draft.leader === "jason" ? draft.leader : null,
           study_guides: draft.study_guides.map((g) => ({
             ...g,
@@ -378,6 +382,7 @@ export default function AdminStudiesPage() {
                       ...study,
                       podcast_url: study.podcast_url ?? "",
                       vault_url: study.vault_url ?? "",
+                      substack_url: study.substack_url ?? "",
                       leader: study.leader === "mat" || study.leader === "jason" ? study.leader : null,
                       study_guides: (study.study_guides ?? []).map((g) => ({
                         ...g,
@@ -473,6 +478,14 @@ export default function AdminStudiesPage() {
                 value={editStudy.vault_url}
                 onChange={(e) => setEditStudy({ ...editStudy, vault_url: e.target.value })}
                 placeholder="http://fxchur.ch/rgvault"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Substack URL (leader notes)</label>
+              <Input
+                value={editStudy.substack_url}
+                onChange={(e) => setEditStudy({ ...editStudy, substack_url: e.target.value })}
+                placeholder="https://jasondavidsnyder.substack.com"
               />
             </div>
             <div className="space-y-1.5">

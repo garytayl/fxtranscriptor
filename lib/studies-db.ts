@@ -11,6 +11,7 @@ type DbStudy = {
   summary: string
   podcast_url: string | null
   vault_url: string | null
+  substack_url: string | null
   tags: string[]
   year: number | null
   is_current: boolean
@@ -49,6 +50,7 @@ function mapDbStudy(row: DbStudy): BibleStudy {
       ),
     podcastUrl: row.podcast_url ?? undefined,
     vaultUrl: row.vault_url ?? undefined,
+    substackUrl: row.substack_url ?? undefined,
     tags: row.tags ?? [],
     year: row.year ?? undefined,
     leader,

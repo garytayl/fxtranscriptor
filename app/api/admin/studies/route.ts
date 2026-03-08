@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
   }
-  const { title, slug, notion_url, summary, podcast_url, vault_url, tags, year, is_current, leader, guides } = body
+  const { title, slug, notion_url, summary, podcast_url, vault_url, substack_url, tags, year, is_current, leader, guides } = body
 
   const titleStr = typeof title === "string" ? title.trim() : ""
   const slugRaw = typeof slug === "string" ? slug.trim() : ""
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
       summary: typeof summary === "string" ? summary.trim() || "" : "",
       podcast_url: typeof podcast_url === "string" ? podcast_url.trim() || null : null,
       vault_url: typeof vault_url === "string" ? vault_url.trim() || null : null,
+      substack_url: typeof substack_url === "string" ? substack_url.trim() || null : null,
       tags: tagsArray,
       year: typeof year === "number" && Number.isFinite(year) ? year : null,
       is_current: !!is_current,

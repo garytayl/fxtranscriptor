@@ -3,6 +3,7 @@ import type { BibleStudy } from "@/lib/studies"
 import { getStudiesByLeaderAsync, getAllStudiesAsync } from "@/lib/studies"
 import { getGroupsByTrack, type SmallGroup } from "@/lib/small-groups"
 import { ExternalLink, Headphones, BookOpen, FileText, ChevronRight } from "lucide-react"
+import { SubstackNotesBlock } from "./substack-notes-block"
 
 export const revalidate = 3600
 
@@ -148,6 +149,13 @@ function StudyCard({
             </ul>
           </div>
         )}
+
+        {study.substackUrl ? (
+          <SubstackNotesBlock
+            substackUrl={study.substackUrl}
+            feedUrl={study.substackUrl.replace(/\/?$/, "/feed")}
+          />
+        ) : null}
 
         <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-border flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
           {study.podcastUrl ? (

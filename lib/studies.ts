@@ -56,6 +56,8 @@ export interface BibleStudy {
   year?: number
   /** Study track for Mat's vs Jason's cards on studies page */
   leader?: StudyLeader
+  /** Optional Substack URL for leader notes (e.g. Jason's notes). Shown on study card and guide pages. */
+  substackUrl?: string
 }
 
 /** All studies: current first, then archive. */

@@ -52,15 +52,30 @@ export default async function StudyGuidePage({ params }: Props) {
                 <ArrowLeft className="size-3.5" />
                 Back to Studies
               </Link>
-              <a
-                href={guide.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-widest uppercase text-white/50 hover:text-amber-200/90 active:text-amber-200 transition-colors border border-white/20 hover:border-amber-500/40 px-3 py-2 rounded min-h-[44px] sm:min-h-0 shrink-0"
-              >
-                Open on Notion
-                <ExternalLink className="size-3" />
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                {study.substackUrl ? (
+                  <a
+                    href={study.substackUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-widest uppercase text-white/50 hover:text-amber-200/90 active:text-amber-200 transition-colors border border-white/20 hover:border-amber-500/40 px-3 py-2 rounded min-h-[44px] sm:min-h-0 shrink-0"
+                  >
+                    {study.leader === "jason" ? "Jason's notes on Substack" : "Leader notes on Substack"}
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
+                {guide.url ? (
+                  <a
+                    href={guide.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 font-mono text-[11px] sm:text-xs tracking-widest uppercase text-white/50 hover:text-amber-200/90 active:text-amber-200 transition-colors border border-white/20 hover:border-amber-500/40 px-3 py-2 rounded min-h-[44px] sm:min-h-0 shrink-0"
+                  >
+                    Open on Notion
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
+              </div>
             </div>
             <p className="font-mono text-[10px] sm:text-xs tracking-[0.3em] text-amber-200/80 mb-2 uppercase">
               {study.title}
