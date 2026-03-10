@@ -140,7 +140,7 @@ export function VersePill({
         <button
           type="button"
           onClick={() => onSelect(passageRef)}
-          className="cursor-pointer inline-flex items-center gap-1 border border-amber-500/30 bg-amber-500/5 active:bg-amber-500/15 pl-2 pr-2.5 py-1 rounded-md font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-amber-200/90 hover:text-amber-200 hover:border-amber-500/50 hover:bg-amber-500/10 text-left transition-colors min-h-[36px] sm:min-h-0 active:scale-[0.97]"
+          className="cursor-pointer inline-flex items-center gap-1 border border-amber-500/30 bg-amber-500/5 active:bg-amber-500/15 pl-2 pr-2.5 py-1 rounded-md font-mono text-[10px] sm:text-[11px] tracking-wider text-amber-200/90 hover:text-amber-200 hover:border-amber-500/50 hover:bg-amber-500/10 text-left transition-colors min-h-[36px] sm:min-h-0 active:scale-[0.97]"
         >
           <span className="w-1 h-3.5 rounded-full bg-amber-500/60 shrink-0" />
           {label}
@@ -206,7 +206,7 @@ export function StudyGuideContent({
       }
       if (refsForThisLink.length > 0) {
         return (
-          <span className="inline-flex flex-wrap items-center gap-1.5 my-0.5 font-mono text-[11px] uppercase tracking-wider text-amber-200/90">
+          <span className="inline-flex flex-wrap items-center gap-1.5 my-0.5 font-mono text-[11px] tracking-wider text-amber-200/90">
             {refsForThisLink.map((ref, i) => (
               <span key={`${ref}-${i}`}>{ref}</span>
             ))}
@@ -231,7 +231,7 @@ export function StudyGuideContent({
     }
     if (refsForThisLink.length > 0) {
       return (
-        <span className="inline-flex flex-wrap items-center gap-2 my-1 font-mono text-[11px] uppercase tracking-wider text-amber-200/90">
+        <span className="inline-flex flex-wrap items-center gap-2 my-1 font-mono text-[11px] tracking-wider text-amber-200/90">
           {refsForThisLink.map((ref, i) => (
             <span key={`${ref}-${i}`}>{ref}</span>
           ))}

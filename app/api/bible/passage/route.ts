@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
-import { parsePassageReference } from "@/lib/bible/reference"
+import { parsePassageReference, formatPassageReferenceForDisplay } from "@/lib/bible/reference"
 import { getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const runtime = "nodejs"
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         : undefined
 
     return NextResponse.json({
-      reference: parsed.raw,
+      reference: formatPassageReferenceForDisplay(parsed),
       translation: translation?.label ?? "Default",
       chapterReference: chapterResponse.chapter.reference,
       verses,

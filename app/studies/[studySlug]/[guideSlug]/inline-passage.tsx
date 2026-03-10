@@ -75,7 +75,7 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
   return (
     <span className="my-2 block rounded-lg border border-border bg-card/60 py-3 sm:py-3 pl-4 pr-3">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-accent">{state.reference}</p>
+        <p className="font-mono text-[10px] tracking-widest text-accent">{state.reference}</p>
         {state.translation && (
           <span className="text-[10px] text-muted-foreground shrink-0">{state.translation}</span>
         )}

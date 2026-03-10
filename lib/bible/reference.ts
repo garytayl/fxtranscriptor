@@ -368,6 +368,16 @@ export function isVerseInRange(verseNumber: number, range: VerseRange | null): b
   return verseNumber >= range.start && verseNumber <= range.end
 }
 
+/** Format a parsed reference for display (e.g. "Acts 4:36", "Acts 9:27-28") so scripture labels look correct. */
+export function formatPassageReferenceForDisplay(parsed: PassageReference): string {
+  const versePart = parsed.verseRange
+    ? parsed.verseRange.start === parsed.verseRange.end
+      ? `:${parsed.verseRange.start}`
+      : `:${parsed.verseRange.start}-${parsed.verseRange.end}`
+    : ""
+  return `${parsed.book} ${parsed.chapterNumber}${versePart}`
+}
+
 export function getReaderUrlFromReference(raw: string, translationKey?: string | null): string | null {
   const parsed = parsePassageReference(raw)
   if (!parsed) {

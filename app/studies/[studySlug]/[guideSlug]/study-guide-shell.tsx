@@ -98,7 +98,7 @@ function MobileBottomSheet({
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <BookOpen className="size-4 shrink-0 text-amber-200/70" />
-            <p className="font-mono text-[11px] tracking-[0.2em] text-amber-200/80 uppercase truncate">
+            <p className="font-mono text-[11px] tracking-[0.2em] text-amber-200/80 truncate">
               {passageRef}
             </p>
           </div>
@@ -171,7 +171,7 @@ function MobileVerseIndicator({
       className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-[#1a1a1a] border border-white/15 rounded-full pl-3.5 pr-4 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
     >
       <BookOpen className="size-3.5 text-amber-200/80" />
-      <span className="font-mono text-[11px] tracking-wider text-amber-200/90 uppercase whitespace-nowrap">
+      <span className="font-mono text-[11px] tracking-wider text-amber-200/90 whitespace-nowrap">
         {passageRef}
       </span>
     </motion.button>

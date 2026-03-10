@@ -24,7 +24,7 @@ What is something that you used to think was the truth that you no longer believ
     1. How is this still an issue we have to contend with today?
 2. After 14 years of preaching and planting churches to the Gentiles, why does Paul go back to Jerusalem? (Gal 2:1-5)
     1. Who does He go with? (Gal 2:1)
-    2. What do we know about Barnabas and Titus? see: [**Acts 4:36. 9:27, 11:22-24, 13:2, 2 Corinthians 8:6, 16, 23, 12:18, Titus 1:4-5**](https://www.stepbible.org/?q=version=HCSB@reference=Acts.4.36%20Acts.9.27%20Acts.11.22-Acts.11.24%20Acts.13.2%202Cor.8.6%202Cor.8.16%202Cor.8.23%202Cor.12.18%20Titus.1.4-Titus.1.5&options=HNVUG)
+    2. What do we know about Barnabas and Titus? see: [**Acts 4:36, 9:27, 11:22-24, 13:2, 2 Corinthians 8:6, 16, 23, 12:18, Titus 1:4-5**](https://www.stepbible.org/?q=version=HCSB@reference=Acts.4.36%20Acts.9.27%20Acts.11.22-Acts.11.24%20Acts.13.2%202Cor.8.6%202Cor.8.16%202Cor.8.23%202Cor.12.18%20Titus.1.4-Titus.1.5&options=HNVUG)
 3. Many people were very interested to go to Jerusalem in Paul's day just as people are in our day. Why was Paul seemingly not interested (14 years) and seemingly even bothered that he had to go back?
     1. How might this be a good lesson for us?
 4. Why was issue such an important issue that it had to pull Paul, Barnabas, and Titus off the mission of preaching, discipling, and serving?
