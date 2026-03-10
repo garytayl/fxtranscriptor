@@ -208,7 +208,7 @@ export function StudyGuideShell({
 
   return (
     <>
-      <div className="pb-32 lg:pb-24 lg:flex lg:gap-12 lg:items-start">
+      <div className="pb-[max(5rem,env(safe-area-inset-bottom,0px))] lg:pb-24 lg:flex lg:gap-12 lg:items-start">
         <main className="min-w-0 flex-1 lg:min-w-0">
           {(title ?? description ?? refs.length > 0) && (
             <header className="mb-6 sm:mb-8">
