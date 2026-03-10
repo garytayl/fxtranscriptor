@@ -80,6 +80,20 @@ export const STUDIES: BibleStudy[] = [
     tags: ["Jonah", "2026"],
     year: 2026,
   },
+  {
+    id: "galatians-2026",
+    slug: "galatians-2026",
+    title: "Galatians",
+    notionUrl: "https://fxchurch.notion.site/Galatians-2026",
+    summary: "A study of Paul's letter to the Galatians on the gospel of grace and freedom in Christ. #Galatians #2026",
+    guideLinks: [
+      { label: "Wk 2: Galatians 2", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-2", defaultPassageRef: "Galatians 2" },
+    ],
+    podcastUrl: "https://fxtalk.podbean.com/category/2501",
+    vaultUrl: "http://fxchur.ch/rgvault",
+    tags: ["Galatians", "2026"],
+    year: 2026,
+  },
 ]
 
 /** Id of the study to feature as "current" on the studies page. */
