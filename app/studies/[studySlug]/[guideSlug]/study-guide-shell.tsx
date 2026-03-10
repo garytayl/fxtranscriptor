@@ -247,12 +247,15 @@ export function StudyGuideShell({
           </article>
         </main>
 
-        {/* Sidebar — desktop only; in-flow + sticky so zoom keeps main content on the left */}
+        {/* Sidebar — desktop only; fixed viewport height so inner content scrolls properly */}
         <aside
           className={`hidden lg:flex lg:flex-col lg:sticky lg:w-[22rem] lg:shrink-0 lg:self-start lg:min-h-0 lg:overflow-hidden bg-[#050505] z-10 ${sidebarTopOffset ? "" : "lg:pt-[var(--navbar-offset)]"}`}
           style={{
             ...(sidebarTopOffset ? { paddingTop: sidebarTopOffset } : {}),
             top: sidebarTopOffset ?? "var(--navbar-offset)",
+            height: sidebarTopOffset
+              ? `calc(100vh - ${sidebarTopOffset})`
+              : "calc(100dvh - var(--navbar-offset, 0px))",
             maxHeight: sidebarTopOffset
               ? `calc(100vh - ${sidebarTopOffset})`
               : "calc(100dvh - var(--navbar-offset, 0px))",
@@ -265,7 +268,7 @@ export function StudyGuideShell({
             </p>
           </div>
           <div
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6 overscroll-contain"
             style={{ WebkitOverflowScrolling: "touch" }}
             data-lenis-prevent
           >
