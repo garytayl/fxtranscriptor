@@ -268,7 +268,7 @@ export function StudyGuideShell({
             </p>
           </div>
           <div
-            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6 overscroll-contain"
+            className="flex-1 min-h-0 flex flex-col justify-start overflow-y-auto overflow-x-hidden px-6 pb-6 overscroll-contain"
             style={{ WebkitOverflowScrolling: "touch" }}
             data-lenis-prevent
           >
@@ -280,7 +280,7 @@ export function StudyGuideShell({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}
-                  className={sidebarPassageClasses}
+                  className={`${sidebarPassageClasses} shrink-0`}
                 >
                   <InlinePassage passageRef={displayRef} />
                 </motion.div>
