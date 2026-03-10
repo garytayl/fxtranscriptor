@@ -115,11 +115,33 @@ export function getAllStudies(): BibleStudy[] {
 /**
  * Merge DB studies with hardcoded STUDIES. DB versions win for matching slugs;
  * hardcoded studies that don't exist in DB are appended so nothing is lost.
+ * For studies that exist in both, guide links are merged: DB guides first, then
+ * any hardcoded guide whose slug is not already in the DB list (so e.g. Week 2
+ * from code appears when DB only has Week 1).
  */
 function mergeStudies(dbStudies: BibleStudy[]): BibleStudy[] {
   const dbSlugs = new Set(dbStudies.map((s) => s.slug))
+  const hardcodedBySlug = new Map(STUDIES.map((s) => [s.slug, s]))
+  const merged: BibleStudy[] = []
+
+  for (const dbStudy of dbStudies) {
+    const hardcoded = hardcodedBySlug.get(dbStudy.slug)
+    if (!hardcoded) {
+      merged.push(dbStudy)
+      continue
+    }
+    const existingSlugs = new Set(dbStudy.guideLinks.map((g) => g.slug).filter(Boolean))
+    const extraGuides = (hardcoded.guideLinks ?? []).filter(
+      (g) => g.slug && !existingSlugs.has(g.slug)
+    )
+    merged.push({
+      ...dbStudy,
+      guideLinks: [...dbStudy.guideLinks, ...extraGuides],
+    })
+  }
+
   const hardcodedOnly = STUDIES.filter((s) => !dbSlugs.has(s.slug))
-  return [...dbStudies, ...hardcodedOnly]
+  return [...merged, ...hardcodedOnly]
 }
 
 /** Async versions that merge database + hardcoded data. */
