@@ -93,11 +93,12 @@ export const STUDIES: BibleStudy[] = [
     vaultUrl: "http://fxchur.ch/rgvault",
     tags: ["Galatians", "2026"],
     year: 2026,
+    leader: "mat",
   },
 ]
 
 /** Id of the study to feature as "current" on the studies page. */
-export const CURRENT_STUDY_ID = "jonah-2026"
+export const CURRENT_STUDY_ID = "galatians-2026"
 
 export function getCurrentStudy(): BibleStudy | null {
   return STUDIES.find((s) => s.id === CURRENT_STUDY_ID) ?? STUDIES[0] ?? null
