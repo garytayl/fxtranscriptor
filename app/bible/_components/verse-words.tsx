@@ -66,7 +66,7 @@ function StrongsClickableWord({
           sideOffset={6}
           className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
         >
-          <WordStudyEntryContent entry={cached} />
+          <WordStudyEntryContent entry={cached} showKjvAlignmentNote />
         </HoverCardContent>
       </HoverCard>
     )

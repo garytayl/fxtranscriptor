@@ -5,6 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Settings2 } from "lucide-react"
 
 import type { BibleTranslation } from "@/lib/bible/translations"
+import {
+  BIBLE_TRANSLATION_CHANGED_EVENT,
+  BIBLE_TRANSLATION_STORAGE_KEY,
+} from "@/lib/bible/translation-storage"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,8 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-
-const STORAGE_KEY = "fx_bible_translation"
 
 type TranslationSettingsProps = {
   translations: BibleTranslation[]
@@ -38,7 +40,8 @@ export function TranslationSettings({ translations, currentKey }: TranslationSet
 
   useEffect(() => {
     if (!currentKey && translations.length > 0) {
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null
+      const stored =
+        typeof window !== "undefined" ? window.localStorage.getItem(BIBLE_TRANSLATION_STORAGE_KEY) : null
       if (stored && stored !== currentKey) {
         const params = new URLSearchParams(searchParams)
         params.set("t", stored)
@@ -57,7 +60,8 @@ export function TranslationSettings({ translations, currentKey }: TranslationSet
   const handleChange = (value: string) => {
     setSelected(value)
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, value)
+      window.localStorage.setItem(BIBLE_TRANSLATION_STORAGE_KEY, value)
+      window.dispatchEvent(new Event(BIBLE_TRANSLATION_CHANGED_EVENT))
     }
     const params = new URLSearchParams(searchParams)
     params.set("t", value)

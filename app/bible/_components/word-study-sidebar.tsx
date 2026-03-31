@@ -29,9 +29,10 @@ export function WordStudySidebarPanel({ code, hasStrongsForChapter = true }: Wor
         >
           {hasStrongsForChapter ? (
             <>
-              Click a word in the text to view the Greek or Hebrew definition.
-              <span className="block mt-1.5 text-white/30 text-xs not-italic">
-                Verse text is shown in KJV so each word matches its Strong’s code.
+              Click a word in the verse to open its Greek or Hebrew lexicon entry.
+              <span className="block mt-1.5 text-white/35 text-xs not-italic leading-relaxed">
+                The verse uses KJV wording for word-by-word Strong&apos;s alignment. The sidebar shows
+                dictionary glosses, which often use different English (e.g. &quot;you&quot; vs &quot;ye&quot;).
               </span>
             </>
           ) : (
@@ -67,7 +68,7 @@ export function WordStudySidebarPanel({ code, hasStrongsForChapter = true }: Wor
           transition={{ duration: 0.2 }}
           className={sidebarEntryClasses}
         >
-          <WordStudyEntryContent entry={entry} />
+          <WordStudyEntryContent entry={entry} showKjvAlignmentNote />
         </motion.div>
       ) : null}
     </AnimatePresence>

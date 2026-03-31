@@ -239,6 +239,14 @@ export function BibleChapterShell({
           </div>
         )}
 
+        {hasStrongsForChapter && verses.length > 0 && (
+          <p className="text-[11px] sm:text-xs leading-relaxed text-muted-foreground border border-border/60 bg-muted/20 rounded-md px-3 py-2">
+            Clickable words use <span className="text-foreground/90">KJV</span> for Strong&apos;s alignment.
+            Your translation choice still applies where word data is not shown. Lexicon English may differ
+            (e.g. modern &quot;you&quot; vs KJV &quot;ye&quot;).
+          </p>
+        )}
+
         {errorMessage ? (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
             {errorMessage}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePreferredBibleTranslationKey } from "@/hooks/use-bible-translation-key"
 import { getReaderUrlFromReference } from "@/lib/bible/reference"
 import { VerseText } from "@/lib/bible/verse-text"
 import { BookOpen, Loader2 } from "lucide-react"
@@ -23,11 +24,13 @@ type State =
 
 export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
   const [state, setState] = useState<State>({ status: "loading" })
+  const translationKey = usePreferredBibleTranslationKey()
 
   useEffect(() => {
     if (!refStr || typeof refStr !== "string") return
     let cancelled = false
     const params = new URLSearchParams({ ref: refStr })
+    if (translationKey) params.set("t", translationKey)
     fetch(`/api/bible/passage?${params.toString()}`)
       .then((res) =>
         res.json().then((data: {
@@ -61,9 +64,9 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
     return () => {
       cancelled = true
     }
-  }, [refStr])
+  }, [refStr, translationKey])
 
-  const readerUrl = refStr ? getReaderUrlFromReference(refStr) : null
+  const readerUrl = refStr ? getReaderUrlFromReference(refStr, translationKey) : null
 
   if (state.status === "loading") {
     return (
