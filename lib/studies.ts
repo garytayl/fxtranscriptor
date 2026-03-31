@@ -88,6 +88,7 @@ export const STUDIES: BibleStudy[] = [
     summary: "A study of Paul's letter to the Galatians on the gospel of grace and freedom in Christ. #Galatians #2026",
     guideLinks: [
       { label: "Wk 2: Galatians 2", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-2", defaultPassageRef: "Galatians 2" },
+      { label: "Wk 3: Galatians 3", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-3", defaultPassageRef: "Galatians 3:1-27" },
       { label: "Wk 4: Galatians 4", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-4", defaultPassageRef: "Galatians 3:26-4:7" },
       { label: "Wk 5: Galatians 4:8–5:1", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-5", defaultPassageRef: "Galatians 4:8-5:1" },
     ],
