@@ -89,6 +89,7 @@ export const STUDIES: BibleStudy[] = [
     guideLinks: [
       { label: "Wk 2: Galatians 2", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-2", defaultPassageRef: "Galatians 2" },
       { label: "Wk 4: Galatians 4", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-4", defaultPassageRef: "Galatians 3:26-4:7" },
+      { label: "Wk 5: Galatians 4:8–5:1", url: "https://fxchurch.notion.site/Galatians-2026", slug: "wk-5", defaultPassageRef: "Galatians 4:8-5:1" },
     ],
     podcastUrl: "https://fxtalk.podbean.com/category/2501",
     vaultUrl: "http://fxchur.ch/rgvault",
