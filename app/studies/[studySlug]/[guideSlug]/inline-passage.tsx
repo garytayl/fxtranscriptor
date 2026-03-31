@@ -12,7 +12,13 @@ interface InlinePassageProps {
 
 type State =
   | { status: "loading" }
-  | { status: "loaded"; reference: string; translation: string; verses: { number: number; text: string }[]; emptyMessage?: string }
+  | {
+      status: "loaded"
+      reference: string
+      translation: string
+      verses: { number: number; text: string; chapter?: number }[]
+      emptyMessage?: string
+    }
   | { status: "error"; message: string }
 
 export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
@@ -24,7 +30,12 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
     const params = new URLSearchParams({ ref: refStr })
     fetch(`/api/bible/passage?${params.toString()}`)
       .then((res) =>
-        res.json().then((data: { reference?: string; translation?: string; verses?: { number: number; text: string }[]; error?: string }) => ({
+        res.json().then((data: {
+          reference?: string
+          translation?: string
+          verses?: { number: number; text: string; chapter?: number }[]
+          error?: string
+        }) => ({
           ok: res.ok,
           data,
         }))
@@ -82,12 +93,17 @@ export function InlinePassage({ passageRef: refStr }: InlinePassageProps) {
       </div>
       {state.verses.length > 0 ? (
         <ol className="mt-3 space-y-2 text-[0.9375rem] sm:text-sm leading-relaxed text-foreground">
-          {state.verses.map((v) => (
-            <li key={v.number} className="flex gap-2">
-              <span className="shrink-0 font-mono text-[10px] font-bold text-muted-foreground mt-1 select-none">{v.number}</span>
-              <VerseText text={v.text} className="leading-[1.7]" />
-            </li>
-          ))}
+          {(() => {
+            const showChapterPrefix = new Set(state.verses.map((v) => v.chapter)).size > 1
+            return state.verses.map((v) => (
+              <li key={showChapterPrefix && v.chapter != null ? `${v.chapter}:${v.number}` : v.number} className="flex gap-2">
+                <span className="shrink-0 font-mono text-[10px] font-bold text-muted-foreground mt-1 select-none">
+                  {showChapterPrefix && v.chapter != null ? `${v.chapter}:${v.number}` : v.number}
+                </span>
+                <VerseText text={v.text} className="leading-[1.7]" />
+              </li>
+            ))
+          })()}
         </ol>
       ) : (
         <p className="mt-2 text-sm text-muted-foreground italic" title={state.emptyMessage}>

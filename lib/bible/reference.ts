@@ -9,6 +9,11 @@ export type PassageReference = {
   bookSlug: string
   chapterNumber: number
   verseRange: VerseRange | null
+  /**
+   * When set, passage spans from chapterNumber:verseRange.start through this chapter:verse
+   * (e.g. Galatians 4:8-5:1). Same-chapter ranges use verseRange only.
+   */
+  crossChapterEnd?: { chapter: number; verse: number }
 }
 
 const ordinalReplacements: Record<string, string> = {
@@ -299,6 +304,45 @@ export function parsePassageReference(raw: string): PassageReference | null {
     return null
   }
 
+  // Cross-chapter or explicit same-chapter: Book c1:v1-c2:v2 (e.g. Gal 4:8-5:1, Gal 4:8-4:31)
+  const cross = normalized.match(/^(.+?)\s+(\d+):(\d+)-(\d+):(\d+)$/)
+  if (cross) {
+    const bookRaw = normalizeBookName(cross[1].replace(/\.+$/, ""))
+    const startCh = Number.parseInt(cross[2], 10)
+    const startVs = Number.parseInt(cross[3], 10)
+    const endCh = Number.parseInt(cross[4], 10)
+    const endVs = Number.parseInt(cross[5], 10)
+    if (![startCh, startVs, endCh, endVs].every((n) => Number.isFinite(n))) {
+      return null
+    }
+    if (startCh < 1 || endCh < startCh) {
+      return null
+    }
+    if (startCh === endCh) {
+      if (endVs < startVs) {
+        return null
+      }
+      return {
+        raw: normalized,
+        book: bookRaw,
+        bookSlug: slugifyBookName(bookRaw),
+        chapterNumber: startCh,
+        verseRange: { start: startVs, end: endVs },
+      }
+    }
+    if (endCh > startCh) {
+      return {
+        raw: normalized,
+        book: bookRaw,
+        bookSlug: slugifyBookName(bookRaw),
+        chapterNumber: startCh,
+        verseRange: { start: startVs, end: startVs },
+        crossChapterEnd: { chapter: endCh, verse: endVs },
+      }
+    }
+    return null
+  }
+
   const match = normalized.match(/^(.+?)\.\s+(\d+)(?::(\d+(?:-\d+)?))?$/) ??
     normalized.match(/^(.+?)\s+(\d+)(?::(\d+(?:-\d+)?))?$/)
   if (!match) {
@@ -370,6 +414,11 @@ export function isVerseInRange(verseNumber: number, range: VerseRange | null): b
 
 /** Format a parsed reference for display (e.g. "Acts 4:36", "Acts 9:27-28") so scripture labels look correct. */
 export function formatPassageReferenceForDisplay(parsed: PassageReference): string {
+  if (parsed.crossChapterEnd && parsed.verseRange) {
+    const vs = parsed.verseRange.start
+    const { chapter: ec, verse: ev } = parsed.crossChapterEnd
+    return `${parsed.book} ${parsed.chapterNumber}:${vs}-${ec}:${ev}`
+  }
   const versePart = parsed.verseRange
     ? parsed.verseRange.start === parsed.verseRange.end
       ? `:${parsed.verseRange.start}`
@@ -385,11 +434,15 @@ export function getReaderUrlFromReference(raw: string, translationKey?: string |
   }
   const params = new URLSearchParams()
   if (parsed.verseRange) {
-    const range =
-      parsed.verseRange.start === parsed.verseRange.end
-        ? String(parsed.verseRange.start)
-        : `${parsed.verseRange.start}-${parsed.verseRange.end}`
-    params.set("v", range)
+    if (parsed.crossChapterEnd) {
+      params.set("v", String(parsed.verseRange.start))
+    } else {
+      const range =
+        parsed.verseRange.start === parsed.verseRange.end
+          ? String(parsed.verseRange.start)
+          : `${parsed.verseRange.start}-${parsed.verseRange.end}`
+      params.set("v", range)
+    }
   }
   if (translationKey) {
     params.set("t", translationKey)

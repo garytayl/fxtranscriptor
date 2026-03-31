@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { parseVerseRange, slugifyBookName } from "../lib/bible/reference"
+import { parsePassageReference, parseVerseRange, slugifyBookName } from "../lib/bible/reference"
 
 describe("slugifyBookName", () => {
   it("slugifies numbered books", () => {
@@ -27,5 +27,30 @@ describe("parseVerseRange", () => {
     expect(parseVerseRange("0")).toBeNull()
     expect(parseVerseRange("abc")).toBeNull()
     expect(parseVerseRange("16-")).toBeNull()
+  })
+})
+
+describe("parsePassageReference", () => {
+  it("parses same-chapter verse range", () => {
+    const p = parsePassageReference("Galatians 4:8-18")
+    expect(p).not.toBeNull()
+    expect(p!.chapterNumber).toBe(4)
+    expect(p!.verseRange).toEqual({ start: 8, end: 18 })
+    expect(p!.crossChapterEnd).toBeUndefined()
+  })
+
+  it("parses cross-chapter range (Gal 4:8-5:1)", () => {
+    const p = parsePassageReference("Galatians 4:8-5:1")
+    expect(p).not.toBeNull()
+    expect(p!.chapterNumber).toBe(4)
+    expect(p!.verseRange).toEqual({ start: 8, end: 8 })
+    expect(p!.crossChapterEnd).toEqual({ chapter: 5, verse: 1 })
+  })
+
+  it("parses explicit same-chapter c:v-c:v as one range", () => {
+    const p = parsePassageReference("Galatians 4:8-4:31")
+    expect(p).not.toBeNull()
+    expect(p!.verseRange).toEqual({ start: 8, end: 31 })
+    expect(p!.crossChapterEnd).toBeUndefined()
   })
 })

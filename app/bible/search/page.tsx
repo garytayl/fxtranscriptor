@@ -4,9 +4,10 @@ import { ArrowLeft } from "lucide-react"
 
 import { PassageSearch } from "@/app/bible/_components/passage-search"
 import { TranslationSettings } from "@/app/bible/_components/translation-settings"
-import { getBookBySlug, getBooksWithSlugs, getChapterVerses, listChapters } from "@/lib/bible/api"
+import { getBookBySlug, getBooksWithSlugs } from "@/lib/bible/api"
+import { getVersesForPassageReference } from "@/lib/bible/passage-verses"
 import { VerseText } from "@/lib/bible/verse-text"
-import { parsePassageList, isVerseInRange } from "@/lib/bible/reference"
+import { parsePassageList, formatPassageReferenceForDisplay } from "@/lib/bible/reference"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 
 export const dynamic = "force-dynamic"
@@ -75,27 +76,18 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
           return { passage, error: `Book "${passage.book}" was not found.` }
         }
 
-        const chapters = await listChapters(book.id, translation?.bibleId)
-        const chapter = chapters.find((item) => item.number === passage.chapterNumber)
-        if (!chapter) {
-          return {
-            passage,
-            error: `Chapter ${passage.chapterNumber} was not found for ${book.name}.`,
-          }
-        }
-
-        const chapterResponse = await getChapterVerses(
-          { chapterId: chapter.id, bookId: book.id },
+        const { verses, error: sliceError } = await getVersesForPassageReference(
+          passage,
+          book.id,
           translation?.bibleId
         )
-        const verses = passage.verseRange
-          ? chapterResponse.verses.filter((verse) => isVerseInRange(verse.number, passage.verseRange))
-          : chapterResponse.verses
+        if (sliceError) {
+          return { passage, error: sliceError }
+        }
         return {
           passage,
           book,
-          chapterNumber: chapter.number,
-          reference: chapterResponse.chapter.reference,
+          reference: formatPassageReferenceForDisplay(passage),
           verses,
         }
       } catch (error) {
@@ -178,14 +170,20 @@ export default async function BibleSearchPage({ searchParams }: SearchPageProps)
                   <p className="mt-3 sm:mt-4 text-sm text-destructive">{result.error}</p>
                 ) : result.verses && result.verses.length > 0 ? (
                   <ol className="mt-3 sm:mt-4 space-y-1.5 sm:space-y-3 text-[0.9375rem] sm:text-base leading-[1.75] sm:leading-relaxed">
-                    {result.verses.map((verse) => (
-                      <li key={verse.number} className="rounded-md px-2 sm:px-3 py-1 sm:py-2 text-foreground">
-                        <span className="mr-1.5 sm:mr-2 align-super text-[10px] sm:text-xs font-bold text-muted-foreground">
-                          {verse.number}
-                        </span>
-                        <VerseText text={verse.text} />
-                      </li>
-                    ))}
+                    {(() => {
+                      const showChapterPrefix = new Set(result.verses.map((v) => v.chapter)).size > 1
+                      return result.verses.map((verse) => (
+                        <li
+                          key={showChapterPrefix ? `${verse.chapter}:${verse.number}` : verse.number}
+                          className="rounded-md px-2 sm:px-3 py-1 sm:py-2 text-foreground"
+                        >
+                          <span className="mr-1.5 sm:mr-2 align-super text-[10px] sm:text-xs font-bold text-muted-foreground">
+                            {showChapterPrefix ? `${verse.chapter}:${verse.number}` : verse.number}
+                          </span>
+                          <VerseText text={verse.text} />
+                        </li>
+                      ))
+                    })()}
                   </ol>
                 ) : (
                   <p className="mt-3 sm:mt-4 text-sm text-muted-foreground">No verses available for this passage.</p>
