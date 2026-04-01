@@ -5,7 +5,6 @@ import { getBookBySlug, getChapterVerses, listChapters } from "@/lib/bible/api"
 import { parseVerseRange } from "@/lib/bible/reference"
 import { getResolvedTranslations, getResolvedTranslationByKey } from "@/lib/bible/translations"
 import { getKeyTermsForChapter } from "@/lib/bible/chapter-key-terms"
-import { getStrongsWordsForChapter } from "@/lib/bible/verse-strongs"
 
 export const revalidate = 3600
 
@@ -50,7 +49,6 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const highlightRange = parseVerseRange(verseQuery)
   let errorMessage: string | null = null
   let verses: { number: number; text: string }[] = []
-  let chapterReference = ""
 
   let footnotes: { verseNumber: number; marker: string; text: string }[] | undefined
   try {
@@ -59,7 +57,6 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       translation?.bibleId
     )
     verses = chapterResponse.verses
-    chapterReference = chapterResponse.chapter.reference
     footnotes = "footnotes" in chapterResponse ? chapterResponse.footnotes : undefined
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : "Unable to load chapter."
@@ -70,8 +67,6 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null
   const query = activeKey ? `?t=${activeKey}` : ""
   const keyTerms = getKeyTermsForChapter(book.slug, chapterNumber)
-  const strongsWordsByVerse =
-    verses.length > 0 ? await getStrongsWordsForChapter(book.slug, chapterNumber) : {}
 
   return (
     <BibleChapterShell
@@ -80,7 +75,6 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       chapters={chapters}
       verses={verses}
       highlightRange={highlightRange}
-      strongsWordsByVerse={strongsWordsByVerse}
       keyTerms={keyTerms}
       previousChapter={previousChapter ?? null}
       nextChapter={nextChapter ?? null}
