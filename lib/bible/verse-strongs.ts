@@ -5,6 +5,7 @@
 
 import { BIBLE_BOOKS_WITH_CHAPTER_COUNTS } from "@/lib/bible/constants"
 import { slugifyBookName } from "@/lib/bible/reference"
+import { verseStrongsLog } from "@/lib/bible/verse-strongs-log"
 
 const KJV_FETCH_BASES = [
   "https://cdn.jsdelivr.net/gh/kaiserlik/kjv@main",
@@ -162,39 +163,68 @@ function getKjvCodeFromSlug(bookSlug: string): string | null {
   return SLUG_TO_KJV_CODE[mapped] ?? null
 }
 
-/**
- * API.Bible usually returns plain USFM (e.g. JHN). Some clients or wrappers may
- * use compound ids — take the last segment so "…-JHN" still resolves.
- */
-function normalizeUsfmFromApiBookId(raw: string): string | null {
-  const u = raw.trim().toUpperCase()
-  if (USFM_TO_KAISERLIK[u]) return u
+export type KaiserlikResolution = "slug" | "usfm_full" | "usfm_segment" | null
+
+export type StrongsLoadTrace = {
+  bookSlug: string
+  apiBookId: string
+  chapter: number
+  resolvedStem: string | null
+  resolutionVia: KaiserlikResolution
+  fetchAttempts: { url: string; status: number; ok: boolean; error?: string }[]
+  jsonTopKeys: string[]
+  kjvCodeUsed: string | null
+  chapterKey: string
+  chapterFound: boolean
+  sampleChapterKeys: string[]
+  verseCount: number
+  /** Actionable hints for operators (also logged server-side). */
+  hints: string[]
+}
+
+/** How we mapped URL/API book to a Kaiserlik file stem (e.g. Jhn). */
+export function resolveKaiserlikBookCodeDetailed(ref: KjvStrongsBookRef): {
+  code: string | null
+  via: KaiserlikResolution
+} {
+  const fromSlug = getKjvCodeFromSlug(ref.slug)
+  if (fromSlug) return { code: fromSlug, via: "slug" }
+
+  if (!ref.id?.trim()) return { code: null, via: null }
+
+  const u = ref.id.trim().toUpperCase()
+  if (USFM_TO_KAISERLIK[u]) return { code: USFM_TO_KAISERLIK[u], via: "usfm_full" }
+
   const parts = u.split(/[-_]/)
   for (let i = parts.length - 1; i >= 0; i--) {
     const seg = parts[i]
-    if (seg && USFM_TO_KAISERLIK[seg]) return seg
+    if (seg && USFM_TO_KAISERLIK[seg]) {
+      return { code: USFM_TO_KAISERLIK[seg], via: "usfm_segment" }
+    }
   }
-  return null
+  return { code: null, via: null }
 }
 
 /** Resolve kaiserlik JSON stem (e.g. Jhn) from URL slug and/or API book id. */
 export function resolveKaiserlikBookCode(ref: KjvStrongsBookRef): string | null {
-  const fromSlug = getKjvCodeFromSlug(ref.slug)
-  if (fromSlug) return fromSlug
-  const usfm = ref.id ? normalizeUsfmFromApiBookId(ref.id) : null
-  if (usfm && USFM_TO_KAISERLIK[usfm]) return USFM_TO_KAISERLIK[usfm]
-  return null
+  return resolveKaiserlikBookCodeDetailed(ref).code
 }
 
-async function fetchBookJson(ref: KjvStrongsBookRef): Promise<KaiserlikBook | null> {
-  const code = resolveKaiserlikBookCode(ref)
-  if (!code) return null
-  const cached = bookCache.get(code)
-  if (cached) return cached
+async function fetchKaiserlikJson(
+  ref: KjvStrongsBookRef,
+  resolvedStem: string
+): Promise<{ json: KaiserlikBook | null; attempts: StrongsLoadTrace["fetchAttempts"] }> {
+  const attempts: StrongsLoadTrace["fetchAttempts"] = []
+  const cached = bookCache.get(resolvedStem)
+  if (cached) {
+    verseStrongsLog.skipped(`using in-memory cache for ${resolvedStem}.json`)
+    return { json: cached, attempts }
+  }
+
   for (const base of KJV_FETCH_BASES) {
-    const url = `${base}/${code}.json`
+    const url = `${base}/${resolvedStem}.json`
+    verseStrongsLog.fetchAttempt(url)
     try {
-      // Avoid static/ISR bake-in of empty Strong's when build-time fetch fails; bypass Next fetch cache.
       const res = await fetch(url, {
         cache: "no-store",
         headers: {
@@ -202,15 +232,41 @@ async function fetchBookJson(ref: KjvStrongsBookRef): Promise<KaiserlikBook | nu
           "User-Agent": "fxtranscriptor-scripture-reader/1.0",
         },
       })
-      if (!res.ok) continue
-      const json = (await res.json()) as KaiserlikBook
-      bookCache.set(code, json)
-      return json
-    } catch {
-      continue
+      const ok = res.ok
+      attempts.push({ url, status: res.status, ok })
+      verseStrongsLog.fetchResponse(url, res.status, ok)
+      if (!ok) continue
+
+      let json: KaiserlikBook
+      try {
+        json = (await res.json()) as KaiserlikBook
+      } catch (parseErr) {
+        verseStrongsLog.jsonParseError(url, parseErr)
+        attempts[attempts.length - 1]!.error = `JSON parse: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`
+        continue
+      }
+
+      bookCache.set(resolvedStem, json)
+      return { json, attempts }
+    } catch (err) {
+      attempts.push({ url, status: 0, ok: false, error: err instanceof Error ? err.message : String(err) })
+      verseStrongsLog.fetchThrow(url, err)
     }
   }
-  return null
+
+  const last = attempts[attempts.length - 1]
+  verseStrongsLog.fetchExhausted(
+    attempts.map((a) => a.url),
+    last?.status ?? null,
+  )
+  return { json: null, attempts }
+}
+
+async function fetchBookJson(ref: KjvStrongsBookRef): Promise<KaiserlikBook | null> {
+  const { code } = resolveKaiserlikBookCodeDetailed(ref)
+  if (!code) return null
+  const { json } = await fetchKaiserlikJson(ref, code)
+  return json
 }
 
 /**
@@ -260,23 +316,117 @@ export async function getStrongsForChapter(
   return out
 }
 
+function emptyTrace(book: KjvStrongsBookRef, chapter: number, partial: Partial<StrongsLoadTrace> = {}): StrongsLoadTrace {
+  return {
+    bookSlug: book.slug,
+    apiBookId: book.id,
+    chapter,
+    resolvedStem: null,
+    resolutionVia: null,
+    fetchAttempts: [],
+    jsonTopKeys: [],
+    kjvCodeUsed: null,
+    chapterKey: "",
+    chapterFound: false,
+    sampleChapterKeys: [],
+    verseCount: 0,
+    hints: [],
+    ...partial,
+  }
+}
+
 /**
- * Get KJV word + Strong's code per verse for a whole chapter.
- * Use this to render verse text so each word matches its Strong's code (avoids WEB/KJV index mismatch).
+ * Load Strong's word data plus a diagnostic trace (for BIBLE_STRONGS_DEBUG UI and server logs).
  */
-export async function getStrongsWordsForChapter(
+export async function loadStrongsChapterWithTrace(
   book: KjvStrongsBookRef,
   chapter: number
-): Promise<Record<number, StrongsWordAndCode[]>> {
-  const json = await fetchBookJson(book)
-  if (!json) return {}
-  const kjvCode = resolveKaiserlikBookCode(book)
-  if (!kjvCode) return {}
+): Promise<{ words: Record<number, StrongsWordAndCode[]>; trace: StrongsLoadTrace }> {
+  const hints: string[] = []
+  verseStrongsLog.resolveStart(book, chapter)
+
+  const { code: resolvedStem, via: resolutionVia } = resolveKaiserlikBookCodeDetailed(book)
+  const viaLog =
+    resolutionVia === null ? "none" : resolutionVia === "slug" ? "slug" : resolutionVia === "usfm_full" ? "usfm_full" : "usfm_segment"
+  verseStrongsLog.resolved(resolvedStem, viaLog)
+
+  if (!resolvedStem) {
+    hints.push(
+      "Map this book: add the URL slug to SLUG_TO_KJV_CODE or ensure apiBookId matches USFM (GEN…REV) in USFM_TO_KAISERLIK.",
+    )
+    hints.push(`Current inputs: slug=${book.slug}, apiBookId=${book.id || "(empty)"}.`)
+    return {
+      words: {},
+      trace: emptyTrace(book, chapter, {
+        resolutionVia,
+        hints,
+      }),
+    }
+  }
+
+  const { json, attempts } = await fetchKaiserlikJson(book, resolvedStem)
+
+  if (!json) {
+    hints.push("Kaiserlik JSON did not load from any CDN URL. Check server outbound HTTPS, jsDelivr/GitHub status, or firewall.")
+    return {
+      words: {},
+      trace: emptyTrace(book, chapter, {
+        resolvedStem,
+        resolutionVia,
+        fetchAttempts: attempts,
+        hints,
+      }),
+    }
+  }
+
+  const topKeys = Object.keys(json)
+  verseStrongsLog.jsonParsed(resolvedStem, topKeys)
+
+  const kjvCode = resolvedStem
   const bookData = getBookData(json)
-  if (!bookData) return {}
+  if (!bookData) {
+    verseStrongsLog.bookDataMissing(resolvedStem, topKeys)
+    hints.push("JSON parsed but book container was empty — Kaiserlik file format may have changed.")
+    return {
+      words: {},
+      trace: emptyTrace(book, chapter, {
+        resolvedStem,
+        resolutionVia,
+        fetchAttempts: attempts,
+        jsonTopKeys: topKeys,
+        kjvCodeUsed: kjvCode,
+        hints,
+      }),
+    }
+  }
+
   const chapterKey = `${kjvCode}|${chapter}`
+  const sampleChapterKeys = Object.keys(bookData).filter((k) => k.includes("|"))
   const chapterData = bookData[chapterKey]
-  if (!chapterData || typeof chapterData !== "object") return {}
+  const chapterFound = !!(chapterData && typeof chapterData === "object")
+
+  verseStrongsLog.chapterLookup(kjvCode, chapter, chapterKey, chapterFound, sampleChapterKeys)
+
+  if (!chapterFound) {
+    hints.push(
+      `Expected chapter key "${chapterKey}" in Kaiserlik data. If chapter exists in the Bible, verify chapter number and file ${kjvCode}.json.`,
+    )
+    return {
+      words: {},
+      trace: emptyTrace(book, chapter, {
+        resolvedStem,
+        resolutionVia,
+        fetchAttempts: attempts,
+        jsonTopKeys: topKeys,
+        kjvCodeUsed: kjvCode,
+        chapterKey,
+        chapterFound: false,
+        sampleChapterKeys,
+        hints,
+      }),
+    }
+  }
+
   const out: Record<number, StrongsWordAndCode[]> = {}
   for (const [verseKey, verseObj] of Object.entries(chapterData)) {
     const lastPipe = verseKey.lastIndexOf("|")
@@ -285,5 +435,39 @@ export async function getStrongsWordsForChapter(
       out[verseNum] = parseEnToWordsAndCodes(verseObj.en)
     }
   }
-  return out
+
+  const verseCount = Object.keys(out).length
+  verseStrongsLog.versesLoaded(verseCount)
+
+  if (verseCount === 0) {
+    hints.push("Chapter object had no verses with `en` + Strong's tags — unexpected Kaiserlik shape for this chapter.")
+  }
+
+  return {
+    words: out,
+    trace: emptyTrace(book, chapter, {
+      resolvedStem,
+      resolutionVia,
+      fetchAttempts: attempts,
+      jsonTopKeys: topKeys,
+      kjvCodeUsed: kjvCode,
+      chapterKey,
+      chapterFound: true,
+      sampleChapterKeys,
+      verseCount,
+      hints,
+    }),
+  }
+}
+
+/**
+ * Get KJV word + Strong's code per verse for a whole chapter.
+ * Use this to render verse text so each word matches its Strong's code (avoids WEB/KJV index mismatch).
+ */
+export async function getStrongsWordsForChapter(
+  book: KjvStrongsBookRef,
+  chapter: number
+): Promise<Record<number, StrongsWordAndCode[]>> {
+  const { words } = await loadStrongsChapterWithTrace(book, chapter)
+  return words
 }
