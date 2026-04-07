@@ -118,11 +118,13 @@ function parseEnToStrongsOrder(en: string): string[] {
   return codes
 }
 
+/** `code` is empty when this segment has no Strong's tag (e.g. untagged text after the last `[G#]` in Kaiserlik `en`). */
 export type StrongsWordAndCode = { word: string; code: string }
 
 /**
  * Parse "en" to word+code pairs so the displayed text matches the Strong's codes (KJV wording).
- * Handles consecutive codes like "every man[G3956][G444]" by using a zero-width space for the second code so the same word is not shown twice.
+ * Handles consecutive codes like "every man[G3956][G444]" by using a middle dot for the second code so the same word is not shown twice.
+ * Appends any text after the final `[G#]`/`[H#]` as a plain segment (`code: ""`) so verses are not truncated.
  */
 export function parseEnToWordsAndCodes(en: string): StrongsWordAndCode[] {
   const pairs: StrongsWordAndCode[] = []
@@ -141,6 +143,10 @@ export function parseEnToWordsAndCodes(en: string): StrongsWordAndCode[] {
     }
     lastWord = displayWord
     lastIndex = m.index + m[0].length
+  }
+  const afterLastTag = en.slice(lastIndex).trim()
+  if (afterLastTag) {
+    pairs.push({ word: afterLastTag, code: "" })
   }
   return pairs
 }
@@ -320,7 +326,7 @@ export async function getStrongsForChapter(
   const words = await getStrongsWordsForChapter(book, chapter)
   const out: Record<number, string[]> = {}
   for (const [verseNum, pairs] of Object.entries(words)) {
-    out[Number(verseNum)] = pairs.map((p) => p.code)
+    out[Number(verseNum)] = pairs.map((p) => p.code).filter((c) => c.length > 0)
   }
   return out
 }

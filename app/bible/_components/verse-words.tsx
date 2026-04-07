@@ -109,7 +109,7 @@ function StrongsClickableWord({
 }
 
 /**
- * Renders verse text. When wordsWithCodes is provided (KJV word+code pairs), each word is clickable with the correct Strong's code. Otherwise shows plain text.
+ * Renders verse text. When wordsWithCodes is provided, tagged words are clickable; segments with an empty `code` are plain text (e.g. Kaiserlik text after the last Strong's tag). Otherwise shows API verse text.
  */
 export function VerseWords({
   verseNumber: _verseNumber,
@@ -124,19 +124,23 @@ export function VerseWords({
     return (
       <span className={className}>
         {wordsWithCodes.map(({ word, code }, i) => (
-          <span key={`${i}-${code}`}>
+          <span key={`${i}-${code || "plain"}`}>
             {i > 0 ? " " : null}
-            <StrongsClickableWord
-              code={code}
-              onSelect={onSelectStrongs}
-              className={
-                highlightStrongs
-                  ? "text-foreground border-b border-dashed border-amber-500/40 hover:border-amber-500/70"
-                  : undefined
-              }
-            >
-              {stripHtml(word)}
-            </StrongsClickableWord>
+            {code ? (
+              <StrongsClickableWord
+                code={code}
+                onSelect={onSelectStrongs}
+                className={
+                  highlightStrongs
+                    ? "text-foreground border-b border-dashed border-amber-500/40 hover:border-amber-500/70"
+                    : undefined
+                }
+              >
+                {stripHtml(word)}
+              </StrongsClickableWord>
+            ) : (
+              <span>{stripHtml(word)}</span>
+            )}
           </span>
         ))}
       </span>
