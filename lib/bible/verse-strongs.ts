@@ -3,6 +3,8 @@
  * Fetches book JSON from jsDelivr, parses "en" field (word[G1234] or word[H1234]) to ordered Strong's codes.
  */
 
+import { jsonrepair } from "jsonrepair"
+
 import { BIBLE_BOOKS_WITH_CHAPTER_COUNTS } from "@/lib/bible/constants"
 import { slugifyBookName } from "@/lib/bible/reference"
 import { verseStrongsLog } from "@/lib/bible/verse-strongs-log"
@@ -237,13 +239,20 @@ async function fetchKaiserlikJson(
       verseStrongsLog.fetchResponse(url, res.status, ok)
       if (!ok) continue
 
+      const text = await res.text()
       let json: KaiserlikBook
       try {
-        json = (await res.json()) as KaiserlikBook
+        json = JSON.parse(text) as KaiserlikBook
       } catch (parseErr) {
-        verseStrongsLog.jsonParseError(url, parseErr)
-        attempts[attempts.length - 1]!.error = `JSON parse: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`
-        continue
+        /** Kaiserlik embeds Spanish etc.; some files have broken string escaping. jsonrepair recovers enough for `en` keys. */
+        try {
+          json = JSON.parse(jsonrepair(text)) as KaiserlikBook
+          verseStrongsLog.jsonRepaired(url)
+        } catch {
+          verseStrongsLog.jsonParseError(url, parseErr)
+          attempts[attempts.length - 1]!.error = `JSON parse: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`
+          continue
+        }
       }
 
       bookCache.set(resolvedStem, json)

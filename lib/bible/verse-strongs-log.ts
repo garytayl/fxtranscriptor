@@ -52,6 +52,11 @@ export const verseStrongsLog = {
     console.error(`${PREFIX} JSON parse error for ${url}`, formatErr(error))
   },
 
+  /** Strict JSON.parse failed; jsonrepair recovered upstream Kaiserlik data. */
+  jsonRepaired(url: string): void {
+    console.warn(`${PREFIX} JSON repaired (upstream Kaiserlik file was invalid JSON): ${url}`)
+  },
+
   bookDataMissing(kaiserlikCode: string, topLevelKeys: string[]): void {
     console.error(`${PREFIX} getBookData empty or invalid after parse (code=${kaiserlikCode}, keys=${topLevelKeys.join(",")})`)
   },
