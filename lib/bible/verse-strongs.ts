@@ -162,11 +162,26 @@ function getKjvCodeFromSlug(bookSlug: string): string | null {
   return SLUG_TO_KJV_CODE[mapped] ?? null
 }
 
+/**
+ * API.Bible usually returns plain USFM (e.g. JHN). Some clients or wrappers may
+ * use compound ids — take the last segment so "…-JHN" still resolves.
+ */
+function normalizeUsfmFromApiBookId(raw: string): string | null {
+  const u = raw.trim().toUpperCase()
+  if (USFM_TO_KAISERLIK[u]) return u
+  const parts = u.split(/[-_]/)
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const seg = parts[i]
+    if (seg && USFM_TO_KAISERLIK[seg]) return seg
+  }
+  return null
+}
+
 /** Resolve kaiserlik JSON stem (e.g. Jhn) from URL slug and/or API book id. */
 export function resolveKaiserlikBookCode(ref: KjvStrongsBookRef): string | null {
   const fromSlug = getKjvCodeFromSlug(ref.slug)
   if (fromSlug) return fromSlug
-  const usfm = ref.id?.trim().toUpperCase()
+  const usfm = ref.id ? normalizeUsfmFromApiBookId(ref.id) : null
   if (usfm && USFM_TO_KAISERLIK[usfm]) return USFM_TO_KAISERLIK[usfm]
   return null
 }
@@ -179,7 +194,14 @@ async function fetchBookJson(ref: KjvStrongsBookRef): Promise<KaiserlikBook | nu
   for (const base of KJV_FETCH_BASES) {
     const url = `${base}/${code}.json`
     try {
-      const res = await fetch(url, { next: { revalidate: 86400 } })
+      // Avoid static/ISR bake-in of empty Strong's when build-time fetch fails; bypass Next fetch cache.
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "fxtranscriptor-scripture-reader/1.0",
+        },
+      })
       if (!res.ok) continue
       const json = (await res.json()) as KaiserlikBook
       bookCache.set(code, json)

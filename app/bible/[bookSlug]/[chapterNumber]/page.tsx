@@ -11,7 +11,8 @@ import {
 import { getStrongsWordsForChapter } from "@/lib/bible/verse-strongs"
 import { getKeyTermsForChapter } from "@/lib/bible/chapter-key-terms"
 
-export const revalidate = 3600
+/** Strong's JSON is fetched from jsDelivr/GitHub; must run at request time so failed build-time fetches never ship empty data. */
+export const dynamic = "force-dynamic"
 
 type PageProps = {
   params: Promise<{
