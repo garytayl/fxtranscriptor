@@ -3,7 +3,13 @@
  * Fetches book JSON from jsDelivr, parses "en" field (word[G1234] or word[H1234]) to ordered Strong's codes.
  */
 
-const KJV_BASE = "https://cdn.jsdelivr.net/gh/kaiserlik/kjv@main"
+import { BIBLE_BOOKS_WITH_CHAPTER_COUNTS } from "@/lib/bible/constants"
+import { slugifyBookName } from "@/lib/bible/reference"
+
+const KJV_FETCH_BASES = [
+  "https://cdn.jsdelivr.net/gh/kaiserlik/kjv@main",
+  "https://raw.githubusercontent.com/kaiserlik/kjv/main",
+]
 
 /** Our book slug (from API.Bible/slugifyBookName) -> kaiserlik book code (e.g. Jhn, 1Jo, Gen) */
 const SLUG_TO_KJV_CODE: Record<string, string> = {
@@ -75,6 +81,23 @@ const SLUG_TO_KJV_CODE: Record<string, string> = {
   revelation: "Rev",
 }
 
+/** Map API.Bible USFM book id (e.g. JHN) -> kaiserlik file stem (e.g. Jhn). Fills gaps when slugify yields a slug we do not list. */
+const USFM_TO_KAISERLIK: Record<string, string> = (() => {
+  const m: Record<string, string> = {}
+  for (const b of BIBLE_BOOKS_WITH_CHAPTER_COUNTS) {
+    const slug = slugifyBookName(b.name)
+    const code = SLUG_TO_KJV_CODE[slug]
+    if (code) m[b.id] = code
+  }
+  return m
+})()
+
+export type KjvStrongsBookRef = {
+  slug: string
+  /** USFM-style id from API.Bible (e.g. JHN, GEN). Used when slug does not match our map. */
+  id: string
+}
+
 /** Normalize Strong's code to canonical form (e.g. "g26" -> "G26"). */
 function normalizeCode(code: string): string {
   const c = code.toUpperCase()
@@ -127,26 +150,45 @@ type KaiserlikBook = Record<string, Record<string, KaiserlikChapter>>
 
 const bookCache = new Map<string, KaiserlikBook>()
 
-function getKjvCode(bookSlug: string): string | null {
-  const slug = bookSlug.toLowerCase().trim()
-  return SLUG_TO_KJV_CODE[slug] ?? null
+/** Same idea as API book slug aliases — API.Bible may use a slug we do not list verbatim. */
+const SLUG_ALIASES_FOR_KAISERLIK: Record<string, string> = {
+  psalm: "psalms",
+  "song-of-songs": "song-of-solomon",
 }
 
-async function fetchBook(bookSlug: string): Promise<KaiserlikBook | null> {
-  const code = getKjvCode(bookSlug)
+function getKjvCodeFromSlug(bookSlug: string): string | null {
+  const slug = bookSlug.toLowerCase().trim()
+  const mapped = SLUG_ALIASES_FOR_KAISERLIK[slug] ?? slug
+  return SLUG_TO_KJV_CODE[mapped] ?? null
+}
+
+/** Resolve kaiserlik JSON stem (e.g. Jhn) from URL slug and/or API book id. */
+export function resolveKaiserlikBookCode(ref: KjvStrongsBookRef): string | null {
+  const fromSlug = getKjvCodeFromSlug(ref.slug)
+  if (fromSlug) return fromSlug
+  const usfm = ref.id?.trim().toUpperCase()
+  if (usfm && USFM_TO_KAISERLIK[usfm]) return USFM_TO_KAISERLIK[usfm]
+  return null
+}
+
+async function fetchBookJson(ref: KjvStrongsBookRef): Promise<KaiserlikBook | null> {
+  const code = resolveKaiserlikBookCode(ref)
   if (!code) return null
-  const cached = bookCache.get(bookSlug)
+  const cached = bookCache.get(code)
   if (cached) return cached
-  const url = `${KJV_BASE}/${code}.json`
-  try {
-    const res = await fetch(url, { next: { revalidate: 86400 } })
-    if (!res.ok) return null
-    const json = (await res.json()) as KaiserlikBook
-    bookCache.set(bookSlug, json)
-    return json
-  } catch {
-    return null
+  for (const base of KJV_FETCH_BASES) {
+    const url = `${base}/${code}.json`
+    try {
+      const res = await fetch(url, { next: { revalidate: 86400 } })
+      if (!res.ok) continue
+      const json = (await res.json()) as KaiserlikBook
+      bookCache.set(code, json)
+      return json
+    } catch {
+      continue
+    }
   }
+  return null
 }
 
 /**
@@ -154,15 +196,15 @@ async function fetchBook(bookSlug: string): Promise<KaiserlikBook | null> {
  * Returns empty array if book/verse not found or not in KJV.
  */
 export async function getStrongsForVerse(
-  bookSlug: string,
+  book: KjvStrongsBookRef,
   chapter: number,
   verse: number
 ): Promise<string[]> {
-  const book = await fetchBook(bookSlug)
-  if (!book) return []
-  const kjvCode = getKjvCode(bookSlug)
+  const json = await fetchBookJson(book)
+  if (!json) return []
+  const kjvCode = resolveKaiserlikBookCode(book)
   if (!kjvCode) return []
-  const bookData = getBookData(book)
+  const bookData = getBookData(json)
   if (!bookData) return []
   const chapterKey = `${kjvCode}|${chapter}`
   const chapterData = bookData[chapterKey]
@@ -185,10 +227,10 @@ function getBookData(book: KaiserlikBook): Record<string, KaiserlikChapter> | nu
  * Get Strong's per verse for a whole chapter. Keys are verse numbers (1-based).
  */
 export async function getStrongsForChapter(
-  bookSlug: string,
+  book: KjvStrongsBookRef,
   chapter: number
 ): Promise<Record<number, string[]>> {
-  const words = await getStrongsWordsForChapter(bookSlug, chapter)
+  const words = await getStrongsWordsForChapter(book, chapter)
   const out: Record<number, string[]> = {}
   for (const [verseNum, pairs] of Object.entries(words)) {
     out[Number(verseNum)] = pairs.map((p) => p.code)
@@ -201,14 +243,14 @@ export async function getStrongsForChapter(
  * Use this to render verse text so each word matches its Strong's code (avoids WEB/KJV index mismatch).
  */
 export async function getStrongsWordsForChapter(
-  bookSlug: string,
+  book: KjvStrongsBookRef,
   chapter: number
 ): Promise<Record<number, StrongsWordAndCode[]>> {
-  const book = await fetchBook(bookSlug)
-  if (!book) return {}
-  const kjvCode = getKjvCode(bookSlug)
+  const json = await fetchBookJson(book)
+  if (!json) return {}
+  const kjvCode = resolveKaiserlikBookCode(book)
   if (!kjvCode) return {}
-  const bookData = getBookData(book)
+  const bookData = getBookData(json)
   if (!bookData) return {}
   const chapterKey = `${kjvCode}|${chapter}`
   const chapterData = bookData[chapterKey]

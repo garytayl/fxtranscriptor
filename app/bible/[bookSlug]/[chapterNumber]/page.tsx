@@ -74,7 +74,9 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const keyTerms = getKeyTermsForChapter(book.slug, chapterNumber)
   const kjvWordStudyEnabled = isKjvTranslationKey(activeKey)
   const strongsWordsByVerse =
-    kjvWordStudyEnabled && verses.length > 0 ? await getStrongsWordsForChapter(book.slug, chapterNumber) : {}
+    kjvWordStudyEnabled && verses.length > 0
+      ? await getStrongsWordsForChapter({ slug: book.slug, id: book.id }, chapterNumber)
+      : {}
 
   return (
     <BibleChapterShell

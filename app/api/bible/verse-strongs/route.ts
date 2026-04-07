@@ -4,15 +4,17 @@ import { getStrongsForChapter } from "@/lib/bible/verse-strongs"
 export const runtime = "nodejs"
 
 /**
- * GET /api/bible/verse-strongs?book=john&chapter=3
+ * GET /api/bible/verse-strongs?book=john&chapter=3&id=JHN
+ * Optional `id` is the API.Bible book id (USFM) when `book` slug does not match our map.
  * Returns Strong's codes per verse for the chapter (KJV word order).
  * Response: { "1": ["G1722","G746",...], "2": [...], ... }
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const book = searchParams.get("book")
+  const bookSlug = searchParams.get("book")
+  const bookId = searchParams.get("id") ?? ""
   const chapterParam = searchParams.get("chapter")
-  if (!book || !chapterParam) {
+  if (!bookSlug || !chapterParam) {
     return NextResponse.json(
       { error: "Query parameters 'book' and 'chapter' are required." },
       { status: 400 }
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid chapter." }, { status: 400 })
   }
   try {
-    const strongsByVerse = await getStrongsForChapter(book, chapter)
+    const strongsByVerse = await getStrongsForChapter({ slug: bookSlug, id: bookId }, chapter)
     const serialized: Record<string, string[]> = {}
     for (const [verseNum, codes] of Object.entries(strongsByVerse)) {
       serialized[String(verseNum)] = codes
