@@ -1,8 +1,10 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { WordStudyEntryContent } from "@/components/word-study"
 import { useLexiconCache } from "@/app/bible/_components/lexicon-cache-context"
+import type { StrongsEntry } from "@/lib/bible/lexicon"
 import { VerseText } from "@/lib/bible/verse-text"
 import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
@@ -14,7 +16,7 @@ type VerseWordsProps = {
   className?: string
   /** When true, words with Strong's get hover styling. */
   highlightStrongs?: boolean
-  /** Called when a word with Strong's is clicked (e.g. to show in sidebar). Definition is fetched on click only. */
+  /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
   onSelectStrongs?: (code: string) => void
   /** Map marker -> text or { text, href } for tooltips and optional cross-ref link. Used when no wordsWithCodes. */
   footnotesForVerse?: Record<string, string | { text: string; href?: string }>
@@ -29,7 +31,7 @@ function stripHtml(s: string): string {
 }
 
 /**
- * Clickable word with Strong's code. Definition loads in sidebar on click. If already in cache, hover shows definition.
+ * Clickable word with Strong's code. Hover/focus opens the definition (fetches on first open). Click still opens sidebar.
  */
 function StrongsClickableWord({
   code,
@@ -42,8 +44,37 @@ function StrongsClickableWord({
   className?: string
   onSelect?: (code: string) => void
 }) {
-  const { getCached } = useLexiconCache()
-  const cached = getCached(code)
+  const { getCached, getEntry } = useLexiconCache()
+  const [entry, setEntry] = useState<StrongsEntry | null>(() => getCached(code))
+  /** False until we know fetch outcome for the current hover (avoids flashing “not available” before load). */
+  const [lexiconReady, setLexiconReady] = useState(() => !!getCached(code))
+
+  useEffect(() => {
+    const c = getCached(code)
+    setEntry(c)
+    setLexiconReady(!!c)
+  }, [code, getCached])
+
+  const handleOpenChange = useCallback(
+    async (open: boolean) => {
+      if (!open) {
+        setLexiconReady(!!getCached(code))
+        return
+      }
+      const cached = getCached(code)
+      if (cached) {
+        setEntry(cached)
+        setLexiconReady(true)
+        return
+      }
+      setEntry(null)
+      setLexiconReady(false)
+      const e = await getEntry(code)
+      setEntry(e)
+      setLexiconReady(true)
+    },
+    [code, getCached, getEntry],
+  )
 
   const trigger = (
     <button
@@ -56,23 +87,25 @@ function StrongsClickableWord({
     </button>
   )
 
-  if (cached) {
-    return (
-      <HoverCard openDelay={200} closeDelay={100}>
-        <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
-        <HoverCardContent
-          align="start"
-          side="top"
-          sideOffset={6}
-          className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
-        >
-          <WordStudyEntryContent entry={cached} showKjvAlignmentNote />
-        </HoverCardContent>
-      </HoverCard>
-    )
-  }
-
-  return trigger
+  return (
+    <HoverCard openDelay={200} closeDelay={100} onOpenChange={handleOpenChange}>
+      <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+      <HoverCardContent
+        align="start"
+        side="top"
+        sideOffset={6}
+        className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
+      >
+        {entry ? (
+          <WordStudyEntryContent entry={entry} showKjvAlignmentNote />
+        ) : !lexiconReady ? (
+          <span className="text-sm text-white/60">Loading…</span>
+        ) : (
+          <span className="text-sm text-white/60">Definition not available.</span>
+        )}
+      </HoverCardContent>
+    </HoverCard>
+  )
 }
 
 /**
