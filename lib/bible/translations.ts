@@ -3,6 +3,9 @@ import "server-only"
 import { getBibleInfo } from "@/lib/bible/api"
 import { LOCAL_HCSB_BIBLE_ID } from "@/lib/bible/local-hcsb"
 
+/** Default API.Bible id for King James Version (see GET /v1/bibles). Override with API_BIBLE_KJV_ID. */
+export const DEFAULT_API_BIBLE_KJV_ID = "de4e12af7f28f599-01"
+
 export type BibleTranslation = {
   key: string
   label: string
@@ -86,10 +89,25 @@ export async function getResolvedTranslations(): Promise<BibleTranslation[]> {
   }
 
   const available = getAvailableTranslations()
-  const withHcsb: BibleTranslation[] = [
+  let withHcsb: BibleTranslation[] = [
     { key: "hcsb", label: "HCSB (Holman Christian Standard Bible)", bibleId: LOCAL_HCSB_BIBLE_ID },
     ...available,
   ]
+
+  const skipBuiltinKjv =
+    process.env.API_BIBLE_INCLUDE_KJV === "0" || process.env.API_BIBLE_INCLUDE_KJV === "false"
+  const configuredKjvId = process.env.API_BIBLE_KJV_ID?.trim()
+  const kjvBibleId =
+    configuredKjvId === "" ? null : (configuredKjvId ?? DEFAULT_API_BIBLE_KJV_ID)
+  const alreadyHasKjv =
+    kjvBibleId != null &&
+    withHcsb.some((t) => t.key.toLowerCase() === "kjv" || t.bibleId === kjvBibleId)
+  if (!skipBuiltinKjv && kjvBibleId && !alreadyHasKjv) {
+    withHcsb = [
+      ...withHcsb,
+      { key: "kjv", label: "King James Version", bibleId: kjvBibleId },
+    ]
+  }
 
   const resolved = await Promise.all(
     withHcsb.map(async (translation) => {
