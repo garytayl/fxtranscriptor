@@ -3,12 +3,17 @@
 import { VerseWords } from "./verse-words"
 import { isVerseInRange } from "@/lib/bible/reference"
 import type { VerseRange } from "@/lib/bible/reference"
+import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 export type FootnoteEntry = string | { text: string; href?: string }
 
 type ChapterVerseListProps = {
   verses: { number: number; text: string }[]
   highlightRange: VerseRange | null
+  /** KJV word + code per verse; when present for a verse, that verse is rendered from this (correct alignment). */
+  strongsWordsByVerse?: Record<number, StrongsWordAndCode[]>
+  /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
+  onSelectStrongs?: (code: string) => void
   /** Footnote by verse and marker; may include kind/target for cross-ref links. */
   footnotes?: {
     verseNumber: number
@@ -39,12 +44,19 @@ function buildFootnotesByVerse(
   return byVerse
 }
 
-export function ChapterVerseList({ verses, highlightRange, footnotes }: ChapterVerseListProps) {
+export function ChapterVerseList({
+  verses,
+  highlightRange,
+  strongsWordsByVerse = {},
+  onSelectStrongs,
+  footnotes,
+}: ChapterVerseListProps) {
   const footnotesByVerse = footnotes ? buildFootnotesByVerse(footnotes) : {}
   return (
     <ol className="space-y-1 sm:space-y-2 text-[0.9375rem] sm:text-base leading-[1.8] sm:leading-relaxed">
       {verses.map((verse) => {
         const isHighlighted = highlightRange ? isVerseInRange(verse.number, highlightRange) : false
+        const wordsWithCodes = strongsWordsByVerse[verse.number]
         const footnotesForVerse = footnotesByVerse[verse.number]
         return (
           <li
@@ -68,6 +80,9 @@ export function ChapterVerseList({ verses, highlightRange, footnotes }: ChapterV
             <VerseWords
               verseNumber={verse.number}
               text={verse.text}
+              wordsWithCodes={wordsWithCodes}
+              highlightStrongs={true}
+              onSelectStrongs={onSelectStrongs}
               footnotesForVerse={footnotesForVerse}
             />
           </li>

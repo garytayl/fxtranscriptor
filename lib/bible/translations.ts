@@ -157,3 +157,17 @@ export function getTranslationByKey(key: string | null | undefined): BibleTransl
 export function getDefaultBibleId(): string | undefined {
   return getDefaultTranslation()?.bibleId
 }
+
+/**
+ * Translation key(s) for which we show KJV-aligned per-word Strong's in the scripture reader.
+ * Default key is `kjv`. Set `API_BIBLE_KJV_KEY` to a comma-separated list if your KJV uses another key.
+ */
+export function isKjvTranslationKey(key: string | null | undefined): boolean {
+  if (!key) return false
+  const configured = process.env.API_BIBLE_KJV_KEY ?? "kjv"
+  const allowed = configured
+    .split(",")
+    .map((k) => k.trim().toLowerCase())
+    .filter(Boolean)
+  return allowed.includes(key.trim().toLowerCase())
+}

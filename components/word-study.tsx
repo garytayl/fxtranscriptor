@@ -18,7 +18,14 @@ type WordStudyProps = {
 }
 
 /** Shared display for a Strong's entry (used in tooltip and sidebar). */
-export function WordStudyEntryContent({ entry }: { entry: StrongsEntry }) {
+export function WordStudyEntryContent({
+  entry,
+  showKjvAlignmentNote = false,
+}: {
+  entry: StrongsEntry
+  /** When true, explains that lexicon English may differ from KJV verse wording used for Strong’s. */
+  showKjvAlignmentNote?: boolean
+}) {
   const isGreek = entry.language === "greek"
   return (
     <div className="space-y-2 text-left">
@@ -49,6 +56,12 @@ export function WordStudyEntryContent({ entry }: { entry: StrongsEntry }) {
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
         {isGreek ? "Greek" : "Hebrew"} · Strong’s
       </p>
+      {showKjvAlignmentNote && (
+        <p className="text-[10px] leading-snug text-muted-foreground/90 border-t border-border pt-2 mt-1">
+          Lexicon glosses use their own English (often modern). The verse line uses KJV wording so each
+          word lines up with its Strong&apos;s code.
+        </p>
+      )}
     </div>
   )
 }
