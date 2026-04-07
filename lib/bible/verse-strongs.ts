@@ -118,13 +118,36 @@ function parseEnToStrongsOrder(en: string): string[] {
   return codes
 }
 
-/** `code` is empty when this segment has no Strong's tag (e.g. untagged text after the last `[G#]` in Kaiserlik `en`). */
+/** `code` is empty when this segment has no Strong's tag (e.g. words before the tagged word in a phrase, or Kaiserlik text after the last `[G#]`). */
 export type StrongsWordAndCode = { word: string; code: string }
+
+/** Kaiserlik embeds `<em>…</em>` in `en`; strip before splitting multi-word spans. */
+function stripKaiserlikMarkup(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+}
+
+/**
+ * Kaiserlik often puts several English words before one tag, e.g. `in[G1722] the daily[G2522]`.
+ * Only the word immediately before `[G#]` is tagged; leading words in that span have no Strong's in the source.
+ */
+function expandRawToWordSegments(raw: string, code: string): StrongsWordAndCode[] {
+  const cleaned = stripKaiserlikMarkup(raw)
+  if (!cleaned) return []
+  const parts = cleaned.split(/\s+/).filter(Boolean)
+  if (parts.length === 1) return [{ word: parts[0], code }]
+  const out: StrongsWordAndCode[] = []
+  for (let i = 0; i < parts.length - 1; i++) {
+    out.push({ word: parts[i], code: "" })
+  }
+  out.push({ word: parts[parts.length - 1], code })
+  return out
+}
 
 /**
  * Parse "en" to word+code pairs so the displayed text matches the Strong's codes (KJV wording).
  * Handles consecutive codes like "every man[G3956][G444]" by using a middle dot for the second code so the same word is not shown twice.
- * Appends any text after the final `[G#]`/`[H#]` as a plain segment (`code: ""`) so verses are not truncated.
+ * Splits multi-word spans before each tag so only the last word carries that Strong's number.
+ * Appends text after the final `[G#]`/`[H#]` as plain word segments (`code: ""`).
  */
 export function parseEnToWordsAndCodes(en: string): StrongsWordAndCode[] {
   const pairs: StrongsWordAndCode[] = []
@@ -133,20 +156,41 @@ export function parseEnToWordsAndCodes(en: string): StrongsWordAndCode[] {
   let lastWord = ""
   let m: RegExpExecArray | null
   while ((m = regex.exec(en)) !== null) {
-    const raw = en.slice(lastIndex, m.index).trim()
+    const raw = en.slice(lastIndex, m.index)
     const code = normalizeCode(m[1])
-    const displayWord = raw || lastWord || code
-    if (!raw && lastWord) {
+
+    if (!raw.trim() && lastWord) {
       pairs.push({ word: "\u00b7", code })
-    } else {
-      pairs.push({ word: displayWord, code })
+      lastIndex = m.index + m[0].length
+      continue
     }
-    lastWord = displayWord
+
+    if (!raw.trim()) {
+      const fallback = lastWord || code
+      pairs.push({ word: fallback, code })
+      lastWord = fallback
+      lastIndex = m.index + m[0].length
+      continue
+    }
+
+    const segments = expandRawToWordSegments(raw, code)
+    if (segments.length === 0) {
+      pairs.push({ word: code, code })
+      lastWord = code
+    } else {
+      for (const seg of segments) {
+        pairs.push(seg)
+      }
+      lastWord = segments[segments.length - 1]!.word
+    }
     lastIndex = m.index + m[0].length
   }
-  const afterLastTag = en.slice(lastIndex).trim()
+
+  const afterLastTag = stripKaiserlikMarkup(en.slice(lastIndex))
   if (afterLastTag) {
-    pairs.push({ word: afterLastTag, code: "" })
+    for (const w of afterLastTag.split(/\s+/).filter(Boolean)) {
+      pairs.push({ word: w, code: "" })
+    }
   }
   return pairs
 }

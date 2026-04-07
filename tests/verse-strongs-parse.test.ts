@@ -18,4 +18,15 @@ describe("parseEnToWordsAndCodes", () => {
     expect(pairs[1]).toEqual({ word: "\u00b7", code: "G444" })
     expect(pairs[2]).toEqual({ word: "man", code: "" })
   })
+
+  it("splits multi-word spans so only the last word before [G#] gets that Strong's code", () => {
+    const en = "in[G1] the daily[G2] ministration."
+    const pairs = parseEnToWordsAndCodes(en)
+    expect(pairs).toEqual([
+      { word: "in", code: "G1" },
+      { word: "the", code: "" },
+      { word: "daily", code: "G2" },
+      { word: "ministration.", code: "" },
+    ])
+  })
 })
