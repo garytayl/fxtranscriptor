@@ -345,7 +345,7 @@ function emptyTrace(book: KjvStrongsBookRef, chapter: number, partial: Partial<S
 }
 
 /**
- * Load Strong's word data plus a diagnostic trace (for BIBLE_STRONGS_DEBUG UI and server logs).
+ * Load Strong's word data plus a diagnostic trace (used by {@link getStrongsWordsForChapter}; trace is not exposed in the app UI).
  */
 export async function loadStrongsChapterWithTrace(
   book: KjvStrongsBookRef,

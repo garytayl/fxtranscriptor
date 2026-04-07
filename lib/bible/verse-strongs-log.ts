@@ -79,8 +79,3 @@ export const verseStrongsLog = {
     console.info(`${PREFIX} skipped: ${reason}`)
   },
 }
-
-export function isVerseStrongsDebugUiEnabled(): boolean {
-  const v = process.env.BIBLE_STRONGS_DEBUG
-  return v === "1" || v === "true"
-}

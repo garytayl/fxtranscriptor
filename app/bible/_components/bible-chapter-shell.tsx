@@ -13,10 +13,9 @@ import { ChapterWordStudy } from "@/app/bible/_components/chapter-word-study"
 import { ChapterVerseList } from "@/app/bible/_components/chapter-verse-list"
 import { LexiconCacheProvider } from "@/app/bible/_components/lexicon-cache-context"
 import { WordStudySidebarPanel } from "@/app/bible/_components/word-study-sidebar"
-import { StrongsDebugPanel } from "@/app/bible/_components/strongs-debug-panel"
 import type { VerseRange } from "@/lib/bible/reference"
 import type { BibleTranslation } from "@/lib/bible/translations"
-import type { StrongsLoadTrace, StrongsWordAndCode } from "@/lib/bible/verse-strongs"
+import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 const DISMISS_THRESHOLD = 60
 
@@ -160,8 +159,6 @@ export type BibleChapterShellProps = {
     targetChapter?: number | null
     targetVerse?: number | null
   }[]
-  /** Set when BIBLE_STRONGS_DEBUG=1 — Kaiserlik load diagnostics for operators. */
-  strongsLoadTrace?: StrongsLoadTrace | null
 }
 
 function ChapterBody({
@@ -180,7 +177,6 @@ function ChapterBody({
   translations,
   activeKey,
   footnotes,
-  strongsLoadTrace,
   onSelectStrongs,
 }: BibleChapterShellProps & { onSelectStrongs?: (code: string) => void }) {
   const hasStrongsForChapter =
@@ -241,18 +237,6 @@ function ChapterBody({
           than the verse (e.g. modern &quot;you&quot; vs &quot;ye&quot;).
         </p>
       )}
-
-      {kjvWordStudyEnabled && verses.length > 0 && !hasStrongsForChapter && (
-        <p className="text-[11px] sm:text-xs leading-relaxed text-amber-900/90 dark:text-amber-200/90 border border-amber-500/35 bg-amber-500/10 rounded-md px-3 py-2">
-          No Strong&apos;s word data loaded for this chapter (sidebar will stay empty until a word can be resolved).
-          Check the server or Vercel function logs for lines starting with{" "}
-          <span className="font-mono text-[10px]">[strongs]</span> — they include HTTP status, URLs tried, and chapter
-          keys. Set environment variable{" "}
-          <span className="font-mono text-[10px]">BIBLE_STRONGS_DEBUG=1</span> to show a full trace on this page.
-        </p>
-      )}
-
-      {strongsLoadTrace ? <StrongsDebugPanel trace={strongsLoadTrace} /> : null}
 
       {errorMessage ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">

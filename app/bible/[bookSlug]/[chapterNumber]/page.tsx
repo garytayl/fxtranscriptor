@@ -8,12 +8,7 @@ import {
   getResolvedTranslationByKey,
   isKjvTranslationKey,
 } from "@/lib/bible/translations"
-import { isVerseStrongsDebugUiEnabled } from "@/lib/bible/verse-strongs-log"
-import {
-  getStrongsWordsForChapter,
-  loadStrongsChapterWithTrace,
-  type StrongsLoadTrace,
-} from "@/lib/bible/verse-strongs"
+import { getStrongsWordsForChapter } from "@/lib/bible/verse-strongs"
 import { getKeyTermsForChapter } from "@/lib/bible/chapter-key-terms"
 
 /** Strong's JSON is fetched from jsDelivr/GitHub; must run at request time so failed build-time fetches never ship empty data. */
@@ -79,17 +74,10 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const query = activeKey ? `?t=${activeKey}` : ""
   const keyTerms = getKeyTermsForChapter(book.slug, chapterNumber)
   const kjvWordStudyEnabled = isKjvTranslationKey(activeKey)
-  let strongsWordsByVerse: Awaited<ReturnType<typeof getStrongsWordsForChapter>> = {}
-  let strongsLoadTrace: StrongsLoadTrace | null = null
-  if (kjvWordStudyEnabled && verses.length > 0) {
-    if (isVerseStrongsDebugUiEnabled()) {
-      const r = await loadStrongsChapterWithTrace({ slug: book.slug, id: book.id }, chapterNumber)
-      strongsWordsByVerse = r.words
-      strongsLoadTrace = r.trace
-    } else {
-      strongsWordsByVerse = await getStrongsWordsForChapter({ slug: book.slug, id: book.id }, chapterNumber)
-    }
-  }
+  const strongsWordsByVerse =
+    kjvWordStudyEnabled && verses.length > 0
+      ? await getStrongsWordsForChapter({ slug: book.slug, id: book.id }, chapterNumber)
+      : {}
 
   return (
     <BibleChapterShell
@@ -108,7 +96,6 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       translations={translations}
       activeKey={activeKey}
       footnotes={footnotes}
-      strongsLoadTrace={strongsLoadTrace}
     />
   )
 }
