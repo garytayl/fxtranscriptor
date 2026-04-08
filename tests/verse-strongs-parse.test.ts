@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { fillTrailingPlainStrongs } from "@/lib/bible/strongs-tail-guess"
 import { parseEnToWordsAndCodes } from "@/lib/bible/verse-strongs"
 
 describe("parseEnToWordsAndCodes", () => {
@@ -28,5 +29,20 @@ describe("parseEnToWordsAndCodes", () => {
       { word: "daily", code: "G2" },
       { word: "ministration.", code: "" },
     ])
+  })
+
+  it("fills trailing untagged Kaiserlik words with Greek Strong's (NT) when uniquely guessable", () => {
+    const en = "in[G1722] the daily[G2522] ministration."
+    const parsed = parseEnToWordsAndCodes(en)
+    const filled = fillTrailingPlainStrongs(parsed, "ACT")
+    const last = filled[filled.length - 1]
+    expect(last?.word).toMatch(/^ministration/)
+    expect(last?.code).toBe("G3009")
+  })
+
+  it("uses overrides for ambiguous plural tails (e.g. tables)", () => {
+    const en = "serve[G1247] tables."
+    const filled = fillTrailingPlainStrongs(parseEnToWordsAndCodes(en), "ACT")
+    expect(filled[filled.length - 1]).toEqual({ word: "tables.", code: "G5132" })
   })
 })

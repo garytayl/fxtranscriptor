@@ -7,6 +7,7 @@ import { jsonrepair } from "jsonrepair"
 
 import { BIBLE_BOOKS_WITH_CHAPTER_COUNTS } from "@/lib/bible/constants"
 import { slugifyBookName } from "@/lib/bible/reference"
+import { fillTrailingPlainStrongs } from "@/lib/bible/strongs-tail-guess"
 import { verseStrongsLog } from "@/lib/bible/verse-strongs-log"
 
 const KJV_FETCH_BASES = [
@@ -491,7 +492,7 @@ export async function loadStrongsChapterWithTrace(
     const lastPipe = verseKey.lastIndexOf("|")
     const verseNum = lastPipe >= 0 ? parseInt(verseKey.slice(lastPipe + 1), 10) : 0
     if (verseNum && verseObj?.en) {
-      out[verseNum] = parseEnToWordsAndCodes(verseObj.en)
+      out[verseNum] = fillTrailingPlainStrongs(parseEnToWordsAndCodes(verseObj.en), book.id)
     }
   }
 
