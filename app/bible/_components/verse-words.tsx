@@ -31,6 +31,26 @@ function stripHtml(s: string): string {
 }
 
 /**
+ * Kaiserlik splits one tagged span into leading plain words + one tagged word; those belong
+ * together visually. Group each run of plain segments with the following tagged word, and group
+ * any trailing plain run — wrapped in nowrap so line breaks don't tear phrases apart.
+ */
+function groupWordsForPhraseLayout(pairs: { word: string; code: string }[]): { word: string; code: string }[][] {
+  const groups: { word: string; code: string }[][] = []
+  let buf: { word: string; code: string }[] = []
+  for (const p of pairs) {
+    if (p.code) {
+      groups.push([...buf, p])
+      buf = []
+    } else {
+      buf.push(p)
+    }
+  }
+  if (buf.length) groups.push(buf)
+  return groups
+}
+
+/**
  * Clickable word with Strong's code. Hover/focus opens the definition (fetches on first open). Click still opens sidebar.
  */
 function StrongsClickableWord({
@@ -121,28 +141,42 @@ export function VerseWords({
   footnotesForVerse,
 }: VerseWordsProps) {
   if (wordsWithCodes && wordsWithCodes.length > 0) {
+    const groups = groupWordsForPhraseLayout(wordsWithCodes)
     return (
       <span className={className}>
-        {wordsWithCodes.map(({ word, code }, i) => (
-          <span key={`${i}-${code || "plain"}`}>
-            {i > 0 ? " " : null}
-            {code ? (
-              <StrongsClickableWord
-                code={code}
-                onSelect={onSelectStrongs}
-                className={
-                  highlightStrongs
-                    ? "text-foreground border-b border-dashed border-amber-500/40 hover:border-amber-500/70"
-                    : undefined
-                }
-              >
-                {stripHtml(word)}
-              </StrongsClickableWord>
-            ) : (
-              <span>{stripHtml(word)}</span>
-            )}
+        {groups.map((group, gi) => {
+          const hasTag = group.some((p) => p.code)
+          const plainOnlyTail = !hasTag && group.every((p) => !p.code)
+          const nowrap =
+            hasTag || (plainOnlyTail && group.length <= 6)
+          return (
+          <span key={`g-${gi}`}>
+            {gi > 0 ? " " : null}
+            <span className={nowrap ? "inline whitespace-nowrap" : "inline"}>
+              {group.map(({ word, code }, wi) => (
+                <span key={`${gi}-${wi}-${code || "plain"}`}>
+                  {wi > 0 ? " " : null}
+                  {code ? (
+                    <StrongsClickableWord
+                      code={code}
+                      onSelect={onSelectStrongs}
+                      className={
+                        highlightStrongs
+                          ? "text-foreground border-b border-dashed border-amber-500/40 hover:border-amber-500/70"
+                          : undefined
+                      }
+                    >
+                      {stripHtml(word)}
+                    </StrongsClickableWord>
+                  ) : (
+                    <span>{stripHtml(word)}</span>
+                  )}
+                </span>
+              ))}
+            </span>
           </span>
-        ))}
+          )
+        })}
       </span>
     )
   }
