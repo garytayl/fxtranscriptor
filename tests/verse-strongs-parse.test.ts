@@ -20,15 +20,22 @@ describe("parseEnToWordsAndCodes", () => {
     expect(pairs[2]).toEqual({ word: "man", code: "" })
   })
 
-  it("splits multi-word spans so only the last word before [G#] gets that Strong's code", () => {
+  it("keeps multi-word spans before [G#] as one phrase sharing that Strong's code", () => {
     const en = "in[G1] the daily[G2] ministration."
     const pairs = parseEnToWordsAndCodes(en)
     expect(pairs).toEqual([
       { word: "in", code: "G1" },
-      { word: "the", code: "" },
-      { word: "daily", code: "G2" },
+      { word: "the daily", code: "G2" },
       { word: "ministration.", code: "" },
     ])
+  })
+
+  it("groups imperative phrases like look ye out under one Strong's", () => {
+    const en =
+      "Wherefore,[G3767] brethren,[G80] look ye out[G1980] among[G1537] you[G5216] seven[G2033] men[G435]"
+    const pairs = parseEnToWordsAndCodes(en)
+    const lookPhrase = pairs.find((p) => p.word.includes("look"))
+    expect(lookPhrase).toEqual({ word: "look ye out", code: "G1980" })
   })
 
   it("fills trailing untagged Kaiserlik words with Greek Strong's (NT) when uniquely guessable", () => {

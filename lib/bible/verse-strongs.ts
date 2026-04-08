@@ -128,26 +128,23 @@ function stripKaiserlikMarkup(s: string): string {
 }
 
 /**
- * Kaiserlik often puts several English words before one tag, e.g. `in[G1722] the daily[G2522]`.
- * Only the word immediately before `[G#]` is tagged; leading words in that span have no Strong's in the source.
+ * Kaiserlik puts one `[G#]` after the last English word of a span that often maps to **one**
+ * Greek/Hebrew lemma (e.g. `look ye out[G1689]`). Keep the whole phrase as **one** surface
+ * string with that Strong's so the UI shows one grouped highlight (not only the last word).
  */
 function expandRawToWordSegments(raw: string, code: string): StrongsWordAndCode[] {
   const cleaned = stripKaiserlikMarkup(raw)
   if (!cleaned) return []
   const parts = cleaned.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return []
   if (parts.length === 1) return [{ word: parts[0], code }]
-  const out: StrongsWordAndCode[] = []
-  for (let i = 0; i < parts.length - 1; i++) {
-    out.push({ word: parts[i], code: "" })
-  }
-  out.push({ word: parts[parts.length - 1], code })
-  return out
+  return [{ word: parts.join(" "), code }]
 }
 
 /**
  * Parse "en" to word+code pairs so the displayed text matches the Strong's codes (KJV wording).
  * Handles consecutive codes like "every man[G3956][G444]" by using a middle dot for the second code so the same word is not shown twice.
- * Splits multi-word spans before each tag so only the last word carries that Strong's number.
+ * Multi-word spans before a tag are kept as one phrase with that Strong's number.
  * Appends text after the final `[G#]`/`[H#]` as plain word segments (`code: ""`).
  */
 export function parseEnToWordsAndCodes(en: string): StrongsWordAndCode[] {
