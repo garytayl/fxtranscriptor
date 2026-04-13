@@ -2,7 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, Target, Trophy, X, Zap } from "lucide-react"
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Flame,
+  Menu,
+  Sparkles,
+  Target,
+  Trophy,
+  X,
+  Zap,
+} from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
@@ -28,6 +40,7 @@ const STORAGE_KEY = "fx_devotions_greek_place_v1"
 const MENU_SWIPE_CLOSE_THRESHOLD = 72
 const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
 const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
+const GREEK_PAGE_KEY = "fx_devotions_greek_v1_page"
 const SESSION_XP = 14
 const VERSE_XP = 8
 const WORD_XP = 12
@@ -36,6 +49,7 @@ const COACH_XP = 20
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
 type GreekCoachPayload = { insight: string; prayerPrompt: string }
+type GreekStudioPage = "xp-home" | "study" | "progress"
 
 function loadPlace(): StoredPlace | null {
   if (typeof window === "undefined") return null
@@ -63,6 +77,7 @@ function stripHtmlTags(s: string): string {
 }
 
 export function GreekOneVerseClient() {
+  const [page, setPage] = useState<GreekStudioPage>("xp-home")
   const [pilotIdx, setPilotIdx] = useState(0)
   const [verse, setVerse] = useState(1)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -154,6 +169,19 @@ export function GreekOneVerseClient() {
   }, [xpBurst])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+    const stored = window.localStorage.getItem(GREEK_PAGE_KEY)
+    if (stored === "study" || stored === "progress" || stored === "xp-home") {
+      setPage(stored as GreekStudioPage)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(GREEK_PAGE_KEY, page)
+  }, [page])
+
+  useEffect(() => {
     if (!hydrated) return
     savePlace({ bookSlug: pilot.bookSlug, chapter: pilot.chapter, verse })
   }, [hydrated, pilot.bookSlug, pilot.chapter, verse])
@@ -167,6 +195,7 @@ export function GreekOneVerseClient() {
     if (initializedDailySession.current) return
     initializedDailySession.current = true
     awardProgress({ kind: "session", key: "daily-open", xp: SESSION_XP })
+    setPage("xp-home")
   }, [hydrated, awardProgress])
 
   useEffect(() => {
@@ -266,6 +295,12 @@ export function GreekOneVerseClient() {
   useEffect(() => {
     if (selectedWordIndex == null) setDetailDragOffsetY(0)
   }, [selectedWordIndex])
+
+  useEffect(() => {
+    if (page !== "study") {
+      setSelectedWordIndex(null)
+    }
+  }, [page])
 
   const selectPilot = useCallback((idx: number) => {
     setPilotIdx(idx)
@@ -513,12 +548,7 @@ export function GreekOneVerseClient() {
     return () => window.removeEventListener("keydown", onKey)
   }, [menuOpen, selectedWordIndex, closeMenu, closeDetails, prevVerse, nextVerse])
 
-  const verseGoal = 6
-  const wordGoal = 8
-  const coachGoal = 1
-  const dailyVersePct = Math.max(0, Math.min(100, (progress.versesToday / verseGoal) * 100))
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
-
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -555,6 +585,45 @@ export function GreekOneVerseClient() {
             <Menu className="size-3.5" />
             Menu
           </button>
+        </div>
+        <div className="px-4 pb-2 sm:px-8 md:px-14">
+          <div className="mx-auto max-w-5xl">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
+              <motion.div
+                className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
+                style={{ width: `${dailyXpPct}%` }}
+                animate={xpBurst != null ? { filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : undefined}
+                transition={xpBurst != null ? { duration: 0.4 } : undefined}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="px-4 pb-3 sm:px-8 md:px-14">
+          <div className="mx-auto flex max-w-5xl items-center gap-2">
+            {(
+              [
+                ["xp-home", "XP"],
+                ["study", "Study"],
+                ["progress", "Progress"],
+              ] as const
+            ).map(([value, label]) => {
+              const active = page === value
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPage(value)}
+                  className={`rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors ${
+                    active
+                      ? "border-emerald-300/55 bg-emerald-400/20 text-emerald-100"
+                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </header>
 
@@ -707,161 +776,217 @@ export function GreekOneVerseClient() {
         onTouchEnd={onVerseTouchEnd}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-          <div className="space-y-2 text-center">
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-300/75">
-              {passageRef.replace(":", " · ")}
-            </p>
-            <div className="mx-auto h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-300/80 to-amber-300/80"
-                style={{ width: verseProgress }}
-              />
-            </div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
-              Verse {verse} of {pilot.maxVerse}
-            </p>
-          </div>
+          {page === "xp-home" ? (
+            <motion.section
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.26 }}
+              className="rounded-2xl border border-white/15 bg-black/30 p-3 sm:p-4 space-y-3 backdrop-blur-md"
+              aria-label="Greek study progression home"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1">
+                  <Trophy className="size-3.5 text-emerald-100" />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100">
+                    Level {progress.level}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">Total XP</p>
+                  <p className="text-sm font-semibold text-white/90">{progress.totalXp}</p>
+                </div>
+              </div>
 
-          <motion.section
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.26 }}
-            className="rounded-2xl border border-white/15 bg-black/30 p-3 sm:p-4 space-y-3 backdrop-blur-md"
-            aria-label="Greek study progress"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1">
-                <Trophy className="size-3.5 text-emerald-100" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px]">
+                  <span className="font-mono uppercase tracking-[0.14em] text-white/50">
+                    <Zap className="mr-1 inline size-3.5 text-amber-200/80" />
+                    Today {progress.todayXp}/{progress.dailyGoalXp} XP
+                  </span>
+                  <span className={`font-mono uppercase tracking-[0.14em] ${progress.dailyGoalReached ? "text-emerald-200/90" : "text-white/45"}`}>
+                    {progress.dailyGoalReached ? "Goal reached" : "Daily goal"}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-300"
+                    style={{ width: `${dailyXpPct}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Streak</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white/90">
+                    <Flame className="mr-1 inline size-3.5 text-orange-300/90" />
+                    {progress.streak}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Verses</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white/90">{progress.versesToday}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Words</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white/90">{progress.wordsToday}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Coach</p>
+                  <p className="mt-0.5 text-sm font-semibold text-white/90">
+                    <Target className="mr-1 inline size-3.5 text-cyan-200/85" />
+                    {progress.coachToday}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-white/55">
+                Start here daily, then move to Study and Progress pages.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPage("study")}
+                className="w-full rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25 sm:w-auto"
+              >
+                Start study
+              </button>
+            </motion.section>
+          ) : null}
+
+          {page === "study" ? (
+            <>
+              <div className="space-y-2 text-center">
+                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-300/75">
+                  {passageRef.replace(":", " · ")}
+                </p>
+                <div className="mx-auto h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-300/80 to-amber-300/80"
+                    style={{ width: verseProgress }}
+                  />
+                </div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+                  Verse {verse} of {pilot.maxVerse}
+                </p>
+              </div>
+
+              {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
+
+              <section className="min-h-[56vh] sm:min-h-[60vh] flex items-center justify-center">
+                <AnimatePresence mode="wait">
+                  {loading ? (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="w-full max-w-3xl space-y-4 animate-pulse"
+                    >
+                      <div className="h-10 rounded-xl bg-white/10" />
+                      <div className="h-10 rounded-xl bg-white/10" />
+                      <div className="h-10 rounded-xl bg-white/10" />
+                    </motion.div>
+                  ) : greekTokens.length > 0 ? (
+                    <motion.div
+                      key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
+                      initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
+                      transition={{ duration: 0.28, ease: "easeOut" }}
+                      lang="el"
+                      className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
+                      style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
+                    >
+                      {greekTokens.map((tok, wi) => {
+                        const selected = selectedWordIndex === wi
+                        const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
+                        return (
+                          <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectGreekWord(wi)}
+                              className={
+                                selected
+                                  ? "border-b-2 border-amber-300/85 text-amber-200"
+                                  : "border-b border-dashed border-amber-300/35 text-amber-100/95 hover:border-amber-300/70 hover:text-amber-50"
+                              }
+                            >
+                              {tok.word}
+                            </button>
+                            {hint ? (
+                              <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
+                            ) : null}
+                          </span>
+                        )
+                      })}
+                    </motion.div>
+                  ) : (
+                    <motion.p
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="text-center text-sm text-white/45"
+                    >
+                      Greek text unavailable for this verse.
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </section>
+            </>
+          ) : null}
+
+          {page === "progress" ? (
+            <motion.section
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-white/15 bg-black/35 p-4 sm:p-5 space-y-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-200/80">Progress detail</p>
+                <span className="rounded-full border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100">
                   Level {progress.level}
                 </span>
               </div>
-              <div className="text-right">
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">Total XP</p>
-                <p className="text-sm font-semibold text-white/90">{progress.totalXp}</p>
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1 flex items-center justify-between text-[11px]">
-                <span className="font-mono uppercase tracking-[0.14em] text-white/50">
-                  <Zap className="mr-1 inline size-3.5 text-amber-200/80" />
-                  Today {progress.todayXp}/{progress.dailyGoalXp} XP
-                </span>
-                <span className={`font-mono uppercase tracking-[0.14em] ${progress.dailyGoalReached ? "text-emerald-200/90" : "text-white/45"}`}>
-                  {progress.dailyGoalReached ? "Goal reached" : "Daily goal"}
-                </span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-300"
-                  style={{ width: `${dailyXpPct}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Streak</p>
-                <p className="mt-0.5 text-sm font-semibold text-white/90">
-                  <Flame className="mr-1 inline size-3.5 text-orange-300/90" />
-                  {progress.streak}
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Verses</p>
-                <p className="mt-0.5 text-sm font-semibold text-white/90">
-                  {progress.versesToday}/{verseGoal}
-                </p>
-                <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-emerald-300/80" style={{ width: `${dailyVersePct}%` }} />
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Total XP</p>
+                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.totalXp}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Today XP</p>
+                  <p className="mt-1 text-sm font-semibold text-white/92">
+                    {progress.todayXp}/{progress.dailyGoalXp}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Streak</p>
+                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.streak} days</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Unique forms</p>
+                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.uniqueWordFormsToday}</p>
                 </div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Words</p>
-                <p className="mt-0.5 text-sm font-semibold text-white/90">
-                  {progress.wordsToday}/{wordGoal}
-                </p>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Today checklist</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-white/82">
+                  <li>• Verses explored: {progress.versesToday}</li>
+                  <li>• Words inspected: {progress.wordsToday}</li>
+                  <li>• Coach asks: {progress.coachToday}</li>
+                </ul>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Coach</p>
-                <p className="mt-0.5 text-sm font-semibold text-white/90">
-                  <Target className="mr-1 inline size-3.5 text-cyan-200/85" />
-                  {Math.min(progress.coachToday, coachGoal)}/{coachGoal}
-                </p>
-              </div>
-            </div>
+              <button
+                type="button"
+                onClick={() => setPage("study")}
+                className="w-full rounded-xl border border-cyan-300/40 bg-cyan-300/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100 hover:bg-cyan-300/25 sm:w-auto"
+              >
+                Back to study
+              </button>
+            </motion.section>
+          ) : null}
 
-            <p className="text-[11px] text-white/55">
-              Dig in daily: read {verseGoal} verses, inspect {wordGoal} words, ask coach once, and build your Greek streak.
-            </p>
-          </motion.section>
-
-          {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
-
-          <section className="min-h-[56vh] sm:min-h-[60vh] flex items-center justify-center">
-            <AnimatePresence mode="wait">
-              {loading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="w-full max-w-3xl space-y-4 animate-pulse"
-                >
-                  <div className="h-10 rounded-xl bg-white/10" />
-                  <div className="h-10 rounded-xl bg-white/10" />
-                  <div className="h-10 rounded-xl bg-white/10" />
-                </motion.div>
-              ) : greekTokens.length > 0 ? (
-                <motion.div
-                  key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
-                  initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
-                  transition={{ duration: 0.28, ease: "easeOut" }}
-                  lang="el"
-                  className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
-                  style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
-                >
-                  {greekTokens.map((tok, wi) => {
-                    const selected = selectedWordIndex === wi
-                    const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
-                    return (
-                      <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectGreekWord(wi)}
-                          className={
-                            selected
-                              ? "border-b-2 border-amber-300/85 text-amber-200"
-                              : "border-b border-dashed border-amber-300/35 text-amber-100/95 hover:border-amber-300/70 hover:text-amber-50"
-                          }
-                        >
-                          {tok.word}
-                        </button>
-                        {hint ? (
-                          <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
-                        ) : null}
-                      </span>
-                    )
-                  })}
-                </motion.div>
-              ) : (
-                <motion.p
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-center text-sm text-white/45"
-                >
-                  Greek text unavailable for this verse.
-                </motion.p>
-              )}
-            </AnimatePresence>
-          </section>
-
-          {showEnglish && english ? (
+          {page === "study" && showEnglish && english ? (
             <p className="mx-auto max-w-3xl text-center text-white/70 leading-relaxed" style={{ fontSize: "clamp(1.05rem, 3.3vw, 1.6rem)" }}>
               {english}
             </p>
@@ -1045,37 +1170,39 @@ export function GreekOneVerseClient() {
         ) : null}
       </AnimatePresence>
 
-      <footer className="shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-        <div className="mx-auto flex max-w-lg gap-3">
-          <button
-            type="button"
-            onClick={prevVerse}
-            disabled={verse <= 1 || loading}
-            className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
-            aria-label="Previous verse"
+      {page === "study" ? (
+        <footer className="shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+          <div className="mx-auto flex max-w-lg gap-3">
+            <button
+              type="button"
+              onClick={prevVerse}
+              disabled={verse <= 1 || loading}
+              className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
+              aria-label="Previous verse"
+            >
+              <ChevronLeft className="size-5" />
+              Prev
+            </button>
+            <button
+              type="button"
+              onClick={nextVerse}
+              disabled={verse >= pilot.maxVerse || loading}
+              className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
+              aria-label="Next verse"
+            >
+              Next
+              <ChevronRight className="size-5" />
+            </button>
+          </div>
+          <Link
+            href={readerUrl}
+            className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-300/90 hover:text-amber-200"
           >
-            <ChevronLeft className="size-5" />
-            Prev
-          </button>
-          <button
-            type="button"
-            onClick={nextVerse}
-            disabled={verse >= pilot.maxVerse || loading}
-            className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
-            aria-label="Next verse"
-          >
-            Next
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-        <Link
-          href={readerUrl}
-          className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-300/90 hover:text-amber-200"
-        >
-          Word study &amp; grammar in reader
-          <ExternalLink className="size-3.5 opacity-80" />
-        </Link>
-      </footer>
+            Word study &amp; grammar in reader
+            <ExternalLink className="size-3.5 opacity-80" />
+          </Link>
+        </footer>
+      ) : null}
     </div>
   )
 }
