@@ -496,7 +496,7 @@ export function GreekOneVerseClient() {
 
     void load()
     return () => controller.abort()
-  }, [hydrated, passageRef, verse, reviewMode, weakWordSet, wordMemory])
+  }, [hydrated, passageRef, verse, reviewMode])
 
   const prevVerse = useCallback(() => {
     setVerse((v) => Math.max(1, v - 1))
