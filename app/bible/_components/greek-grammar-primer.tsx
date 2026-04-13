@@ -3,7 +3,7 @@
 import { BookOpen, GraduationCap } from "lucide-react"
 
 /**
- * Visible “start here” grammar intro for MorphGNT pilot chapters (John 1, Luke 6).
+ * Visible "start here" grammar intro for NT MorphGNT chapters.
  */
 export function GreekGrammarPrimer({
   wordHintsEnabled,
@@ -17,12 +17,10 @@ export function GreekGrammarPrimer({
       <div className="flex items-start gap-3 px-3 py-3 sm:px-4 sm:py-3.5 border-b border-amber-500/20">
         <GraduationCap className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden />
         <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold text-foreground tracking-tight">
-            Learn Greek as you read <span className="text-muted-foreground font-normal">(John 1 · Luke 6)</span>
-          </p>
+          <p className="text-sm font-semibold text-foreground tracking-tight">Learn Greek as you read</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Tap any word in the gold Greek line for a full breakdown. Use the primer below for tenses, moods,
-            participles, and cases—then come back to the verse and tap words to see them in context.
+            participles, and cases, then jump back into your chapter and tap words in context.
           </p>
         </div>
       </div>
