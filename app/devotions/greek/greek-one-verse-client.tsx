@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } fr
 import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
 
+import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
+import { GreekMorphWords } from "@/app/bible/_components/greek-morph-words"
+import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
+import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import {
   MORPH_PILOT_CHAPTERS,
   morphPilotPassageRef,
@@ -54,7 +58,9 @@ export function GreekOneVerseClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [english, setEnglish] = useState("")
-  const [greekLine, setGreekLine] = useState("")
+  const [greekTokens, setGreekTokens] = useState<GreekMorphToken[]>([])
+  const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
+  const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
 
@@ -89,6 +95,7 @@ export function GreekOneVerseClient() {
 
     setLoading(true)
     setError(null)
+    setSelectedWordIndex(null)
 
     const load = async () => {
       try {
@@ -100,34 +107,49 @@ export function GreekOneVerseClient() {
         ])
         const pass = (await passRes.json()) as Record<string, unknown>
         const morph = (await morphRes.json()) as Record<string, unknown>
-
+        let passError: string | null = null
+        let nextEnglish = ""
         if (!passRes.ok) {
-          const msg = typeof pass.error === "string" ? pass.error : "Could not load this verse."
-          setError(msg)
-          setEnglish("")
-          setGreekLine("")
-          return
-        }
-        if (typeof pass.error === "string" && pass.error) {
-          setError(pass.error)
-          setEnglish("")
-          setGreekLine("")
-          return
+          passError = typeof pass.error === "string" ? pass.error : "Could not load this verse."
+        } else if (typeof pass.error === "string" && pass.error) {
+          passError = pass.error
+        } else {
+          const verses = pass.verses as PassageVerse[] | undefined
+          const row = verses?.find((v) => v.number === verse) ?? verses?.[0]
+          nextEnglish = row?.text ? stripHtmlTags(row.text).replace(/\s+/g, " ").trim() : ""
         }
 
-        const verses = pass.verses as PassageVerse[] | undefined
-        const row = verses?.find((v) => v.number === verse) ?? verses?.[0]
-        setEnglish(row?.text ? stripHtmlTags(row.text).replace(/\s+/g, " ").trim() : "")
+        let morphError: string | null = null
+        let nextGreekTokens: GreekMorphToken[] = []
+        if (!morphRes.ok) {
+          morphError = typeof morph.error === "string" ? morph.error : "Could not load Greek morphology."
+        } else if (typeof morph.error === "string" && morph.error && morph.available === false) {
+          morphError = morph.error
+        } else {
+          const mVerses = morph.verses as { number: number; tokens: GreekMorphToken[] }[] | undefined
+          const mv = mVerses?.find((x) => x.number === verse) ?? mVerses?.[0]
+          nextGreekTokens = mv?.tokens ?? []
+          if (nextGreekTokens.length === 0) morphError = "Could not load Greek morphology."
+        }
 
-        const mVerses = morph.verses as { number: number; tokens: { word: string }[] }[] | undefined
-        const mv = mVerses?.find((x) => x.number === verse) ?? mVerses?.[0]
-        const line = mv?.tokens?.length ? mv.tokens.map((tok) => tok.word).join(" ") : ""
-        setGreekLine(line)
+        setEnglish(nextEnglish)
+        setGreekTokens(nextGreekTokens)
+        if (passError && nextGreekTokens.length > 0) {
+          setError("English translation unavailable right now. Greek grammar study is still available.")
+        } else if (!passError && morphError && nextEnglish) {
+          setError("Greek morphology unavailable for this verse.")
+        } else if (passError) {
+          setError(passError)
+        } else if (morphError) {
+          setError(morphError)
+        } else {
+          setError(null)
+        }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") return
         setError("Could not load this verse.")
         setEnglish("")
-        setGreekLine("")
+        setGreekTokens([])
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -153,6 +175,10 @@ export function GreekOneVerseClient() {
   const selectPilot = useCallback((idx: number) => {
     setPilotIdx(idx)
     setVerse(1)
+  }, [])
+
+  const handleSelectGreekWord = useCallback((_: number, wordIndex: number) => {
+    setSelectedWordIndex(wordIndex)
   }, [])
 
   const swipeStartX = useRef<number | null>(null)
@@ -188,6 +214,9 @@ export function GreekOneVerseClient() {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [prevVerse, nextVerse])
+
+  const selectedToken =
+    selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-gradient-to-b from-[#06080f] via-[#050505] to-[#030306] text-white">
@@ -255,14 +284,27 @@ export function GreekOneVerseClient() {
                   {english || (error ? "" : "—")}
                 </p>
 
-                {greekLine ? (
-                  <p
-                    lang="el"
-                    className="font-serif text-center leading-[1.35] text-amber-200/88 px-1"
-                    style={{ fontSize: "clamp(1.35rem, 4.6vw, 2.65rem)" }}
-                  >
-                    {greekLine}
-                  </p>
+                {greekTokens.length > 0 ? (
+                  <div className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
+                    <GreekMorphWords
+                      verseNumber={verse}
+                      tokens={greekTokens}
+                      selectedIndex={selectedWordIndex}
+                      onSelect={handleSelectGreekWord}
+                      wordHintsEnabled={wordHintsEnabled}
+                    />
+                    <GreekGrammarPrimer
+                      wordHintsEnabled={wordHintsEnabled}
+                      onToggleWordHints={() => setWordHintsEnabled((v) => !v)}
+                    />
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 sm:p-4">
+                      <MorphologySidebarPanel
+                        token={selectedToken}
+                        verseNumber={selectedWordIndex == null ? 0 : verse}
+                        wordIndex={selectedWordIndex ?? 0}
+                      />
+                    </div>
+                  </div>
                 ) : !loading && !error && english ? (
                   <p className="text-center text-sm text-white/40 font-sans">Greek text unavailable for this verse.</p>
                 ) : null}
