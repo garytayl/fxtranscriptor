@@ -19,6 +19,7 @@ import {
   Flame,
   Calendar,
   Bell,
+  Languages,
 } from "lucide-react"
 import { getPassageEntry, savePassageEntry, listPassageEntries, getPassageNotes, saveVerseNote, getVerseNote, type ListedPassageEntry, type VerseNote } from "@/lib/devotions-storage"
 import { getDevotionsSettings, setShowTracking, setChaptersPerDay } from "@/lib/devotions-settings"
@@ -1125,6 +1126,13 @@ export function DevotionsClient() {
                       <BookOpen className="w-5 h-5 text-amber-400/80" />
                       {studyLoading ? "Loading…" : "Study guides"}
                     </button>
+                    <Link
+                      href="/devotions/greek"
+                      className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/15 hover:border-emerald-500/40 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Languages className="w-5 h-5 text-emerald-400/85 shrink-0" aria-hidden />
+                      Learn Greek · one verse
+                    </Link>
                     <button
                       type="button"
                       onClick={() => { setDir(1); setStep("topicPicker"); }}
@@ -2093,6 +2101,14 @@ export function DevotionsClient() {
             >
               <BookOpen className="w-4 h-4 shrink-0" />
               Open in full Scripture reader
+            </Link>
+            <Link
+              href="/devotions/greek"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/25 hover:bg-emerald-500/10 transition-colors text-left"
+            >
+              <Languages className="w-4 h-4 shrink-0" />
+              Learn Greek · one verse
             </Link>
             <button
               type="button"
