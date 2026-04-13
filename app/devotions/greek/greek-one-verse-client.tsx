@@ -42,7 +42,6 @@ const VERSE_SWIPE_HORIZONTAL_RATIO = 1.35
 const MENU_SWIPE_CLOSE_THRESHOLD = 72
 const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
 const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
-const GREEK_PAGE_KEY = "fx_devotions_greek_v1_page"
 const SESSION_XP = 14
 const VERSE_XP = 8
 const WORD_XP = 12
@@ -195,19 +194,6 @@ export function GreekOneVerseClient() {
   }, [xpBurst])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const stored = window.localStorage.getItem(GREEK_PAGE_KEY)
-    if (stored === "study" || stored === "progress" || stored === "xp-home") {
-      setPage(stored as GreekStudioPage)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    window.localStorage.setItem(GREEK_PAGE_KEY, page)
-  }, [page])
-
-  useEffect(() => {
     if (!hydrated) return
     savePlace({ bookSlug: pilot.bookSlug, chapter: pilot.chapter, verse })
   }, [hydrated, pilot.bookSlug, pilot.chapter, verse])
@@ -330,7 +316,7 @@ export function GreekOneVerseClient() {
     }
   }, [page])
 
-  const jumpToRolodex = useCallback(() => {
+  const applyRolodexSelection = useCallback(() => {
     const targetPilotIdx = MORPH_PILOT_CHAPTERS.findIndex(
       (item) => item.bookSlug === rolodexBookSlug && item.chapter === rolodexChapter,
     )
@@ -339,8 +325,17 @@ export function GreekOneVerseClient() {
     const safeVerse = Math.min(Math.max(1, rolodexVerse), targetPilot.maxVerse)
     setPilotIdx(targetPilotIdx)
     setVerse(safeVerse)
+  }, [rolodexBookSlug, rolodexChapter, rolodexVerse])
+
+  const jumpToRolodex = useCallback(() => {
+    applyRolodexSelection()
     closeMenu()
-  }, [rolodexBookSlug, rolodexChapter, rolodexVerse, closeMenu])
+  }, [applyRolodexSelection, closeMenu])
+
+  const startStudyFromXp = useCallback(() => {
+    applyRolodexSelection()
+    setPage("study")
+  }, [applyRolodexSelection])
 
   const handleSelectGreekWord = useCallback((wordIndex: number) => {
     setSelectedWordIndex((prev) => (prev === wordIndex ? null : wordIndex))
@@ -610,7 +605,7 @@ export function GreekOneVerseClient() {
           </Link>
           <div className="text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">Greek Studio</p>
-            <p className="text-sm text-white/80">{pilot.label}</p>
+            <p className="text-sm text-white/80">{page === "study" ? pilot.label : "XP Home"}</p>
           </div>
           <button
             type="button"
@@ -915,14 +910,84 @@ export function GreekOneVerseClient() {
               </div>
 
               <p className="text-[11px] text-white/55">
-                Start here daily, then move to Study and Progress pages.
+                Start on XP, pick your target passage, then enter Study.
               </p>
+              <div className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Choose passage</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <label className="space-y-1">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
+                    <select
+                      value={rolodexBookSlug}
+                      onChange={(e) => {
+                        const nextBook = e.target.value
+                        const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
+                        setRolodexBookSlug(nextBook)
+                        if (firstChapter) {
+                          setRolodexChapter(firstChapter.chapter)
+                          setRolodexVerse((current) => Math.min(current, firstChapter.maxVerse))
+                        }
+                      }}
+                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
+                      aria-label="Select Greek study book"
+                    >
+                      {rolodexBooks.map((item) => (
+                        <option key={item.bookSlug} value={item.bookSlug}>
+                          {item.bookName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
+                    <select
+                      value={rolodexChapter}
+                      onChange={(e) => {
+                        const nextChapter = Number.parseInt(e.target.value, 10)
+                        const chapterItem = rolodexChapters.find((item) => item.chapter === nextChapter)
+                        setRolodexChapter(nextChapter)
+                        if (chapterItem) {
+                          setRolodexVerse((current) => Math.min(current, chapterItem.maxVerse))
+                        }
+                      }}
+                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
+                      aria-label="Select Greek study chapter"
+                    >
+                      {rolodexChapters.map((item) => (
+                        <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
+                          {item.chapter}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
+                    <select
+                      value={rolodexVerse}
+                      onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
+                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
+                      aria-label="Select Greek study verse"
+                    >
+                      {rolodexVerseOptions.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+                  Target: {selectedRolodexChapter.label}:{rolodexVerse}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setPage("study")}
+                onClick={startStudyFromXp}
                 className="w-full rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25 sm:w-auto"
               >
-                Start study
+                Enter study
               </button>
             </motion.section>
           ) : null}
