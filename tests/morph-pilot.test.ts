@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest"
 import { getGreekMorphTokensForChapter } from "@/lib/bible/morph-lookup"
 
 describe("morph pilot chapters", () => {
+  it("loads Matthew 1", () => {
+    const ch = getGreekMorphTokensForChapter("matthew", 1)
+    expect(ch).not.toBeNull()
+    expect(ch![1]?.length).toBeGreaterThan(5)
+  })
+
   it("loads John 1", () => {
     const ch = getGreekMorphTokensForChapter("john", 1)
     expect(ch).not.toBeNull()
@@ -30,8 +36,15 @@ describe("morph pilot chapters", () => {
     expect(ch![25]?.length).toBeGreaterThan(0)
   })
 
-  it("returns null for non-pilot chapters", () => {
-    expect(getGreekMorphTokensForChapter("luke", 5)).toBeNull()
+  it("loads Revelation 22", () => {
+    const ch = getGreekMorphTokensForChapter("revelation", 22)
+    expect(ch).not.toBeNull()
+    expect(ch![1]?.length).toBeGreaterThan(5)
+    expect(ch![21]?.length).toBeGreaterThan(0)
+  })
+
+  it("returns null for non-NT or out-of-range chapters", () => {
+    expect(getGreekMorphTokensForChapter("genesis", 1)).toBeNull()
     expect(getGreekMorphTokensForChapter("john", 22)).toBeNull()
   })
 })

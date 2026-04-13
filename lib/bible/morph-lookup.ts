@@ -1,28 +1,7 @@
 import type { PassageReference } from "@/lib/bible/reference"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
-import john1 from "@/lib/bible/morph-data/john-1.json"
-import john2 from "@/lib/bible/morph-data/john-2.json"
-import john3 from "@/lib/bible/morph-data/john-3.json"
-import john4 from "@/lib/bible/morph-data/john-4.json"
-import john5 from "@/lib/bible/morph-data/john-5.json"
-import john6 from "@/lib/bible/morph-data/john-6.json"
-import john7 from "@/lib/bible/morph-data/john-7.json"
-import john8 from "@/lib/bible/morph-data/john-8.json"
-import john9 from "@/lib/bible/morph-data/john-9.json"
-import john10 from "@/lib/bible/morph-data/john-10.json"
-import john11 from "@/lib/bible/morph-data/john-11.json"
-import john12 from "@/lib/bible/morph-data/john-12.json"
-import john13 from "@/lib/bible/morph-data/john-13.json"
-import john14 from "@/lib/bible/morph-data/john-14.json"
-import john15 from "@/lib/bible/morph-data/john-15.json"
-import john16 from "@/lib/bible/morph-data/john-16.json"
-import john17 from "@/lib/bible/morph-data/john-17.json"
-import john18 from "@/lib/bible/morph-data/john-18.json"
-import john19 from "@/lib/bible/morph-data/john-19.json"
-import john20 from "@/lib/bible/morph-data/john-20.json"
-import john21 from "@/lib/bible/morph-data/john-21.json"
-import luke6 from "@/lib/bible/morph-data/luke-6.json"
+import { NT_MORPH_CHAPTER_DATA } from "@/lib/bible/morph-data/nt-datasets.generated"
 
 type MorphChapterFile = {
   meta: {
@@ -36,30 +15,7 @@ type MorphChapterFile = {
   verses: Record<string, GreekMorphToken[]>
 }
 
-const MORPH_PILOT_CHAPTERS = [
-  john1,
-  john2,
-  john3,
-  john4,
-  john5,
-  john6,
-  john7,
-  john8,
-  john9,
-  john10,
-  john11,
-  john12,
-  john13,
-  john14,
-  john15,
-  john16,
-  john17,
-  john18,
-  john19,
-  john20,
-  john21,
-  luke6,
-] as MorphChapterFile[]
+const MORPH_PILOT_CHAPTERS = NT_MORPH_CHAPTER_DATA as unknown as MorphChapterFile[]
 
 const MORPH_META = MORPH_PILOT_CHAPTERS[0].meta
 
@@ -67,8 +23,33 @@ const MORPH_META = MORPH_PILOT_CHAPTERS[0].meta
  * API.Bible book `id` is often USFM (e.g. LUK, JHN). Local HCSB uses the same ids as `lib/bible/constants`.
  */
 const USFM_ID_TO_MORPH_SLUG: Record<string, string> = {
+  MAT: "matthew",
+  MRK: "mark",
   LUK: "luke",
   JHN: "john",
+  ACT: "acts",
+  ROM: "romans",
+  "1CO": "1-corinthians",
+  "2CO": "2-corinthians",
+  GAL: "galatians",
+  EPH: "ephesians",
+  PHP: "philippians",
+  COL: "colossians",
+  "1TH": "1-thessalonians",
+  "2TH": "2-thessalonians",
+  "1TI": "1-timothy",
+  "2TI": "2-timothy",
+  TIT: "titus",
+  PHM: "philemon",
+  HEB: "hebrews",
+  JAS: "james",
+  "1PE": "1-peter",
+  "2PE": "2-peter",
+  "1JN": "1-john",
+  "2JN": "2-john",
+  "3JN": "3-john",
+  JUD: "jude",
+  REV: "revelation",
 }
 
 /**
