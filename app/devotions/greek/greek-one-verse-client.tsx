@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X }
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
+import { expandGreekMorphToken } from "@/lib/bible/robinson-greek"
 import {
   MORPH_PILOT_CHAPTERS,
   morphPilotPassageRef,
@@ -24,6 +25,10 @@ type StoredPlace = {
 }
 
 type PassageVerse = { number: number; text: string }
+type GreekCoachPayload = {
+  insight: string
+  prayerPrompt: string
+}
 
 function loadPlace(): StoredPlace | null {
   if (typeof window === "undefined") return null
@@ -64,6 +69,10 @@ export function GreekOneVerseClient() {
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
   const [showPrimer, setShowPrimer] = useState(false)
   const [showEnglish, setShowEnglish] = useState(false)
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [coachError, setCoachError] = useState<string | null>(null)
+  const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
+  const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
   const menuDragStartY = useRef<number | null>(null)
   const menuDragCurrentY = useRef<number | null>(null)
   const menuDragPointerId = useRef<number | null>(null)
@@ -200,6 +209,74 @@ export function GreekOneVerseClient() {
     setSelectedWordIndex(wordIndex)
   }, [])
 
+  const selectedToken =
+    selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
+  const selectedTokenExpanded = selectedToken ? expandGreekMorphToken(selectedToken) : null
+
+  const runAiCoach = useCallback(async () => {
+    if (!selectedToken) return
+    const tokenKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}-${selectedWordIndex}-${selectedToken.word}`
+    if (coachLoading) return
+    if (coachTokenKey === tokenKey && coachPayload) return
+    setCoachLoading(true)
+    setCoachError(null)
+    try {
+      const response = await fetch("/api/devotions/greek-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: passageRef,
+          english,
+          greekWord: selectedToken.word,
+          lemma: selectedToken.lemma,
+          parse: selectedToken.parse,
+          category: selectedTokenExpanded?.posLabel ?? selectedToken.pos,
+          parseSummary: selectedTokenExpanded?.parseSummary ?? selectedToken.parse,
+        }),
+      })
+      const data = (await response.json()) as
+        | {
+            insight?: string
+            prayerPrompt?: string
+            microGloss?: string
+            grammarHook?: string
+            reflectionPrompt?: string
+            error?: string
+          }
+        | undefined
+      const insight =
+        data?.insight ??
+        [data?.microGloss, data?.grammarHook].filter((s): s is string => typeof s === "string" && s.length > 0).join(
+          " ",
+        )
+      const prayerPrompt = data?.prayerPrompt ?? data?.reflectionPrompt
+      if (!response.ok || !insight || !prayerPrompt) {
+        throw new Error(data?.error || "Could not generate AI coach insight.")
+      }
+      setCoachPayload({
+        insight: insight.trim(),
+        prayerPrompt: prayerPrompt.trim(),
+      })
+      setCoachTokenKey(tokenKey)
+    } catch (err) {
+      setCoachError(err instanceof Error ? err.message : "Could not generate AI coach insight.")
+    } finally {
+      setCoachLoading(false)
+    }
+  }, [
+    selectedToken,
+    selectedTokenExpanded,
+    coachLoading,
+    coachTokenKey,
+    coachPayload,
+    passageRef,
+    english,
+    pilot.bookSlug,
+    pilot.chapter,
+    verse,
+    selectedWordIndex,
+  ])
+
   const swipeStartX = useRef<number | null>(null)
 
   const onTouchStart = useCallback((e: TouchEvent) => {
@@ -236,9 +313,18 @@ export function GreekOneVerseClient() {
     return () => window.removeEventListener("keydown", onKey)
   }, [menuOpen, prevVerse, nextVerse])
 
-  const selectedToken =
-    selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
   const hasStudyDrawer = showPrimer || selectedToken != null
+  const activeTokenKey =
+    selectedToken && selectedWordIndex != null
+      ? `${pilot.bookSlug}-${pilot.chapter}-${verse}-${selectedWordIndex}-${selectedToken.word}`
+      : null
+
+  useEffect(() => {
+    if (!selectedToken || !activeTokenKey) return
+    if (coachTokenKey === activeTokenKey) return
+    setCoachPayload(null)
+    setCoachError(null)
+  }, [selectedToken, activeTokenKey, coachTokenKey])
   const onMenuDragStart = useCallback((e: PointerEvent<HTMLDivElement>) => {
     menuDragPointerId.current = e.pointerId
     menuDragStartY.current = e.clientY
@@ -533,6 +619,34 @@ export function GreekOneVerseClient() {
                   verseNumber={verse}
                   wordIndex={selectedWordIndex ?? 0}
                 />
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200/70">
+                      AI Greek Coach
+                    </p>
+                    <button
+                      type="button"
+                      onClick={runAiCoach}
+                      disabled={coachLoading}
+                      className="rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-100 hover:bg-emerald-400/25 disabled:opacity-60"
+                    >
+                      {coachLoading ? "Thinking…" : "Coach me"}
+                    </button>
+                  </div>
+                  {coachError ? (
+                    <p className="mt-2 text-xs text-red-300/90">{coachError}</p>
+                  ) : null}
+                  {coachPayload ? (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-sm text-white/85 leading-relaxed">{coachPayload.insight}</p>
+                      <p className="text-xs text-emerald-100/85 leading-relaxed">{coachPayload.prayerPrompt}</p>
+                    </div>
+                  ) : !coachLoading && !coachError ? (
+                    <p className="mt-2 text-xs text-white/55">
+                      Get one short insight, then a prayerful reflection prompt from this exact Greek form.
+                    </p>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
