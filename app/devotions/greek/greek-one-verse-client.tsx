@@ -425,11 +425,11 @@ export function GreekOneVerseClient() {
             ) : (
               <>
                 {greekTokens.length > 0 ? (
-                  <div className="min-h-[44vh] flex items-center justify-center">
+                  <div className="min-h-[52vh] sm:min-h-[56vh] flex items-center justify-center">
                     <div
                       lang="el"
-                      className="w-full text-center text-amber-100/95 leading-[1.45] flex flex-wrap justify-center gap-x-2.5 gap-y-3 px-1"
-                      style={{ fontSize: "clamp(1.45rem, 4.9vw, 2.95rem)" }}
+                      className="w-full text-center text-amber-100/95 leading-[1.32] sm:leading-[1.28] flex flex-wrap justify-center gap-x-3 gap-y-3.5 sm:gap-y-4 px-1"
+                      style={{ fontSize: "clamp(2.15rem, 8.2vw, 5.8rem)" }}
                     >
                       {greekTokens.map((tok, wi) => {
                         const isSel = selectedWordIndex === wi
