@@ -1,22 +1,23 @@
 const GREEK_WORD_MEMORY_KEY = "fx_devotions_greek_v1_word_memory"
 const MAX_TRACKED_WORD_FORMS = 5000
-const MAX_WEAK_SCORE = 8
+const MAX_WEAK_SCORE = 12
+
+export type GreekWordFamiliarity = "new" | "seen" | "learned"
 
 export type GreekWordMemoryEntry = {
   taps: number
-  recognized: number
+  correct: number
   weakScore: number
+  familiarity: GreekWordFamiliarity
   lastSeenAt: string
 }
 
 export type GreekWordMemory = Record<string, GreekWordMemoryEntry>
 
-export type GreekWordMemoryTapStatus = "new" | "recognized" | "learning"
-
 export type GreekWordMemoryTapResult = {
   memory: GreekWordMemory
   entry: GreekWordMemoryEntry
-  status: GreekWordMemoryTapStatus
+  previouslySeen: boolean
 }
 
 function toFiniteInt(value: unknown, fallback = 0): number {
@@ -28,13 +29,16 @@ function normalizeEntry(value: unknown): GreekWordMemoryEntry | null {
   if (!value || typeof value !== "object") return null
   const raw = value as Partial<GreekWordMemoryEntry>
   const taps = toFiniteInt(raw.taps)
-  const recognized = Math.min(taps, toFiniteInt(raw.recognized))
+  const correct = Math.min(taps, toFiniteInt(raw.correct))
   const weakScore = Math.min(MAX_WEAK_SCORE, toFiniteInt(raw.weakScore))
+  const familiarity: GreekWordFamiliarity =
+    raw.familiarity === "learned" || raw.familiarity === "seen" ? raw.familiarity : "new"
   const lastSeenAt = typeof raw.lastSeenAt === "string" ? raw.lastSeenAt : ""
   return {
     taps,
-    recognized,
+    correct,
     weakScore,
+    familiarity,
     lastSeenAt,
   }
 }
@@ -62,7 +66,7 @@ export function getGreekWordMemory(): GreekWordMemory {
   return parseGreekWordMemory(window.localStorage.getItem(GREEK_WORD_MEMORY_KEY))
 }
 
-export function saveGreekWordMemory(memory: GreekWordMemory): void {
+function saveGreekWordMemory(memory: GreekWordMemory): void {
   if (typeof window === "undefined") return
   window.localStorage.setItem(GREEK_WORD_MEMORY_KEY, JSON.stringify(memory))
 }
@@ -74,40 +78,52 @@ function pruneWordMemory(memory: GreekWordMemory): GreekWordMemory {
   return Object.fromEntries(entries.slice(0, MAX_TRACKED_WORD_FORMS))
 }
 
-export function updateGreekWordMemory(
-  memory: GreekWordMemory,
-  wordFormKey: string,
-  recognizedTap: boolean,
-): GreekWordMemoryTapResult {
+function familiarityFromStats(taps: number, correct: number): GreekWordFamiliarity {
+  if (correct >= 3 && correct / Math.max(1, taps) >= 0.75) return "learned"
+  if (taps >= 2 || correct >= 1) return "seen"
+  return "new"
+}
+
+export function recordGreekWordMemoryTap(wordFormKey: string, wasCorrect: boolean): GreekWordMemoryTapResult {
   const key = wordFormKey.trim()
   if (!key) {
-    return {
-      memory,
-      entry: { taps: 0, recognized: 0, weakScore: 0, lastSeenAt: "" },
-      status: "learning",
+    const fallback: GreekWordMemoryEntry = {
+      taps: 0,
+      correct: 0,
+      weakScore: 0,
+      familiarity: "new",
+      lastSeenAt: "",
     }
+    return { memory: getGreekWordMemory(), entry: fallback, previouslySeen: false }
   }
-  const current = memory[key] ?? { taps: 0, recognized: 0, weakScore: 0, lastSeenAt: "" }
-  const taps = current.taps + 1
-  const recognized = Math.min(taps, current.recognized + (recognizedTap ? 1 : 0))
-  const weakDelta = recognizedTap ? -1 : 1
-  const weakScore = Math.max(0, Math.min(MAX_WEAK_SCORE, current.weakScore + weakDelta))
-  const status: GreekWordMemoryTapStatus = recognizedTap ? "recognized" : taps === 1 ? "new" : "learning"
+
+  const current = getGreekWordMemory()
+  const existing = current[key]
+  const nextTaps = (existing?.taps ?? 0) + 1
+  const nextCorrect = Math.min(nextTaps, (existing?.correct ?? 0) + (wasCorrect ? 1 : 0))
+  const weakDelta = wasCorrect ? -2 : 2
+  const nextWeakScore = Math.max(0, Math.min(MAX_WEAK_SCORE, (existing?.weakScore ?? 0) + weakDelta))
   const entry: GreekWordMemoryEntry = {
-    taps,
-    recognized,
-    weakScore,
+    taps: nextTaps,
+    correct: nextCorrect,
+    weakScore: nextWeakScore,
+    familiarity: familiarityFromStats(nextTaps, nextCorrect),
     lastSeenAt: new Date().toISOString(),
   }
+
   const next = pruneWordMemory({
-    ...memory,
+    ...current,
     [key]: entry,
   })
   saveGreekWordMemory(next)
-  return { memory: next, entry, status }
+  return {
+    memory: next,
+    entry,
+    previouslySeen: Boolean(existing && existing.taps > 0),
+  }
 }
 
-export function getWeakWordForms(memory: GreekWordMemory, minWeakScore = 2): Set<string> {
+export function buildWeakWordSet(memory: GreekWordMemory, minWeakScore = 3): Set<string> {
   const out = new Set<string>()
   for (const [key, entry] of Object.entries(memory)) {
     if (entry.weakScore >= minWeakScore) out.add(key)
@@ -115,14 +131,8 @@ export function getWeakWordForms(memory: GreekWordMemory, minWeakScore = 2): Set
   return out
 }
 
-export function recordGreekWordMemoryTap(wordFormKey: string): GreekWordMemoryTapResult {
-  const current = getGreekWordMemory()
-  const previousEntry = current[wordFormKey]
-  const recognizedTap = Boolean(previousEntry && previousEntry.taps > 0)
-  return updateGreekWordMemory(current, wordFormKey, recognizedTap)
+export function getWordFamiliarityLabel(familiarity: GreekWordFamiliarity): string {
+  if (familiarity === "learned") return "Learned"
+  if (familiarity === "seen") return "Seen"
+  return "New"
 }
-
-export function buildWeakWordSet(memory: GreekWordMemory, minWeakScore = 2): Set<string> {
-  return getWeakWordForms(memory, minWeakScore)
-}
-

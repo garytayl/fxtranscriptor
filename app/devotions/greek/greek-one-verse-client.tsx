@@ -2,29 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  Flame,
-  Lightbulb,
-  Menu,
-  RefreshCw,
-  Sparkles,
-  Target,
-  Trophy,
-  Trash2,
-  X,
-  Zap,
-} from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, Target, X, Zap } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
-import { expandGreekMorphToken } from "@/lib/bible/robinson-greek"
 import { buildGreekWordLearningClues } from "@/lib/bible/greek-word-learning-clues"
 import {
   getGreekProgressSnapshot,
@@ -35,8 +18,10 @@ import {
 import {
   buildWeakWordSet,
   getGreekWordMemory,
+  getWordFamiliarityLabel,
   recordGreekWordMemoryTap,
-  type GreekWordMemoryEntry,
+  type GreekWordFamiliarity,
+  type GreekWordMemory,
 } from "@/lib/devotions-greek-word-memory"
 import {
   MORPH_PILOT_CHAPTERS,
@@ -55,31 +40,25 @@ const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
 const SESSION_XP = 14
 const VERSE_XP = 8
 const WORD_XP = 12
-const COACH_XP = 20
-const COACH_HISTORY_LIMIT = 6
-const MICRO_WIN_STREAK_TARGET = 3
+const LEVEL_COMPLETE_XP = 24
+const QUEST_MIN_TARGETS = 3
+const QUEST_MAX_TARGETS = 5
+const DAILY_VERSE_RUN_KEY = "daily-verse-run"
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
-type GreekCoachPayload = {
-  insight: string
-  prayerPrompt: string
-  microGloss?: string
-  grammarHook?: string
-  reflectionPrompt?: string
+type QuestWordStage = "challenge" | "revealed"
+type QuestWordChallenge = {
+  targetIndex: number
+  options: string[]
+  correctOptionIndex: number
 }
-type CoachHistoryItem = {
-  id: string
-  question: string
-  insight: string
-  prayerPrompt: string
+type LevelCompleteState = {
+  levelKey: string
+  xpGained: number
+  learnedWords: number
+  encouragement: string
 }
-type CoachQuickAction = {
-  id: string
-  label: string
-  prompt: string
-}
-type GreekStudioPage = "xp-home" | "study" | "progress"
 
 function loadPlace(): StoredPlace | null {
   if (typeof window === "undefined") return null
@@ -106,8 +85,54 @@ function stripHtmlTags(s: string): string {
   return s.replace(/<[^>]+>/g, "")
 }
 
+function wordFormKey(token: GreekMorphToken): string {
+  return `${token.lemma}|${token.parse}`
+}
+
+function pickQuestTargetIndexes(
+  tokens: GreekMorphToken[],
+  weakSet: Set<string>,
+  memory: GreekWordMemory,
+  reviewMode: boolean,
+): number[] {
+  if (tokens.length === 0) return []
+  const scored = tokens.map((token, idx) => {
+    const key = wordFormKey(token)
+    const mem = memory[key]
+    const isWeak = weakSet.has(key)
+    const familiarity = mem?.familiarity ?? "new"
+    const familiarityScore = familiarity === "new" ? 3 : familiarity === "seen" ? 2 : -2
+    const contentScore = /^(V|N|A|R|D)/.test(token.pos) ? 3 : 1
+    const reviewBoost = reviewMode ? (isWeak ? 8 : familiarity === "seen" ? 4 : -3) : 0
+    const score = (isWeak ? 6 : 0) + familiarityScore + contentScore + reviewBoost
+    return { idx, score }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  const targetCount = Math.min(
+    tokens.length,
+    Math.max(QUEST_MIN_TARGETS, Math.min(QUEST_MAX_TARGETS, Math.ceil(tokens.length * 0.34))),
+  )
+  return scored.slice(0, targetCount).map((item) => item.idx)
+}
+
+function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number): QuestWordChallenge | null {
+  const target = tokens[targetIndex]
+  if (!target) return null
+  const pool = Array.from(new Set(tokens.map((t) => t.lemma)))
+  const distractors = pool
+    .filter((lemma) => lemma !== target.lemma)
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 3)
+  const optionSet = new Set<string>([target.lemma, ...distractors])
+  const options = Array.from(optionSet)
+  if (options.length < 2) return null
+  options.sort((a, b) => a.localeCompare(b))
+  const correctOptionIndex = options.findIndex((x) => x === target.lemma)
+  if (correctOptionIndex < 0) return null
+  return { targetIndex, options, correctOptionIndex }
+}
+
 export function GreekOneVerseClient() {
-  const [page, setPage] = useState<GreekStudioPage>("study")
   const [pilotIdx, setPilotIdx] = useState(0)
   const [verse, setVerse] = useState(1)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -122,18 +147,14 @@ export function GreekOneVerseClient() {
   const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
   const [showEnglish, setShowEnglish] = useState(false)
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
-  const [coachLoading, setCoachLoading] = useState(false)
-  const [coachError, setCoachError] = useState<string | null>(null)
-  const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
-  const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
-  const [coachQuestion, setCoachQuestion] = useState("")
-  const [coachHistory, setCoachHistory] = useState<CoachHistoryItem[]>([])
-  const [coachCopied, setCoachCopied] = useState(false)
-  const [wordMemory, setWordMemory] = useState<Record<string, GreekWordMemoryEntry>>(() =>
-    getGreekWordMemory(),
-  )
+  const [wordMemory, setWordMemory] = useState<GreekWordMemory>(() => getGreekWordMemory())
   const [reviewMode, setReviewMode] = useState(false)
-  const [microWinCount, setMicroWinCount] = useState(0)
+  const [questStage, setQuestStage] = useState<QuestWordStage>("challenge")
+  const [questChallenge, setQuestChallenge] = useState<QuestWordChallenge | null>(null)
+  const [questTargetIndexes, setQuestTargetIndexes] = useState<number[]>([])
+  const [completedTargetIndexes, setCompletedTargetIndexes] = useState<number[]>([])
+  const [dailyVerseRunDone, setDailyVerseRunDone] = useState(false)
+  const [levelComplete, setLevelComplete] = useState<LevelCompleteState | null>(null)
   const [microWinBurst, setMicroWinBurst] = useState<string | null>(null)
   const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
     getGreekProgressSnapshot(getGreekStudyProgress()),
@@ -146,6 +167,13 @@ export function GreekOneVerseClient() {
     () => morphPilotReaderUrl(pilot.bookSlug, pilot.chapter, verse),
     [pilot.bookSlug, pilot.chapter, verse],
   )
+  const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
+  const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 2), [wordMemory])
+  const levelProgressPct = questTargetIndexes.length
+    ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
+    : 0
+  const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
+
   const rolodexBooks = useMemo(() => {
     const seen = new Set<string>()
     return MORPH_PILOT_CHAPTERS.filter((item) => {
@@ -166,16 +194,6 @@ export function GreekOneVerseClient() {
   const rolodexVerseOptions = useMemo(
     () => Array.from({ length: selectedRolodexChapter.maxVerse }, (_, idx) => idx + 1),
     [selectedRolodexChapter.maxVerse],
-  )
-  const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
-  const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 8), [wordMemory])
-  const weakWordsInVerse = useMemo(
-    () =>
-      greekTokens.reduce((acc, tok) => {
-        const key = `${tok.lemma}|${tok.parse}`
-        return weakWordSet.has(key) ? acc + 1 : acc
-      }, 0),
-    [greekTokens, weakWordSet],
   )
 
   const verseSwipeStartX = useRef<number | null>(null)
@@ -203,9 +221,7 @@ export function GreekOneVerseClient() {
     (event: Parameters<typeof recordGreekStudyEvent>[0]) => {
       const { progress: updated, awardedXp } = recordGreekStudyEvent(event)
       setProgress(getGreekProgressSnapshot(updated))
-      if (awardedXp > 0) {
-        setXpBurst(awardedXp)
-      }
+      if (awardedXp > 0) setXpBurst(awardedXp)
       return awardedXp
     },
     [],
@@ -229,12 +245,8 @@ export function GreekOneVerseClient() {
   useEffect(() => {
     if (typeof window === "undefined") return
     const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === "fx_devotions_greek_v1_progress") {
-        refreshProgress()
-      }
-      if (!e.key || e.key === "fx_devotions_greek_v1_word_memory") {
-        refreshWordMemory()
-      }
+      if (!e.key || e.key === "fx_devotions_greek_v1_progress") refreshProgress()
+      if (!e.key || e.key === "fx_devotions_greek_v1_word_memory") refreshWordMemory()
     }
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
@@ -289,6 +301,10 @@ export function GreekOneVerseClient() {
     setLoading(true)
     setError(null)
     setSelectedWordIndex(null)
+    setQuestStage("challenge")
+    setQuestChallenge(null)
+    setCompletedTargetIndexes([])
+    setLevelComplete(null)
 
     const load = async () => {
       try {
@@ -328,6 +344,11 @@ export function GreekOneVerseClient() {
 
         setEnglish(nextEnglish)
         setGreekTokens(nextGreekTokens)
+        const targets = pickQuestTargetIndexes(nextGreekTokens, weakWordSet, wordMemory, reviewMode)
+        setQuestTargetIndexes(targets)
+        if (targets.length > 0) {
+          setQuestChallenge(buildChallengeForTarget(nextGreekTokens, targets[0]))
+        }
         if (passError && nextGreekTokens.length > 0) {
           setError("English translation unavailable right now. Greek grammar study is still available.")
         } else if (!passError && morphError && nextEnglish) {
@@ -344,6 +365,7 @@ export function GreekOneVerseClient() {
         setError("Could not load this verse.")
         setEnglish("")
         setGreekTokens([])
+        setQuestTargetIndexes([])
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -351,7 +373,7 @@ export function GreekOneVerseClient() {
 
     void load()
     return () => controller.abort()
-  }, [hydrated, passageRef, verse])
+  }, [hydrated, passageRef, verse, reviewMode, weakWordSet, wordMemory])
 
   const prevVerse = useCallback(() => {
     setVerse((v) => Math.max(1, v - 1))
@@ -362,17 +384,14 @@ export function GreekOneVerseClient() {
   }, [pilot.maxVerse])
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
-  const closeDetails = useCallback(() => setSelectedWordIndex(null), [])
+  const closeDetails = useCallback(() => {
+    setSelectedWordIndex(null)
+    setQuestStage("challenge")
+  }, [])
 
   useEffect(() => {
     if (selectedWordIndex == null) setDetailDragOffsetY(0)
   }, [selectedWordIndex])
-
-  useEffect(() => {
-    if (page !== "study") {
-      setSelectedWordIndex(null)
-    }
-  }, [page])
 
   const applyRolodexSelection = useCallback(() => {
     const targetPilotIdx = MORPH_PILOT_CHAPTERS.findIndex(
@@ -390,43 +409,102 @@ export function GreekOneVerseClient() {
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
 
-  const handleSelectGreekWord = useCallback((wordIndex: number) => {
-    const token = greekTokens[wordIndex]
-    if (!token) return
-    const wordFormKey = `${token.lemma}|${token.parse}`
-    const { memory, status } = recordGreekWordMemoryTap(wordFormKey)
-    setWordMemory(memory)
-    if (status === "recognized") {
-      setMicroWinBurst("You recognized this form")
-      setMicroWinCount((prev) => prev + 1)
-    } else if (status === "new") {
-      setMicroWinBurst("New form logged")
-    }
-    setSelectedWordIndex(wordIndex)
-  }, [greekTokens])
+  const finishVerseIfComplete = useCallback(
+    (nextCompleted: number[]) => {
+      const uniqueDone = Array.from(new Set(nextCompleted))
+      if (questTargetIndexes.length === 0) return
+      if (uniqueDone.length < questTargetIndexes.length) return
+      if (levelComplete?.levelKey === levelKey) return
+      const learnedWords = uniqueDone.reduce((acc, idx) => {
+        const token = greekTokens[idx]
+        if (!token) return acc
+        const familiarity = wordMemory[wordFormKey(token)]?.familiarity
+        return familiarity === "learned" ? acc + 1 : acc
+      }, 0)
+      const encouragement =
+        learnedWords >= Math.ceil(questTargetIndexes.length / 2)
+          ? "Strong verse run - your recall is improving."
+          : "Level complete - keep tapping and these forms will stick."
+      const awarded = awardProgress({
+        kind: "verse",
+        key: `${levelKey}-quest-complete`,
+        xp: LEVEL_COMPLETE_XP,
+      })
+      setLevelComplete({
+        levelKey,
+        xpGained: awarded,
+        learnedWords,
+        encouragement,
+      })
+      setMicroWinBurst("Level complete")
+      const runKey = `${levelKey}-${new Date().toISOString().slice(0, 10)}`
+      if (!dailyVerseRunDone) {
+        awardProgress({ kind: "session", key: `${DAILY_VERSE_RUN_KEY}-${runKey}`, xp: 10 })
+        setDailyVerseRunDone(true)
+      }
+    },
+    [questTargetIndexes, levelComplete?.levelKey, levelKey, greekTokens, wordMemory, awardProgress, dailyVerseRunDone],
+  )
 
-  const jumpToWeakWordVerse = useCallback(() => {
-    if (!reviewMode || greekTokens.length === 0) return
-    const weakIndex = greekTokens.findIndex((tok) => weakWordSet.has(`${tok.lemma}|${tok.parse}`))
-    if (weakIndex >= 0) {
-      setSelectedWordIndex(weakIndex)
+  const handleSelectGreekWord = useCallback(
+    (wordIndex: number) => {
+      if (!questTargetIndexes.includes(wordIndex)) return
+      setSelectedWordIndex(wordIndex)
+      setQuestStage("challenge")
+      const challenge = buildChallengeForTarget(greekTokens, wordIndex)
+      setQuestChallenge(challenge)
+    },
+    [questTargetIndexes, greekTokens],
+  )
+
+  const revealQuestWord = useCallback(
+    (wasCorrect: boolean) => {
+      if (selectedWordIndex == null) return
+      const token = greekTokens[selectedWordIndex]
+      if (!token) return
+      const key = wordFormKey(token)
+      const { memory, previouslySeen, entry } = recordGreekWordMemoryTap(key, wasCorrect)
+      setWordMemory(memory)
+      setQuestStage("revealed")
+
+      awardProgress({
+        kind: "word",
+        key: `${levelKey}-${selectedWordIndex}-${entry.familiarity}`,
+        xp: WORD_XP,
+        wordFormKey: key,
+      })
+
+      if (entry.familiarity === "learned") {
+        setMicroWinBurst(`Learned: ${token.word}`)
+      } else if (previouslySeen || entry.familiarity === "seen") {
+        setMicroWinBurst(`Seen again: ${token.word}`)
+      } else {
+        setMicroWinBurst(`New form: ${token.word}`)
+      }
+
+      setCompletedTargetIndexes((prev) => {
+        const next = prev.includes(selectedWordIndex) ? prev : [...prev, selectedWordIndex]
+        finishVerseIfComplete(next)
+        return next
+      })
+    },
+    [selectedWordIndex, greekTokens, awardProgress, levelKey, finishVerseIfComplete],
+  )
+
+  const continueQuest = useCallback(() => {
+    if (selectedWordIndex == null) return
+    const remaining = questTargetIndexes.filter(
+      (idx) => !completedTargetIndexes.includes(idx) && idx !== selectedWordIndex,
+    )
+    if (remaining.length === 0) {
+      closeDetails()
       return
     }
-    if (weakWordSet.size > 0) {
-      nextVerse()
-    }
-  }, [reviewMode, greekTokens, weakWordSet, nextVerse])
-
-  useEffect(() => {
-    if (microWinCount > 0 && microWinCount % MICRO_WIN_STREAK_TARGET === 0) {
-      setMicroWinBurst("You are improving")
-    }
-  }, [microWinCount])
-
-  useEffect(() => {
-    if (!reviewMode) return
-    jumpToWeakWordVerse()
-  }, [reviewMode, pilotIdx, verse, jumpToWeakWordVerse])
+    const nextIndex = remaining[0]
+    setSelectedWordIndex(nextIndex)
+    setQuestStage("challenge")
+    setQuestChallenge(buildChallengeForTarget(greekTokens, nextIndex))
+  }, [selectedWordIndex, questTargetIndexes, completedTargetIndexes, closeDetails, greekTokens])
 
   const onVerseTouchStart = useCallback((e: TouchEvent) => {
     verseSwipeStartX.current = e.changedTouches[0]?.clientX ?? null
@@ -435,7 +513,7 @@ export function GreekOneVerseClient() {
 
   const onVerseTouchEnd = useCallback(
     (e: TouchEvent) => {
-      if (page !== "study" || menuOpen || selectedWordIndex != null) return
+      if (menuOpen || selectedWordIndex != null) return
       const start = verseSwipeStartX.current
       const startY = verseSwipeStartY.current
       verseSwipeStartX.current = null
@@ -453,178 +531,8 @@ export function GreekOneVerseClient() {
       if (dx > 0) prevVerse()
       else nextVerse()
     },
-    [page, menuOpen, selectedWordIndex, prevVerse, nextVerse],
+    [menuOpen, selectedWordIndex, prevVerse, nextVerse],
   )
-
-  const selectedToken =
-    selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
-  const selectedTokenExpanded = selectedToken ? expandGreekMorphToken(selectedToken) : null
-  const selectedTokenLearningClues = selectedToken ? buildGreekWordLearningClues(selectedToken) : null
-  const defaultCoachQuestion = selectedTokenLearningClues?.articleFunctionHint
-    ? "What is the article doing here?"
-    : "Why is this form parsed this way?"
-
-  const activeTokenKey =
-    selectedToken && selectedWordIndex != null
-      ? `${pilot.bookSlug}-${pilot.chapter}-${verse}-${selectedWordIndex}-${selectedToken.word}`
-      : null
-  const verseGreekContext = greekTokens.map((tok) => tok.word).join(" ")
-  const quickActions = useMemo<CoachQuickAction[]>(
-    () => [
-      { id: "article", label: "Article", prompt: "What is this article doing in this phrase?" },
-      { id: "syntax", label: "Syntax role", prompt: "What role does this word play in the sentence?" },
-      { id: "case", label: "Case logic", prompt: "Why this case here, and what does it signal?" },
-      { id: "tense", label: "Tense force", prompt: "What force does this tense/aspect add in context?" },
-      { id: "compare", label: "Compare forms", prompt: "How would the meaning change if a different form were used?" },
-      { id: "memory", label: "Memory hook", prompt: "Give me a memory hook for this exact form." },
-      { id: "prayer", label: "Prayer bridge", prompt: "Turn this grammar insight into a short prayer prompt." },
-    ],
-    [],
-  )
-  const coachCanAsk = Boolean(selectedToken && activeTokenKey && !coachLoading)
-  const coachMicroFocus = selectedTokenExpanded?.parseSummary ?? selectedToken?.parse ?? ""
-
-  useEffect(() => {
-    if (!activeTokenKey) {
-      setCoachPayload(null)
-      setCoachError(null)
-      setCoachQuestion("")
-      setCoachHistory([])
-      setCoachCopied(false)
-      return
-    }
-    if (selectedToken) {
-      awardProgress({
-        kind: "word",
-        key: activeTokenKey,
-        xp: WORD_XP,
-        wordFormKey: `${selectedToken.lemma}|${selectedToken.parse}`,
-      })
-    }
-    if (coachTokenKey?.startsWith(`${activeTokenKey}|`)) return
-    setCoachPayload(null)
-    setCoachError(null)
-    setCoachQuestion("")
-    setCoachHistory([])
-    setCoachCopied(false)
-  }, [activeTokenKey, coachTokenKey, selectedToken, awardProgress])
-
-  const runAiCoach = useCallback(async (explicitQuestion?: string) => {
-    if (!selectedToken || !activeTokenKey) return
-    if (coachLoading) return
-    const resolvedQuestion = (explicitQuestion ?? coachQuestion).trim()
-    const requestKey = `${activeTokenKey}|${resolvedQuestion.toLowerCase()}`
-    if (coachTokenKey === requestKey && coachPayload) return
-
-    setCoachLoading(true)
-    setCoachError(null)
-    setCoachCopied(false)
-    try {
-      const response = await fetch("/api/devotions/greek-coach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reference: passageRef,
-          greekWord: selectedToken.word,
-          lemma: selectedToken.lemma,
-          parse: selectedToken.parse,
-          category: selectedTokenExpanded?.posLabel ?? selectedToken.pos,
-          parseSummary: selectedTokenExpanded?.parseSummary ?? selectedToken.parse,
-          english,
-          verseGreek: verseGreekContext,
-          userQuestion: resolvedQuestion || undefined,
-        }),
-      })
-      const data = (await response.json()) as
-        | {
-            insight?: string
-            prayerPrompt?: string
-            microGloss?: string
-            grammarHook?: string
-            reflectionPrompt?: string
-            error?: string
-          }
-        | undefined
-      const insight =
-        data?.insight ??
-        [data?.microGloss, data?.grammarHook]
-          .filter((s): s is string => typeof s === "string" && s.length > 0)
-          .join(" ")
-      const prayerPrompt = data?.prayerPrompt ?? data?.reflectionPrompt
-      if (!response.ok || !insight || !prayerPrompt) {
-        throw new Error(data?.error || "Could not generate AI coach insight.")
-      }
-      const nextPayload: GreekCoachPayload = {
-        insight: insight.trim(),
-        prayerPrompt: prayerPrompt.trim(),
-        microGloss: typeof data?.microGloss === "string" ? data.microGloss.trim() : undefined,
-        grammarHook: typeof data?.grammarHook === "string" ? data.grammarHook.trim() : undefined,
-        reflectionPrompt: typeof data?.reflectionPrompt === "string" ? data.reflectionPrompt.trim() : undefined,
-      }
-      setCoachPayload(nextPayload)
-      setCoachTokenKey(requestKey)
-      setCoachHistory((prev) => {
-        const nextItem: CoachHistoryItem = {
-          id: requestKey,
-          question: resolvedQuestion || "Coach me",
-          insight: nextPayload.insight,
-          prayerPrompt: nextPayload.prayerPrompt,
-        }
-        return [nextItem, ...prev.filter((entry) => entry.id !== requestKey)].slice(0, COACH_HISTORY_LIMIT)
-      })
-      awardProgress({
-        kind: "coach",
-        key: requestKey,
-        xp: COACH_XP,
-      })
-    } catch (err) {
-      setCoachError(err instanceof Error ? err.message : "Could not generate AI coach insight.")
-    } finally {
-      setCoachLoading(false)
-    }
-  }, [
-    selectedToken,
-    selectedTokenExpanded,
-    activeTokenKey,
-    coachLoading,
-    coachTokenKey,
-    coachPayload,
-    passageRef,
-    english,
-    verseGreekContext,
-    coachQuestion,
-    awardProgress,
-  ])
-
-  const handleAskCoach = useCallback(
-    (prompt?: string) => {
-      if (!coachCanAsk) return
-      if (prompt) {
-        setCoachQuestion(prompt)
-      }
-      void runAiCoach(prompt)
-    },
-    [coachCanAsk, runAiCoach],
-  )
-
-  const copyCoachInsight = useCallback(async () => {
-    if (!coachPayload || typeof navigator === "undefined" || !navigator.clipboard) return
-    const lines = [
-      `Word: ${selectedToken?.word ?? ""}`,
-      `Question: ${coachQuestion.trim() || "Coach me"}`,
-      `Insight: ${coachPayload.insight}`,
-      `Prayer Prompt: ${coachPayload.prayerPrompt}`,
-    ]
-    if (coachPayload.grammarHook) lines.push(`Grammar Hook: ${coachPayload.grammarHook}`)
-    if (coachPayload.microGloss) lines.push(`Micro Gloss: ${coachPayload.microGloss}`)
-    await navigator.clipboard.writeText(lines.join("\n"))
-    setCoachCopied(true)
-    window.setTimeout(() => setCoachCopied(false), 1500)
-  }, [coachPayload, selectedToken?.word, coachQuestion])
-
-  const clearCoachHistory = useCallback(() => {
-    setCoachHistory([])
-  }, [])
 
   const onMenuTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const y = e.changedTouches[0]?.clientY
@@ -662,25 +570,28 @@ export function GreekOneVerseClient() {
     detailSwipeStartedAt.current = Date.now()
   }, [])
 
-  const onDetailTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
-    const y = e.changedTouches[0]?.clientY
-    const x = e.changedTouches[0]?.clientX
-    if (typeof y !== "number" || typeof x !== "number") return
-    detailSwipeCurrentY.current = y
-    detailSwipeCurrentX.current = x
-    const startY = detailSwipeStartY.current
-    const startX = detailSwipeStartX.current
-    if (startY == null || startX == null) return
-    const deltaY = y - startY
-    const deltaX = Math.abs(x - startX)
-    const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
-    const mostlyVertical = deltaY > 0 && deltaY > deltaX * 1.15
-    if (atTop && mostlyVertical) {
-      setDetailDragOffsetY(Math.min(170, deltaY * 0.85))
-    } else if (detailDragOffsetY !== 0) {
-      setDetailDragOffsetY(0)
-    }
-  }, [detailDragOffsetY])
+  const onDetailTouchMove = useCallback(
+    (e: TouchEvent<HTMLDivElement>) => {
+      const y = e.changedTouches[0]?.clientY
+      const x = e.changedTouches[0]?.clientX
+      if (typeof y !== "number" || typeof x !== "number") return
+      detailSwipeCurrentY.current = y
+      detailSwipeCurrentX.current = x
+      const startY = detailSwipeStartY.current
+      const startX = detailSwipeStartX.current
+      if (startY == null || startX == null) return
+      const deltaY = y - startY
+      const deltaX = Math.abs(x - startX)
+      const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
+      const mostlyVertical = deltaY > 0 && deltaY > deltaX * 1.15
+      if (atTop && mostlyVertical) {
+        setDetailDragOffsetY(Math.min(170, deltaY * 0.85))
+      } else if (detailDragOffsetY !== 0) {
+        setDetailDragOffsetY(0)
+      }
+    },
+    [detailDragOffsetY],
+  )
 
   const onDetailTouchEnd = useCallback(
     (e: TouchEvent<HTMLDivElement>) => {
@@ -728,21 +639,16 @@ export function GreekOneVerseClient() {
     return () => window.removeEventListener("keydown", onKey)
   }, [menuOpen, selectedWordIndex, closeMenu, closeDetails, prevVerse, nextVerse])
 
+  const selectedToken =
+    selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
+  const selectedTokenLearningClues = selectedToken ? buildGreekWordLearningClues(selectedToken) : null
+  const selectedMemory = selectedToken ? wordMemory[wordFormKey(selectedToken)] : null
+  const selectedFamiliarity: GreekWordFamiliarity = selectedMemory?.familiarity ?? "new"
+  const selectedFamiliarityLabel = getWordFamiliarityLabel(selectedFamiliarity)
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
+
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <motion.div
-          className="absolute -top-24 -left-20 h-64 w-64 rounded-full bg-emerald-300/10 blur-3xl"
-          animate={{ opacity: [0.35, 0.65, 0.35], scale: [1, 1.08, 1] }}
-          transition={{ duration: 7.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl"
-          animate={{ opacity: [0.3, 0.58, 0.3], scale: [1, 1.06, 1] }}
-          transition={{ duration: 8.2, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
       <header className="shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
           <Link
@@ -753,8 +659,8 @@ export function GreekOneVerseClient() {
             Back
           </Link>
           <div className="text-center">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">Greek Studio</p>
-            <p className="text-sm text-white/80">{page === "study" ? pilot.label : "Progress"}</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">Verse Quest</p>
+            <p className="text-sm text-white/80">{pilot.label}</p>
           </div>
           <button
             type="button"
@@ -766,8 +672,8 @@ export function GreekOneVerseClient() {
             Menu
           </button>
         </div>
-        <div className="px-4 pb-2 sm:px-8 md:px-14">
-          <div className="mx-auto max-w-5xl">
+        <div className="px-4 pb-3 sm:px-8 md:px-14">
+          <div className="mx-auto max-w-5xl space-y-2">
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
@@ -776,33 +682,12 @@ export function GreekOneVerseClient() {
                 transition={xpBurst != null ? { duration: 0.4 } : undefined}
               />
             </div>
-          </div>
-        </div>
-        <div className="px-4 pb-3 sm:px-8 md:px-14">
-          <div className="mx-auto flex max-w-5xl items-center gap-2">
-            {(
-              [
-                ["study", "Study"],
-                ["xp-home", "XP"],
-                ["progress", "Progress"],
-              ] as const
-            ).map(([value, label]) => {
-              const active = page === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setPage(value)}
-                  className={`rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors ${
-                    active
-                      ? "border-emerald-300/55 bg-emerald-400/20 text-emerald-100"
-                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                  }`}
-                >
-                  {label}
-                </button>
-              )
-            })}
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-250"
+                style={{ width: `${levelProgressPct}%` }}
+              />
+            </div>
           </div>
         </div>
       </header>
@@ -814,7 +699,7 @@ export function GreekOneVerseClient() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.92 }}
             transition={{ duration: 0.24 }}
-            className="pointer-events-none absolute right-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-emerald-300/50 bg-emerald-400/25 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,0.35)]"
+            className="pointer-events-none absolute right-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-emerald-300/50 bg-emerald-400/25 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-50"
           >
             +{xpBurst} XP
           </motion.div>
@@ -836,6 +721,23 @@ export function GreekOneVerseClient() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {levelComplete ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="pointer-events-none absolute left-1/2 top-[max(5.6rem,calc(env(safe-area-inset-top)+5rem))] z-[74] w-[min(92vw,460px)] -translate-x-1/2 rounded-2xl border border-emerald-300/45 bg-black/55 px-4 py-3 backdrop-blur-lg"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/90">Level Complete</p>
+            <p className="mt-1 text-sm text-white/90">{levelComplete.encouragement}</p>
+            <p className="mt-1 text-xs text-white/70">
+              +{levelComplete.xpGained} XP · Learned words {levelComplete.learnedWords}/{questTargetIndexes.length}
+            </p>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {menuOpen ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -850,7 +752,7 @@ export function GreekOneVerseClient() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.985 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="mx-auto w-full max-w-2xl rounded-3xl border border-white/20 bg-[#0a1020]/95 p-4 sm:p-5 shadow-[0_20px_80px_rgba(0,0,0,0.55)]"
+              className="mx-auto w-full max-w-2xl rounded-3xl border border-white/20 bg-[#0a1020]/95 p-4 sm:p-5"
               role="dialog"
               aria-label="Study controls"
               onClick={(e) => e.stopPropagation()}
@@ -858,156 +760,151 @@ export function GreekOneVerseClient() {
               onTouchMove={onMenuTouchMove}
               onTouchEnd={onMenuTouchEnd}
             >
-            <div className="mb-4 flex items-center justify-between">
-              <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-200/80">
-                <Sparkles className="size-3.5" />
-                Study controls
-              </p>
-              <button
-                type="button"
-                onClick={closeMenu}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/75 hover:bg-white/[0.12]"
-                aria-label="Close study controls"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
-                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
-                  Verse rolodex
+              <div className="mb-4 flex items-center justify-between">
+                <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-200/80">
+                  <Sparkles className="size-3.5" />
+                  Verse controls
                 </p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <label className="space-y-1">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
-                    <select
-                      value={rolodexBookSlug}
-                      onChange={(e) => {
-                        const nextBook = e.target.value
-                        const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
-                        setRolodexBookSlug(nextBook)
-                        if (firstChapter) {
-                          setRolodexChapter(firstChapter.chapter)
-                          setRolodexVerse((current) => Math.min(current, firstChapter.maxVerse))
-                        }
-                      }}
-                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
-                      aria-label="Select Greek study book"
+                <button
+                  type="button"
+                  onClick={closeMenu}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/75 hover:bg-white/[0.12]"
+                  aria-label="Close study controls"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Verse rolodex</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <label className="space-y-1">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
+                      <select
+                        value={rolodexBookSlug}
+                        onChange={(e) => {
+                          const nextBook = e.target.value
+                          const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
+                          setRolodexBookSlug(nextBook)
+                          if (firstChapter) {
+                            setRolodexChapter(firstChapter.chapter)
+                            setRolodexVerse((current) => Math.min(current, firstChapter.maxVerse))
+                          }
+                        }}
+                        className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
+                        aria-label="Select Greek study book"
+                      >
+                        {rolodexBooks.map((item) => (
+                          <option key={item.bookSlug} value={item.bookSlug}>
+                            {item.bookName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
+                      <select
+                        value={rolodexChapter}
+                        onChange={(e) => {
+                          const nextChapter = Number.parseInt(e.target.value, 10)
+                          const chapterItem = rolodexChapters.find((item) => item.chapter === nextChapter)
+                          setRolodexChapter(nextChapter)
+                          if (chapterItem) {
+                            setRolodexVerse((current) => Math.min(current, chapterItem.maxVerse))
+                          }
+                        }}
+                        className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
+                        aria-label="Select Greek study chapter"
+                      >
+                        {rolodexChapters.map((item) => (
+                          <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
+                            {item.chapter}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
+                      <select
+                        value={rolodexVerse}
+                        onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
+                        className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
+                        aria-label="Select Greek study verse"
+                      >
+                        {rolodexVerseOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+                      {selectedRolodexChapter.label}:{rolodexVerse}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={jumpToRolodex}
+                      className="rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25"
                     >
-                      {rolodexBooks.map((item) => (
-                        <option key={item.bookSlug} value={item.bookSlug}>
-                          {item.bookName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-1">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
-                    <select
-                      value={rolodexChapter}
-                      onChange={(e) => {
-                        const nextChapter = Number.parseInt(e.target.value, 10)
-                        const chapterItem = rolodexChapters.find((item) => item.chapter === nextChapter)
-                        setRolodexChapter(nextChapter)
-                        if (chapterItem) {
-                          setRolodexVerse((current) => Math.min(current, chapterItem.maxVerse))
-                        }
-                      }}
-                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
-                      aria-label="Select Greek study chapter"
-                    >
-                      {rolodexChapters.map((item) => (
-                        <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
-                          {item.chapter}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-1">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
-                    <select
-                      value={rolodexVerse}
-                      onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
-                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
-                      aria-label="Select Greek study verse"
-                    >
-                      {rolodexVerseOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      Go to verse
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
-                    {selectedRolodexChapter.label}:{rolodexVerse}
-                  </p>
+
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={jumpToRolodex}
-                    className="rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25"
+                    onClick={() => setReviewMode((v) => !v)}
+                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                      reviewMode
+                        ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
+                        : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                    }`}
                   >
-                    Go to verse
+                    {reviewMode ? "Review On" : "Review Mode"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setWordHintsEnabled((v) => !v)}
+                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                      wordHintsEnabled
+                        ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
+                        : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                    }`}
+                  >
+                    {wordHintsEnabled ? "Hints On" : "Hints Off"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEnglish((v) => !v)}
+                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                      showEnglish
+                        ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
+                        : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                    }`}
+                  >
+                    {showEnglish ? "English On" : "English Off"}
+                  </button>
+                  <Link
+                    href={readerUrl}
+                    onClick={closeMenu}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
+                  >
+                    Full Reader
+                    <ExternalLink className="size-3.5 opacity-70" />
+                  </Link>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setReviewMode((v) => !v)}
-                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                    reviewMode
-                      ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
-                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                  }`}
-                >
-                  {reviewMode ? "Review On" : "Review Weak"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWordHintsEnabled((v) => !v)}
-                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                    wordHintsEnabled
-                      ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
-                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                  }`}
-                >
-                  {wordHintsEnabled ? "Hints On" : "Hints Off"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowEnglish((v) => !v)}
-                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                    showEnglish
-                      ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
-                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                  }`}
-                >
-                  {showEnglish ? "English On" : "English Off"}
-                </button>
-                <Link
-                  href={readerUrl}
                   onClick={closeMenu}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
+                  className="w-full rounded-2xl border border-white/20 bg-white/[0.04] py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-white/80 hover:bg-white/[0.1]"
                 >
-                  Full Reader
-                  <ExternalLink className="size-3.5 opacity-70" />
-                </Link>
+                  Done
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={closeMenu}
-                className="w-full rounded-2xl border border-white/20 bg-white/[0.04] py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-white/80 hover:bg-white/[0.1]"
-              >
-                Done
-              </button>
-            </div>
             </motion.div>
           </motion.div>
         ) : null}
@@ -1019,316 +916,115 @@ export function GreekOneVerseClient() {
         onTouchEnd={onVerseTouchEnd}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-          {page === "xp-home" ? (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.26 }}
-              className="rounded-2xl border border-white/15 bg-black/30 p-3 sm:p-4 space-y-3 backdrop-blur-md"
-              aria-label="Greek study progression home"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1">
-                  <Trophy className="size-3.5 text-emerald-100" />
-                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100">
-                    Level {progress.level}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">Total XP</p>
-                  <p className="text-sm font-semibold text-white/90">{progress.totalXp}</p>
-                </div>
-              </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
+            <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1">
+              Targets {completedTargetIndexes.length}/{questTargetIndexes.length}
+            </span>
+            <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1">
+              Review {reviewMode ? "On" : "Off"}
+            </span>
+            <span className="rounded-full border border-white/20 bg-white/[0.03] px-2.5 py-1">
+              Streak <Flame className="mx-1 inline size-3.5 text-orange-300/90" />
+              {progress.streak}
+            </span>
+          </div>
 
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[11px]">
-                  <span className="font-mono uppercase tracking-[0.14em] text-white/50">
-                    <Zap className="mr-1 inline size-3.5 text-amber-200/80" />
-                    Today {progress.todayXp}/{progress.dailyGoalXp} XP
-                  </span>
-                  <span className={`font-mono uppercase tracking-[0.14em] ${progress.dailyGoalReached ? "text-emerald-200/90" : "text-white/45"}`}>
-                    {progress.dailyGoalReached ? "Goal reached" : "Daily goal"}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-300"
-                    style={{ width: `${dailyXpPct}%` }}
-                  />
-                </div>
-              </div>
+          <div className="space-y-2 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-300/75">{passageRef.replace(":", " · ")}</p>
+            <div className="mx-auto h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-300/80 to-amber-300/80"
+                style={{ width: verseProgress }}
+              />
+            </div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+              Verse {verse} of {pilot.maxVerse}
+            </p>
+          </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Streak</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white/90">
-                    <Flame className="mr-1 inline size-3.5 text-orange-300/90" />
-                    {progress.streak}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Verses</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white/90">{progress.versesToday}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Words</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white/90">{progress.wordsToday}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Coach</p>
-                  <p className="mt-0.5 text-sm font-semibold text-white/90">
-                    <Target className="mr-1 inline size-3.5 text-cyan-200/85" />
-                    {progress.coachToday}
-                  </p>
-                </div>
-              </div>
+          {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
 
-              <p className="text-[11px] text-white/55">Micro wins: repeated taps are tracked and weak forms surface in review mode.</p>
-              <div className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
-                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Choose passage</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <label className="space-y-1">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
-                    <select
-                      value={rolodexBookSlug}
-                      onChange={(e) => {
-                        const nextBook = e.target.value
-                        const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
-                        setRolodexBookSlug(nextBook)
-                        if (firstChapter) {
-                          setRolodexChapter(firstChapter.chapter)
-                          setRolodexVerse((current) => Math.min(current, firstChapter.maxVerse))
-                        }
-                      }}
-                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
-                      aria-label="Select Greek study book"
-                    >
-                      {rolodexBooks.map((item) => (
-                        <option key={item.bookSlug} value={item.bookSlug}>
-                          {item.bookName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-1">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
-                    <select
-                      value={rolodexChapter}
-                      onChange={(e) => {
-                        const nextChapter = Number.parseInt(e.target.value, 10)
-                        const chapterItem = rolodexChapters.find((item) => item.chapter === nextChapter)
-                        setRolodexChapter(nextChapter)
-                        if (chapterItem) {
-                          setRolodexVerse((current) => Math.min(current, chapterItem.maxVerse))
-                        }
-                      }}
-                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
-                      aria-label="Select Greek study chapter"
-                    >
-                      {rolodexChapters.map((item) => (
-                        <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
-                          {item.chapter}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-1">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
-                    <select
-                      value={rolodexVerse}
-                      onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
-                      className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-emerald-300/50 focus:outline-none"
-                      aria-label="Select Greek study verse"
-                    >
-                      {rolodexVerseOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
-                  Target: {selectedRolodexChapter.label}:{rolodexVerse}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={jumpToRolodex}
-                className="w-full rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25 sm:w-auto"
-              >
-                Jump to verse
-              </button>
-            </motion.section>
-          ) : null}
-
-          {page === "study" ? (
-            <>
-              <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
-                <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1">
-                  Known forms {Object.keys(wordMemory).length}
-                </span>
-                <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1">
-                  Weak in verse {weakWordsInVerse}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setReviewMode((v) => !v)}
-                  className={`rounded-full border px-2.5 py-1 ${
-                    reviewMode
-                      ? "border-cyan-300/50 bg-cyan-300/20 text-cyan-100"
-                      : "border-white/20 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                  }`}
+          <section className="min-h-[56vh] sm:min-h-[60vh] flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full max-w-3xl space-y-4 animate-pulse"
                 >
-                  {reviewMode ? "Reviewing weak words" : "Start review mode"}
-                </button>
-              </div>
-              <div className="space-y-2 text-center">
-                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-300/75">
-                  {passageRef.replace(":", " · ")}
-                </p>
-                <div className="mx-auto h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-300/80 to-amber-300/80"
-                    style={{ width: verseProgress }}
-                  />
-                </div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
-                  Verse {verse} of {pilot.maxVerse}
-                </p>
-              </div>
-
-              {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
-
-              <section className="min-h-[56vh] sm:min-h-[60vh] flex items-center justify-center">
-                <AnimatePresence mode="wait">
-                  {loading ? (
-                    <motion.div
-                      key="loading"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="w-full max-w-3xl space-y-4 animate-pulse"
-                    >
-                      <div className="h-10 rounded-xl bg-white/10" />
-                      <div className="h-10 rounded-xl bg-white/10" />
-                      <div className="h-10 rounded-xl bg-white/10" />
-                    </motion.div>
-                  ) : greekTokens.length > 0 ? (
-                    <motion.div
-                      key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
-                      initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
-                      transition={{ duration: 0.28, ease: "easeOut" }}
-                      lang="el"
-                      className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
-                      style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
-                    >
-                      {greekTokens.map((tok, wi) => {
-                        const selected = selectedWordIndex === wi
-                        const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
-                        const wordFormKey = `${tok.lemma}|${tok.parse}`
-                        const memoryEntry = wordMemory[wordFormKey]
-                        const knownWord = Boolean(memoryEntry)
-                        const weakWord = weakWordSet.has(wordFormKey)
-                        const repeatedWord = (memoryEntry?.taps ?? 0) >= 2
-                        return (
-                          <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
-                            <button
-                              type="button"
-                              onClick={() => handleSelectGreekWord(wi)}
-                              className={
-                                selected
-                                  ? "border-b-2 border-amber-300/85 text-amber-200"
-                                  : weakWord
-                                    ? "border-b border-dashed border-cyan-300/70 text-cyan-100 hover:border-cyan-200 hover:text-cyan-50"
-                                    : knownWord
-                                      ? "border-b border-dashed border-emerald-300/60 text-emerald-100 hover:border-emerald-200 hover:text-emerald-50"
-                                  : "border-b border-dashed border-amber-300/35 text-amber-100/95 hover:border-amber-300/70 hover:text-amber-50"
-                              }
-                            >
-                              {tok.word}
-                            </button>
-                            {repeatedWord ? (
-                              <span className="mt-0.5 font-mono text-[8px] sm:text-[9px] text-emerald-300/70">seen</span>
-                            ) : null}
-                            {hint ? (
-                              <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
-                            ) : null}
+                  <div className="h-10 rounded-xl bg-white/10" />
+                  <div className="h-10 rounded-xl bg-white/10" />
+                  <div className="h-10 rounded-xl bg-white/10" />
+                </motion.div>
+              ) : greekTokens.length > 0 ? (
+                <motion.div
+                  key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
+                  initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
+                  lang="el"
+                  className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
+                  style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
+                >
+                  {greekTokens.map((tok, wi) => {
+                    const key = wordFormKey(tok)
+                    const memory = wordMemory[key]
+                    const familiarity = memory?.familiarity ?? "new"
+                    const weakWord = weakWordSet.has(key)
+                    const targetWord = questTargetIndexes.includes(wi)
+                    const completedWord = completedTargetIndexes.includes(wi)
+                    const selected = selectedWordIndex === wi
+                    const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
+                    return (
+                      <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectGreekWord(wi)}
+                          disabled={!targetWord}
+                          className={
+                            selected
+                              ? "border-b-2 border-amber-300/85 text-amber-200"
+                              : !targetWord
+                                ? "border-b border-transparent text-amber-100/35"
+                                : weakWord
+                                  ? "border-b border-dashed border-cyan-300/80 text-cyan-100 hover:border-cyan-200 hover:text-cyan-50"
+                                  : familiarity === "learned"
+                                    ? "border-b border-dashed border-emerald-300/70 text-emerald-100 hover:border-emerald-200 hover:text-emerald-50"
+                                    : "border-b border-dashed border-amber-300/55 text-amber-100/95 hover:border-amber-300/80 hover:text-amber-50"
+                          }
+                        >
+                          {tok.word}
+                        </button>
+                        {targetWord ? (
+                          <span className="mt-0.5 font-mono text-[8px] sm:text-[9px] text-white/55">
+                            {completedWord ? "done" : familiarity}
                           </span>
-                        )
-                      })}
-                    </motion.div>
-                  ) : (
-                    <motion.p
-                      key="empty"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="text-center text-sm text-white/45"
-                    >
-                      Greek text unavailable for this verse.
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </section>
-            </>
-          ) : null}
+                        ) : null}
+                        {hint ? (
+                          <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
+                        ) : null}
+                      </span>
+                    )
+                  })}
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center text-sm text-white/45"
+                >
+                  Greek text unavailable for this verse.
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </section>
 
-          {page === "progress" ? (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-white/15 bg-black/35 p-4 sm:p-5 space-y-3"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-200/80">Progress detail</p>
-                <span className="rounded-full border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100">
-                  Level {progress.level}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Total XP</p>
-                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.totalXp}</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Today XP</p>
-                  <p className="mt-1 text-sm font-semibold text-white/92">
-                    {progress.todayXp}/{progress.dailyGoalXp}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Streak</p>
-                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.streak} days</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Unique forms</p>
-                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.uniqueWordForms}</p>
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Today checklist</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-white/82">
-                  <li>• Verses explored: {progress.versesToday}</li>
-                  <li>• Words inspected: {progress.wordsToday}</li>
-                  <li>• Coach asks: {progress.coachToday}</li>
-                </ul>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPage("study")}
-                className="w-full rounded-xl border border-cyan-300/40 bg-cyan-300/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100 hover:bg-cyan-300/25 sm:w-auto"
-              >
-                Back to study
-              </button>
-            </motion.section>
-          ) : null}
-
-          {page === "study" && showEnglish && english ? (
+          {showEnglish && english ? (
             <p className="mx-auto max-w-3xl text-center text-white/70 leading-relaxed" style={{ fontSize: "clamp(1.05rem, 3.3vw, 1.6rem)" }}>
               {english}
             </p>
@@ -1355,7 +1051,7 @@ export function GreekOneVerseClient() {
               animate={{ y: detailDragOffsetY }}
               exit={{ y: "100%" }}
               transition={detailDragOffsetY > 0 ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
-              className="relative z-[67] w-full rounded-t-3xl border-t border-white/20 bg-[#060b14]/95 shadow-[0_-20px_60px_rgba(0,0,0,0.55)]"
+              className="relative z-[67] w-full rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
               onTouchStart={onDetailTouchStart}
               onTouchMove={onDetailTouchMove}
               onTouchEnd={onDetailTouchEnd}
@@ -1372,300 +1068,111 @@ export function GreekOneVerseClient() {
                 ref={detailContentRef}
                 className="mx-auto max-h-[68vh] w-full max-w-4xl overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6"
               >
-              <div
-                data-detail-swipe-handle
-                className="mb-2 flex flex-col items-center gap-1.5 pb-1 text-center select-none"
-              >
-                <div className="h-1.5 w-14 rounded-full bg-white/25" />
-                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Swipe down from here to close</p>
-              </div>
-              <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Word details</p>
-                  <p className="mt-0.5 text-sm text-white/80" lang="el">
-                    {selectedToken.word}
-                  </p>
+                <div data-detail-swipe-handle className="mb-2 flex flex-col items-center gap-1.5 pb-1 text-center select-none">
+                  <div className="h-1.5 w-14 rounded-full bg-white/25" />
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Swipe down from here to close</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={closeDetails}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/70 hover:bg-white/[0.12]"
-                  aria-label="Close word details"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              <MorphologySidebarPanel
-                token={selectedToken}
-                verseNumber={verse}
-                wordIndex={selectedWordIndex ?? 0}
-              />
-
-              {selectedTokenLearningClues ? (
-                <div className="mt-3 rounded-xl border border-blue-300/25 bg-blue-400/[0.07] p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-blue-100/80">Why this form?</p>
-                  {selectedTokenLearningClues.quickReason ? (
-                    <p className="mt-2 text-sm text-white/90 leading-relaxed">{selectedTokenLearningClues.quickReason}</p>
-                  ) : (
-                    <p className="mt-2 text-sm text-white/70 leading-relaxed">
-                      Parse template: <span className="font-mono text-white/85">{selectedTokenLearningClues.parseTemplate}</span>
-                    </p>
-                  )}
-                  {selectedTokenLearningClues.slotClues.length > 0 ? (
-                    <ul className="mt-2 list-disc pl-4 space-y-1 text-xs text-white/75">
-                      {selectedTokenLearningClues.slotClues.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {selectedTokenLearningClues.articleFunctionHint ? (
-                    <p className="mt-2 text-xs text-blue-100/85 leading-relaxed">
-                      Article note: {selectedTokenLearningClues.articleFunctionHint}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="mt-3 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-3 sm:p-4 shadow-[0_10px_30px_rgba(16,185,129,0.12)]">
-                <div className="flex items-start justify-between gap-3">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach Lab</p>
-                    <p className="mt-0.5 text-xs text-white/65">Quick actions, re-ask history, and context-aware grammar prompts.</p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Verse Quest · Word</p>
+                    <p className="mt-0.5 text-sm text-white/80" lang="el">
+                      {selectedToken.word}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleAskCoach()}
-                    disabled={!coachCanAsk}
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
+                    onClick={closeDetails}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/70 hover:bg-white/[0.12]"
+                    aria-label="Close word details"
                   >
-                    <Lightbulb className="size-3.5" />
-                    {coachLoading ? "Thinking..." : "Coach me"}
+                    <X className="size-4" />
                   </button>
                 </div>
 
-                <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-2.5">
-                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Current focus</p>
-                  <p className="mt-1 text-xs text-white/82">
-                    {selectedToken?.word} ({selectedToken?.lemma}) - {coachMicroFocus}
-                  </p>
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <input
-                      value={coachQuestion}
-                      onChange={(e) => setCoachQuestion(e.target.value)}
-                      placeholder="Ask a Greek question in plain English..."
-                      className="flex-1 rounded-xl border border-emerald-300/35 bg-black/35 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/60 focus:outline-none"
-                      aria-label="Ask AI Greek coach a question"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAskCoach()}
-                      disabled={!coachCanAsk}
-                      className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
-                    >
-                      Ask
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {quickActions.map((action) => (
-                      <button
-                        key={action.id}
-                        type="button"
-                        onClick={() => handleAskCoach(action.prompt)}
-                        disabled={!coachCanAsk}
-                        className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => handleAskCoach(defaultCoachQuestion)}
-                      disabled={!coachCanAsk}
-                      className="rounded-full border border-emerald-300/35 bg-emerald-300/10 px-3 py-1.5 text-[11px] text-emerald-100/90 hover:bg-emerald-300/20 disabled:opacity-60"
-                    >
-                      Deep dive this form
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleAskCoach(coachHistory[0]?.question)}
-                    disabled={!coachCanAsk || coachHistory.length === 0}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
-                  >
-                    <RefreshCw className="size-3.5" />
-                    Re-ask latest
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void copyCoachInsight()}
-                    disabled={!coachPayload}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
-                  >
-                    <Copy className="size-3.5" />
-                    {coachCopied ? "Copied" : "Copy insight"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearCoachHistory}
-                    disabled={coachHistory.length === 0}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
-                  >
-                    <Trash2 className="size-3.5" />
-                    Clear history
-                  </button>
-                </div>
-
-                {coachHistory.length > 0 ? (
-                  <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Recent coach prompts</p>
-                      <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
-                        {coachHistory.length}/{COACH_HISTORY_LIMIT}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {coachHistory.map((item) => (
+                {questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
+                  <div className="mb-3 rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
+                    <p className="mt-1 text-sm text-white/85">Which lemma matches this word form?</p>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {questChallenge.options.map((option, idx) => (
                         <button
-                          key={item.id}
+                          key={option}
                           type="button"
-                          onClick={() => handleAskCoach(item.question)}
-                          disabled={!coachCanAsk}
-                          className="w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-left hover:bg-black/30 disabled:opacity-60"
+                          onClick={() => revealQuestWord(idx === questChallenge.correctOptionIndex)}
+                          className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white/88 hover:bg-black/45"
                         >
-                          <p className="text-[11px] text-white/85">{item.question}</p>
-                          <p className="mt-0.5 text-[10px] text-white/55 line-clamp-2">{item.insight}</p>
+                          {option}
                         </button>
                       ))}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => revealQuestWord(false)}
+                      className="mt-2 rounded-lg border border-white/20 bg-white/[0.03] px-3 py-1.5 text-xs text-white/72 hover:bg-white/[0.08]"
+                    >
+                      Reveal without guessing
+                    </button>
                   </div>
                 ) : null}
 
-                {coachError ? (
-                  <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
+                {questStage === "revealed" ? (
+                  <div className="mb-3 rounded-xl border border-emerald-300/30 bg-emerald-400/[0.08] p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100/85">Reveal</p>
+                    <p className="mt-1 text-sm text-white/92">
+                      Familiarity: <span className="text-emerald-100">{selectedFamiliarityLabel}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-white/75">
+                      {selectedTokenLearningClues?.quickReason ??
+                        `Lemma ${selectedToken.lemma} · parse ${selectedToken.parse}`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={continueQuest}
+                      className="mt-2 rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-1.5 text-xs text-emerald-50 hover:bg-emerald-400/30"
+                    >
+                      Continue quest
+                    </button>
+                  </div>
                 ) : null}
-                {coachLoading ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-3 overflow-hidden rounded-xl border border-emerald-200/25 bg-black/35"
-                  >
-                    <motion.div
-                      className="h-0.5 bg-gradient-to-r from-transparent via-emerald-300/70 to-transparent"
-                      animate={{ x: ["-100%", "100%"] }}
-                      transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-                    />
-                    <div className="space-y-2 p-3">
-                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.15em] text-emerald-100/85">
-                        <Sparkles className="size-3.5 animate-pulse" />
-                        Coach is parsing the form
-                        <span className="inline-flex items-center gap-1 text-emerald-200/90">
-                          <motion.span
-                            className="h-1.5 w-1.5 rounded-full bg-emerald-200/90"
-                            animate={{ opacity: [0.3, 1, 0.3] }}
-                            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-                          />
-                          <motion.span
-                            className="h-1.5 w-1.5 rounded-full bg-emerald-200/90"
-                            animate={{ opacity: [0.3, 1, 0.3] }}
-                            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.14 }}
-                          />
-                          <motion.span
-                            className="h-1.5 w-1.5 rounded-full bg-emerald-200/90"
-                            animate={{ opacity: [0.3, 1, 0.3] }}
-                            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.28 }}
-                          />
-                        </span>
-                      </div>
-                      <div className="space-y-1.5">
-                        <motion.div
-                          className="h-2 rounded-full bg-white/15"
-                          animate={{ opacity: [0.35, 0.75, 0.35] }}
-                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-                        />
-                        <motion.div
-                          className="h-2 w-11/12 rounded-full bg-white/12"
-                          animate={{ opacity: [0.35, 0.72, 0.35] }}
-                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: 0.12 }}
-                        />
-                        <motion.div
-                          className="h-2 w-8/12 rounded-full bg-white/12"
-                          animate={{ opacity: [0.35, 0.68, 0.35] }}
-                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: 0.24 }}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : null}
-                {coachPayload ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-3 space-y-2 rounded-xl border border-emerald-200/25 bg-black/25 p-3"
-                  >
-                    <p className="text-sm leading-relaxed text-white/92">{coachPayload.insight}</p>
-                    {coachPayload.grammarHook ? (
-                      <p className="text-xs leading-relaxed text-cyan-100/90">Grammar hook: {coachPayload.grammarHook}</p>
-                    ) : null}
-                    {coachPayload.microGloss ? (
-                      <p className="text-xs leading-relaxed text-white/70">Micro gloss: {coachPayload.microGloss}</p>
-                    ) : null}
-                    <p className="text-xs leading-relaxed text-emerald-100/95">{coachPayload.prayerPrompt}</p>
-                    {coachPayload.reflectionPrompt ? (
-                      <p className="text-xs leading-relaxed text-emerald-200/85">Reflection: {coachPayload.reflectionPrompt}</p>
-                    ) : null}
-                  </motion.div>
-                ) : !coachLoading && !coachError ? (
-                  <p className="mt-3 text-xs text-white/62 leading-relaxed">
-                    Tap quick actions to drill grammar, syntax, and prayer applications for this exact word.
-                  </p>
-                ) : null}
-              </div>
+
+                <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
               </div>
             </motion.section>
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      {page === "study" ? (
-        <footer className="shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
-          <div className="mx-auto flex max-w-lg gap-3">
-            <button
-              type="button"
-              onClick={prevVerse}
-              disabled={verse <= 1 || loading}
-              className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
-              aria-label="Previous verse"
-            >
-              <ChevronLeft className="size-5" />
-              Prev
-            </button>
-            <button
-              type="button"
-              onClick={nextVerse}
-              disabled={verse >= pilot.maxVerse || loading}
-              className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
-              aria-label="Next verse"
-            >
-              Next
-              <ChevronRight className="size-5" />
-            </button>
-          </div>
-          <Link
-            href={readerUrl}
-            className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-300/90 hover:text-amber-200"
+      <footer className="shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="mx-auto flex max-w-lg gap-3">
+          <button
+            type="button"
+            onClick={prevVerse}
+            disabled={verse <= 1 || loading}
+            className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
+            aria-label="Previous verse"
           >
-            Word study &amp; grammar in reader
-            <ExternalLink className="size-3.5 opacity-80" />
-          </Link>
-        </footer>
-      ) : null}
+            <ChevronLeft className="size-5" />
+            Prev
+          </button>
+          <button
+            type="button"
+            onClick={nextVerse}
+            disabled={verse >= pilot.maxVerse || loading}
+            className="flex-1 min-h-[52px] rounded-xl border border-white/20 bg-white/[0.04] font-mono text-xs uppercase tracking-[0.16em] text-white/90 hover:bg-white/[0.1] disabled:pointer-events-none disabled:opacity-40 inline-flex items-center justify-center gap-1"
+            aria-label="Next verse"
+          >
+            Next
+            <ChevronRight className="size-5" />
+          </button>
+        </div>
+        <Link
+          href={readerUrl}
+          className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-300/90 hover:text-amber-200"
+        >
+          Word study &amp; grammar in reader
+          <ExternalLink className="size-3.5 opacity-80" />
+        </Link>
+      </footer>
     </div>
   )
 }
