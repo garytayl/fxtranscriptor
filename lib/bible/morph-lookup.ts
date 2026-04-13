@@ -1,5 +1,6 @@
 import type { PassageReference } from "@/lib/bible/reference"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
+import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 import john1 from "@/lib/bible/morph-data/john-1.json"
 import luke6 from "@/lib/bible/morph-data/luke-6.json"
 
@@ -59,10 +60,10 @@ export type MorphPassagePayload = {
   readerGrammarUrl: string | null
 }
 
-/** Reader URL with KJV + verse anchor for Greek grammar pilot chapters. */
+/** Reader URL with `t=fx-greek` + verse anchor for Greek grammar pilot chapters. */
 export function getReaderGrammarUrl(bookSlug: string, chapter: number, verse: number): string {
   const params = new URLSearchParams()
-  params.set("t", "kjv")
+  params.set("t", FX_GREEK_GRAMMAR_TRANSLATION_KEY)
   params.set("v", String(verse))
   return `/bible/${bookSlug}/${chapter}?${params.toString()}`
 }

@@ -1,7 +1,12 @@
 import "server-only"
 
 import { getBibleInfo } from "@/lib/bible/api"
+import { getFxGreekGrammarTranslationLabel } from "@/lib/bible/fx-greek-reader-server"
 import { LOCAL_HCSB_BIBLE_ID } from "@/lib/bible/local-hcsb"
+import {
+  FX_GREEK_GRAMMAR_TRANSLATION_KEY,
+  LOCAL_FX_GREEK_GRAMMAR_BIBLE_ID,
+} from "@/lib/bible/reader-translation-keys"
 
 /** Default API.Bible id for King James Version (see GET /v1/bibles). Override with API_BIBLE_KJV_ID. */
 export const DEFAULT_API_BIBLE_KJV_ID = "de4e12af7f28f599-01"
@@ -109,6 +114,15 @@ export async function getResolvedTranslations(): Promise<BibleTranslation[]> {
     ]
   }
 
+  withHcsb = [
+    ...withHcsb,
+    {
+      key: FX_GREEK_GRAMMAR_TRANSLATION_KEY,
+      label: getFxGreekGrammarTranslationLabel(),
+      bibleId: LOCAL_FX_GREEK_GRAMMAR_BIBLE_ID,
+    },
+  ]
+
   const resolved = await Promise.all(
     withHcsb.map(async (translation) => {
       if (translation.bibleId === LOCAL_HCSB_BIBLE_ID) {
@@ -188,4 +202,11 @@ export function isKjvTranslationKey(key: string | null | undefined): boolean {
     .map((k) => k.trim().toLowerCase())
     .filter(Boolean)
   return allowed.includes(key.trim().toLowerCase())
+}
+
+/** KJV and the virtual `fx-greek` reader mode (KJV text + Strong's + Greek morph UI). */
+export function isStrongsWordStudyTranslationKey(key: string | null | undefined): boolean {
+  if (!key) return false
+  if (key.trim().toLowerCase() === FX_GREEK_GRAMMAR_TRANSLATION_KEY) return true
+  return isKjvTranslationKey(key)
 }

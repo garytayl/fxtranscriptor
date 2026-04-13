@@ -12,6 +12,11 @@ import {
 } from "@/lib/bible/local-hcsb"
 import { parseChapterHtmlToVerses, sanitizeChapterHtml } from "@/lib/bible/parse"
 import { slugifyBookName } from "@/lib/bible/reference"
+import {
+  getFxGreekGrammarTranslationLabel,
+  resolveReaderTranslationToApiBibleId,
+} from "@/lib/bible/fx-greek-reader-server"
+import { LOCAL_FX_GREEK_GRAMMAR_BIBLE_ID } from "@/lib/bible/reader-translation-keys"
 import { getDefaultBibleId } from "@/lib/bible/translations"
 import type { BibleBook, BibleChapter, BibleChapterContent, BibleVerse } from "@/lib/bible/types"
 
@@ -100,7 +105,8 @@ async function bibleFetch<T>(path: string, searchParams?: Record<string, string 
 
 function resolveBibleId(bibleId?: string) {
   const { bibleId: envBibleId } = getBibleEnv()
-  return bibleId ?? envBibleId
+  const raw = bibleId ?? envBibleId
+  return resolveReaderTranslationToApiBibleId(raw)
 }
 
 /** List all bibles your API key can access. Use this to get exact IDs for API_BIBLE_BSB_ID / API_BIBLE_WEBU_ID. */
@@ -125,6 +131,10 @@ export async function listBooks(bibleId?: string): Promise<ApiBibleBook[]> {
 }
 
 export async function getBibleInfo(bibleId?: string): Promise<ApiBibleInfo | null> {
+  if (bibleId === LOCAL_FX_GREEK_GRAMMAR_BIBLE_ID) {
+    const name = getFxGreekGrammarTranslationLabel()
+    return { id: LOCAL_FX_GREEK_GRAMMAR_BIBLE_ID, name, abbreviation: "FX" }
+  }
   const resolvedBibleId = resolveBibleId(bibleId)
   if (resolvedBibleId === LOCAL_HCSB_BIBLE_ID) {
     return { id: LOCAL_HCSB_BIBLE_ID, name: "HCSB", abbreviation: "HCSB" }

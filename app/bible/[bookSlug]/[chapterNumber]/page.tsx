@@ -6,7 +6,7 @@ import { parseVerseRange } from "@/lib/bible/reference"
 import {
   getResolvedTranslations,
   getResolvedTranslationByKey,
-  isKjvTranslationKey,
+  isStrongsWordStudyTranslationKey,
 } from "@/lib/bible/translations"
 import { getGreekMorphTokensForChapter } from "@/lib/bible/morph-lookup"
 import { getStrongsWordsForChapter } from "@/lib/bible/verse-strongs"
@@ -74,7 +74,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
   const nextChapter = currentIndex < chapters.length - 1 ? chapters[currentIndex + 1] : null
   const query = activeKey ? `?t=${activeKey}` : ""
   const keyTerms = getKeyTermsForChapter(book.slug, chapterNumber)
-  const kjvWordStudyEnabled = isKjvTranslationKey(activeKey)
+  const kjvWordStudyEnabled = isStrongsWordStudyTranslationKey(activeKey)
   const strongsWordsByVerse =
     kjvWordStudyEnabled && verses.length > 0
       ? await getStrongsWordsForChapter({ slug: book.slug, id: book.id }, chapterNumber)
