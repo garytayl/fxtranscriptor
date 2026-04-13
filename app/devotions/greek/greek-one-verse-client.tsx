@@ -4,9 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } fr
 import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X } from "lucide-react"
 
-import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
-import { GreekMorphWords } from "@/app/bible/_components/greek-morph-words"
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
+import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import {
   MORPH_PILOT_CHAPTERS,
@@ -63,6 +62,8 @@ export function GreekOneVerseClient() {
   const [greekTokens, setGreekTokens] = useState<GreekMorphToken[]>([])
   const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
+  const [showPrimer, setShowPrimer] = useState(false)
+  const [showEnglish, setShowEnglish] = useState(false)
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
 
@@ -234,6 +235,7 @@ export function GreekOneVerseClient() {
 
   const selectedToken =
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
+  const hasStudyDrawer = showPrimer || selectedToken != null
 
   return (
     <div className="fixed inset-0 z-[60] relative flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,#131822,transparent_40%),linear-gradient(to_bottom,#06080f,#050505,#030306)] text-white">
@@ -344,6 +346,31 @@ export function GreekOneVerseClient() {
                 >
                   {wordHintsEnabled ? "Hints: On" : "Hints: Off"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEnglish((v) => !v)}
+                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors ${
+                    showEnglish
+                      ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
+                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {showEnglish ? "English: On" : "English: Off"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPrimer((v) => !v)
+                    setMenuOpen(false)
+                  }}
+                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors ${
+                    showPrimer
+                      ? "border-purple-300/50 bg-purple-300/15 text-purple-100"
+                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {showPrimer ? "Primer: On" : "Primer: Off"}
+                </button>
                 <Link
                   href={readerUrl}
                   onClick={() => setMenuOpen(false)}
@@ -397,42 +424,86 @@ export function GreekOneVerseClient() {
               </div>
             ) : (
               <>
-                <p
-                  className="font-sans font-light text-white/[0.96] text-center leading-[1.25] tracking-tight px-1"
-                  style={{ fontSize: "clamp(1.65rem, 5.8vw, 3.25rem)" }}
-                >
-                  {english || (error ? "" : "—")}
-                </p>
-
                 {greekTokens.length > 0 ? (
-                  <div className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
-                    <GreekMorphWords
-                      verseNumber={verse}
-                      tokens={greekTokens}
-                      selectedIndex={selectedWordIndex}
-                      onSelect={handleSelectGreekWord}
-                      wordHintsEnabled={wordHintsEnabled}
-                    />
-                    <GreekGrammarPrimer
-                      wordHintsEnabled={wordHintsEnabled}
-                      onToggleWordHints={() => setWordHintsEnabled((v) => !v)}
-                    />
-                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 sm:p-4">
-                      <MorphologySidebarPanel
-                        token={selectedToken}
-                        verseNumber={selectedWordIndex == null ? 0 : verse}
-                        wordIndex={selectedWordIndex ?? 0}
-                      />
+                  <div className="min-h-[44vh] flex items-center justify-center">
+                    <div
+                      lang="el"
+                      className="w-full text-center text-amber-100/95 leading-[1.45] flex flex-wrap justify-center gap-x-2.5 gap-y-3 px-1"
+                      style={{ fontSize: "clamp(1.45rem, 4.9vw, 2.95rem)" }}
+                    >
+                      {greekTokens.map((tok, wi) => {
+                        const isSel = selectedWordIndex === wi
+                        const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
+                        return (
+                          <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectGreekWord(verse, wi)}
+                              className={`transition-colors ${
+                                isSel
+                                  ? "text-amber-200 border-b-2 border-amber-300/85"
+                                  : "text-amber-100/95 border-b border-dashed border-amber-300/35 hover:border-amber-300/70 hover:text-amber-50"
+                              }`}
+                            >
+                              {tok.word}
+                            </button>
+                            {hint ? (
+                              <span
+                                className="font-mono text-[9px] sm:text-[10px] leading-none text-amber-400/70 max-w-[6rem] truncate"
+                                title={hint}
+                              >
+                                {hint}
+                              </span>
+                            ) : null}
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 ) : !loading && !error && english ? (
                   <p className="text-center text-sm text-white/40 font-sans">Greek text unavailable for this verse.</p>
+                ) : null}
+                {showEnglish && english ? (
+                  <p
+                    className="font-sans font-light text-white/70 text-center leading-[1.4] tracking-tight px-2"
+                    style={{ fontSize: "clamp(1.05rem, 3.2vw, 1.6rem)" }}
+                  >
+                    {english}
+                  </p>
                 ) : null}
               </>
             )}
           </div>
         </div>
       </div>
+
+      {hasStudyDrawer ? (
+        <div className="shrink-0 border-t border-white/[0.08] bg-black/45 backdrop-blur-xl max-h-[38vh] overflow-y-auto">
+          <div className="mx-auto w-full max-w-4xl px-4 py-3 sm:px-6 sm:py-4 space-y-3">
+            {showPrimer ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-purple-200/70 mb-2">
+                  Grammar Primer
+                </p>
+                <p className="text-xs sm:text-sm text-white/75 leading-relaxed">
+                  Tap a Greek word to inspect tense, voice, mood, and case. Use hints for compact training wheels (for
+                  example, <span className="font-mono text-white/80">aor.act.ind</span> or{" "}
+                  <span className="font-mono text-white/80">nom.sg.m</span>). Turn primer off in Menu for pure reading mode.
+                </p>
+              </div>
+            ) : null}
+            {selectedToken ? (
+              <div className="rounded-xl border border-white/10 bg-black/25 p-3 sm:p-4">
+                <MorphologySidebarPanel
+                  token={selectedToken}
+                  verseNumber={verse}
+                  wordIndex={selectedWordIndex ?? 0}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <footer className="shrink-0 border-t border-white/[0.06] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 bg-black/25 backdrop-blur-lg">
         <div className="flex items-stretch gap-3 justify-center max-w-lg mx-auto">
