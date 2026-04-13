@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent, type PointerEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X } from "lucide-react"
 
@@ -73,9 +73,8 @@ export function GreekOneVerseClient() {
   const [coachError, setCoachError] = useState<string | null>(null)
   const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
   const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
-  const menuDragStartY = useRef<number | null>(null)
-  const menuDragCurrentY = useRef<number | null>(null)
-  const menuDragPointerId = useRef<number | null>(null)
+  const menuSwipeStartY = useRef<number | null>(null)
+  const menuSwipeCurrentY = useRef<number | null>(null)
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
 
@@ -325,26 +324,26 @@ export function GreekOneVerseClient() {
     setCoachPayload(null)
     setCoachError(null)
   }, [selectedToken, activeTokenKey, coachTokenKey])
-  const onMenuDragStart = useCallback((e: PointerEvent<HTMLDivElement>) => {
-    menuDragPointerId.current = e.pointerId
-    menuDragStartY.current = e.clientY
-    menuDragCurrentY.current = e.clientY
-    e.currentTarget.setPointerCapture(e.pointerId)
+  const onMenuTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    const y = e.changedTouches[0]?.clientY
+    if (typeof y !== "number") return
+    menuSwipeStartY.current = y
+    menuSwipeCurrentY.current = y
   }, [])
 
-  const onMenuDragMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
-    if (menuDragPointerId.current !== e.pointerId) return
-    menuDragCurrentY.current = e.clientY
+  const onMenuTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    const y = e.changedTouches[0]?.clientY
+    if (typeof y !== "number") return
+    menuSwipeCurrentY.current = y
   }, [])
 
-  const onMenuDragEnd = useCallback((e: PointerEvent<HTMLDivElement>) => {
-    if (menuDragPointerId.current !== e.pointerId) return
-    const startY = menuDragStartY.current
-    const endY = menuDragCurrentY.current ?? e.clientY
-    menuDragStartY.current = null
-    menuDragCurrentY.current = null
-    menuDragPointerId.current = null
+  const onMenuTouchEnd = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    const startY = menuSwipeStartY.current
+    const endY = menuSwipeCurrentY.current ?? e.changedTouches[0]?.clientY ?? null
+    menuSwipeStartY.current = null
+    menuSwipeCurrentY.current = null
     if (startY == null) return
+    if (endY == null) return
     const deltaY = endY - startY
     if (deltaY > 68) setMenuOpen(false)
   }, [])
@@ -377,18 +376,23 @@ export function GreekOneVerseClient() {
       </header>
 
       {menuOpen ? (
-        <div className="absolute inset-0 z-[70] bg-black/65 backdrop-blur-sm px-3 pt-[max(4.7rem,calc(env(safe-area-inset-top)+4.2rem))] sm:px-6">
+        <div
+          className="absolute inset-0 z-[70] bg-black/65 backdrop-blur-sm px-3 pt-[max(4.7rem,calc(env(safe-area-inset-top)+4.2rem))] sm:px-6"
+          onPointerDown={() => setMenuOpen(false)}
+          onClick={() => setMenuOpen(false)}
+        >
           <div
             className="mx-auto w-full max-w-3xl rounded-3xl border border-white/15 bg-[#0a0d14]/95 p-4 sm:p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
             role="dialog"
             aria-label="Greek study menu"
-            onPointerDown={onMenuDragStart}
-            onPointerMove={onMenuDragMove}
-            onPointerUp={onMenuDragEnd}
-            onPointerCancel={() => {
-              menuDragStartY.current = null
-              menuDragCurrentY.current = null
-              menuDragPointerId.current = null
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={onMenuTouchStart}
+            onTouchMove={onMenuTouchMove}
+            onTouchEnd={onMenuTouchEnd}
+            onTouchCancel={() => {
+              menuSwipeStartY.current = null
+              menuSwipeCurrentY.current = null
             }}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -398,6 +402,10 @@ export function GreekOneVerseClient() {
               </p>
               <button
                 type="button"
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                  setMenuOpen(false)
+                }}
                 onClick={() => setMenuOpen(false)}
                 className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
                 aria-label="Close Greek study menu"
@@ -504,10 +512,13 @@ export function GreekOneVerseClient() {
           </div>
           <button
             type="button"
-            aria-label="Close menu backdrop"
-            className="mt-3 h-[calc(100dvh-12rem)] w-full cursor-default"
+            onPointerDown={() => setMenuOpen(false)}
             onClick={() => setMenuOpen(false)}
-          />
+            className="mx-auto mt-3 block rounded-full border border-white/20 bg-white/10 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/75 hover:bg-white/15"
+            aria-label="Close study menu"
+          >
+            Close
+          </button>
         </div>
       ) : null}
 
