@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, Menu, Sparkles, X } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
+import { GreekAiCoachBlock } from "@/app/devotions/greek/greek-ai-coach-block"
 import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
@@ -215,6 +216,8 @@ export function GreekGrammarReaderClient() {
 
   const selectedToken =
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
+  const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
+  const verseGreekLine = greekTokens.map((t) => t.word).join(" ")
 
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
@@ -579,6 +582,19 @@ export function GreekGrammarReaderClient() {
                     <X className="size-4" />
                   </button>
                 </div>
+
+                {selectedWordIndex != null ? (
+                  <GreekAiCoachBlock
+                    key={`${levelKey}-coach-${selectedWordIndex}`}
+                    passageRef={passageRef}
+                    levelKey={levelKey}
+                    wordIndex={selectedWordIndex}
+                    english={english}
+                    verseGreekLine={verseGreekLine}
+                    token={selectedToken}
+                    variant="amber"
+                  />
+                ) : null}
 
                 <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
               </div>

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, X } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
+import { GreekAiCoachBlock } from "@/app/devotions/greek/greek-ai-coach-block"
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
@@ -148,6 +149,7 @@ export function GreekVerseQuestClient() {
   const [xpBurst, setXpBurst] = useState<number | null>(null)
 
   const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
+  const verseGreekLine = useMemo(() => greekTokens.map((t) => t.word).join(" "), [greekTokens])
   const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 2), [wordMemory])
   const levelProgressPct = questTargetIndexes.length
     ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
@@ -1019,6 +1021,22 @@ export function GreekVerseQuestClient() {
                       {selectedTokenLearningClues?.quickReason ??
                         `Lemma ${selectedToken.lemma} · parse ${selectedToken.parse}`}
                     </p>
+                    {selectedWordIndex != null ? (
+                      <GreekAiCoachBlock
+                        key={`${levelKey}-coach-${selectedWordIndex}`}
+                        passageRef={passageRef}
+                        levelKey={levelKey}
+                        wordIndex={selectedWordIndex}
+                        english={english}
+                        verseGreekLine={verseGreekLine}
+                        token={selectedToken}
+                        variant="emerald"
+                        onXpAwarded={(xp) => {
+                          refreshProgress()
+                          if (xp > 0) setXpBurst(xp)
+                        }}
+                      />
+                    ) : null}
                     <button
                       type="button"
                       onClick={continueQuest}
