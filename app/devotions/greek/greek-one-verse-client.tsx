@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent, type PointerEvent } from "react"
 import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X } from "lucide-react"
 
@@ -64,6 +64,9 @@ export function GreekOneVerseClient() {
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
   const [showPrimer, setShowPrimer] = useState(false)
   const [showEnglish, setShowEnglish] = useState(false)
+  const menuDragStartY = useRef<number | null>(null)
+  const menuDragCurrentY = useRef<number | null>(null)
+  const menuDragPointerId = useRef<number | null>(null)
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
 
@@ -236,6 +239,29 @@ export function GreekOneVerseClient() {
   const selectedToken =
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
   const hasStudyDrawer = showPrimer || selectedToken != null
+  const onMenuDragStart = useCallback((e: PointerEvent<HTMLDivElement>) => {
+    menuDragPointerId.current = e.pointerId
+    menuDragStartY.current = e.clientY
+    menuDragCurrentY.current = e.clientY
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [])
+
+  const onMenuDragMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
+    if (menuDragPointerId.current !== e.pointerId) return
+    menuDragCurrentY.current = e.clientY
+  }, [])
+
+  const onMenuDragEnd = useCallback((e: PointerEvent<HTMLDivElement>) => {
+    if (menuDragPointerId.current !== e.pointerId) return
+    const startY = menuDragStartY.current
+    const endY = menuDragCurrentY.current ?? e.clientY
+    menuDragStartY.current = null
+    menuDragCurrentY.current = null
+    menuDragPointerId.current = null
+    if (startY == null) return
+    const deltaY = endY - startY
+    if (deltaY > 68) setMenuOpen(false)
+  }, [])
 
   return (
     <div className="fixed inset-0 z-[60] relative flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,#131822,transparent_40%),linear-gradient(to_bottom,#06080f,#050505,#030306)] text-white">
@@ -270,6 +296,14 @@ export function GreekOneVerseClient() {
             className="mx-auto w-full max-w-3xl rounded-3xl border border-white/15 bg-[#0a0d14]/95 p-4 sm:p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
             role="dialog"
             aria-label="Greek study menu"
+            onPointerDown={onMenuDragStart}
+            onPointerMove={onMenuDragMove}
+            onPointerUp={onMenuDragEnd}
+            onPointerCancel={() => {
+              menuDragStartY.current = null
+              menuDragCurrentY.current = null
+              menuDragPointerId.current = null
+            }}
           >
             <div className="mb-4 flex items-center justify-between">
               <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-200/75">
