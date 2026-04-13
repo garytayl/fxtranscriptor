@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Settings2 } from "lucide-react"
 
 import type { BibleTranslation } from "@/lib/bible/translations"
+import { withFxGreekTranslation } from "@/lib/bible/with-fx-greek-translation"
 import {
   BIBLE_TRANSLATION_CHANGED_EVENT,
   BIBLE_TRANSLATION_STORAGE_KEY,
@@ -27,19 +28,20 @@ export function TranslationSettings({ translations, currentKey }: TranslationSet
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const translationOptions = useMemo(() => withFxGreekTranslation(translations), [translations])
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState(currentKey ?? translations[0]?.key ?? "")
+  const [selected, setSelected] = useState(currentKey ?? translationOptions[0]?.key ?? "")
 
   const currentLabel = useMemo(() => {
-    if (!translations.length) {
+    if (!translationOptions.length) {
       return "Default"
     }
-    const match = translations.find((translation) => translation.key === (currentKey ?? selected))
-    return match?.label ?? translations[0]?.label ?? "Default"
-  }, [translations, currentKey, selected])
+    const match = translationOptions.find((translation) => translation.key === (currentKey ?? selected))
+    return match?.label ?? translationOptions[0]?.label ?? "Default"
+  }, [translationOptions, currentKey, selected])
 
   useEffect(() => {
-    if (!currentKey && translations.length > 0) {
+    if (!currentKey && translationOptions.length > 0) {
       const stored =
         typeof window !== "undefined" ? window.localStorage.getItem(BIBLE_TRANSLATION_STORAGE_KEY) : null
       if (stored && stored !== currentKey) {
@@ -49,7 +51,7 @@ export function TranslationSettings({ translations, currentKey }: TranslationSet
         setSelected(stored)
       }
     }
-  }, [currentKey, pathname, router, searchParams, translations.length])
+  }, [currentKey, pathname, router, searchParams, translationOptions.length])
 
   useEffect(() => {
     if (currentKey) {
@@ -99,7 +101,7 @@ export function TranslationSettings({ translations, currentKey }: TranslationSet
               onChange={(event) => handleChange(event.target.value)}
               className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
-              {translations.map((translation) => (
+              {translationOptions.map((translation) => (
                 <option key={translation.key} value={translation.key}>
                   {translation.label}
                 </option>
