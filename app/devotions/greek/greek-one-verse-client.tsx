@@ -6,12 +6,16 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Copy,
   ExternalLink,
   Flame,
+  Lightbulb,
   Menu,
+  RefreshCw,
   Sparkles,
   Target,
   Trophy,
+  Trash2,
   X,
   Zap,
 } from "lucide-react"
@@ -46,10 +50,28 @@ const SESSION_XP = 14
 const VERSE_XP = 8
 const WORD_XP = 12
 const COACH_XP = 20
+const COACH_HISTORY_LIMIT = 6
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
-type GreekCoachPayload = { insight: string; prayerPrompt: string }
+type GreekCoachPayload = {
+  insight: string
+  prayerPrompt: string
+  microGloss?: string
+  grammarHook?: string
+  reflectionPrompt?: string
+}
+type CoachHistoryItem = {
+  id: string
+  question: string
+  insight: string
+  prayerPrompt: string
+}
+type CoachQuickAction = {
+  id: string
+  label: string
+  prompt: string
+}
 type GreekStudioPage = "xp-home" | "study" | "progress"
 
 function loadPlace(): StoredPlace | null {
@@ -98,6 +120,8 @@ export function GreekOneVerseClient() {
   const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
   const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
   const [coachQuestion, setCoachQuestion] = useState("")
+  const [coachHistory, setCoachHistory] = useState<CoachHistoryItem[]>([])
+  const [coachCopied, setCoachCopied] = useState(false)
   const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
     getGreekProgressSnapshot(getGreekStudyProgress()),
   )
@@ -382,12 +406,28 @@ export function GreekOneVerseClient() {
       ? `${pilot.bookSlug}-${pilot.chapter}-${verse}-${selectedWordIndex}-${selectedToken.word}`
       : null
   const verseGreekContext = greekTokens.map((tok) => tok.word).join(" ")
+  const quickActions = useMemo<CoachQuickAction[]>(
+    () => [
+      { id: "article", label: "Article", prompt: "What is this article doing in this phrase?" },
+      { id: "syntax", label: "Syntax role", prompt: "What role does this word play in the sentence?" },
+      { id: "case", label: "Case logic", prompt: "Why this case here, and what does it signal?" },
+      { id: "tense", label: "Tense force", prompt: "What force does this tense/aspect add in context?" },
+      { id: "compare", label: "Compare forms", prompt: "How would the meaning change if a different form were used?" },
+      { id: "memory", label: "Memory hook", prompt: "Give me a memory hook for this exact form." },
+      { id: "prayer", label: "Prayer bridge", prompt: "Turn this grammar insight into a short prayer prompt." },
+    ],
+    [],
+  )
+  const coachCanAsk = Boolean(selectedToken && activeTokenKey && !coachLoading)
+  const coachMicroFocus = selectedTokenExpanded?.parseSummary ?? selectedToken?.parse ?? ""
 
   useEffect(() => {
     if (!activeTokenKey) {
       setCoachPayload(null)
       setCoachError(null)
       setCoachQuestion("")
+      setCoachHistory([])
+      setCoachCopied(false)
       return
     }
     if (selectedToken) {
@@ -402,6 +442,8 @@ export function GreekOneVerseClient() {
     setCoachPayload(null)
     setCoachError(null)
     setCoachQuestion("")
+    setCoachHistory([])
+    setCoachCopied(false)
   }, [activeTokenKey, coachTokenKey, selectedToken, awardProgress])
 
   const runAiCoach = useCallback(async (explicitQuestion?: string) => {
@@ -413,6 +455,7 @@ export function GreekOneVerseClient() {
 
     setCoachLoading(true)
     setCoachError(null)
+    setCoachCopied(false)
     try {
       const response = await fetch("/api/devotions/greek-coach", {
         method: "POST",
@@ -448,11 +491,24 @@ export function GreekOneVerseClient() {
       if (!response.ok || !insight || !prayerPrompt) {
         throw new Error(data?.error || "Could not generate AI coach insight.")
       }
-      setCoachPayload({
+      const nextPayload: GreekCoachPayload = {
         insight: insight.trim(),
         prayerPrompt: prayerPrompt.trim(),
-      })
+        microGloss: typeof data?.microGloss === "string" ? data.microGloss.trim() : undefined,
+        grammarHook: typeof data?.grammarHook === "string" ? data.grammarHook.trim() : undefined,
+        reflectionPrompt: typeof data?.reflectionPrompt === "string" ? data.reflectionPrompt.trim() : undefined,
+      }
+      setCoachPayload(nextPayload)
       setCoachTokenKey(requestKey)
+      setCoachHistory((prev) => {
+        const nextItem: CoachHistoryItem = {
+          id: requestKey,
+          question: resolvedQuestion || "Coach me",
+          insight: nextPayload.insight,
+          prayerPrompt: nextPayload.prayerPrompt,
+        }
+        return [nextItem, ...prev.filter((entry) => entry.id !== requestKey)].slice(0, COACH_HISTORY_LIMIT)
+      })
       awardProgress({
         kind: "coach",
         key: requestKey,
@@ -476,6 +532,36 @@ export function GreekOneVerseClient() {
     coachQuestion,
     awardProgress,
   ])
+
+  const handleAskCoach = useCallback(
+    (prompt?: string) => {
+      if (!coachCanAsk) return
+      if (prompt) {
+        setCoachQuestion(prompt)
+      }
+      void runAiCoach(prompt)
+    },
+    [coachCanAsk, runAiCoach],
+  )
+
+  const copyCoachInsight = useCallback(async () => {
+    if (!coachPayload || typeof navigator === "undefined" || !navigator.clipboard) return
+    const lines = [
+      `Word: ${selectedToken?.word ?? ""}`,
+      `Question: ${coachQuestion.trim() || "Coach me"}`,
+      `Insight: ${coachPayload.insight}`,
+      `Prayer Prompt: ${coachPayload.prayerPrompt}`,
+    ]
+    if (coachPayload.grammarHook) lines.push(`Grammar Hook: ${coachPayload.grammarHook}`)
+    if (coachPayload.microGloss) lines.push(`Micro Gloss: ${coachPayload.microGloss}`)
+    await navigator.clipboard.writeText(lines.join("\n"))
+    setCoachCopied(true)
+    window.setTimeout(() => setCoachCopied(false), 1500)
+  }, [coachPayload, selectedToken?.word, coachQuestion])
+
+  const clearCoachHistory = useCallback(() => {
+    setCoachHistory([])
+  }, [])
 
   const onMenuTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const y = e.changedTouches[0]?.clientY
@@ -1225,19 +1311,27 @@ export function GreekOneVerseClient() {
               ) : null}
 
               <div className="mt-3 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-3 sm:p-4 shadow-[0_10px_30px_rgba(16,185,129,0.12)]">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach</p>
-                    <p className="mt-0.5 text-xs text-white/65">Ask about this exact form in this exact line.</p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach Lab</p>
+                    <p className="mt-0.5 text-xs text-white/65">Quick actions, re-ask history, and context-aware grammar prompts.</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => void runAiCoach()}
-                    disabled={coachLoading}
-                    className="rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
+                    onClick={() => handleAskCoach()}
+                    disabled={!coachCanAsk}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
                   >
+                    <Lightbulb className="size-3.5" />
                     {coachLoading ? "Thinking..." : "Coach me"}
                   </button>
+                </div>
+
+                <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-2.5">
+                  <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Current focus</p>
+                  <p className="mt-1 text-xs text-white/82">
+                    {selectedToken?.word} ({selectedToken?.lemma}) - {coachMicroFocus}
+                  </p>
                 </div>
 
                 <div className="mt-3 space-y-2">
@@ -1251,38 +1345,90 @@ export function GreekOneVerseClient() {
                     />
                     <button
                       type="button"
-                      onClick={() => void runAiCoach()}
-                      disabled={coachLoading}
+                      onClick={() => handleAskCoach()}
+                      disabled={!coachCanAsk}
                       className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
                     >
                       Ask
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {quickActions.map((action) => (
+                      <button
+                        key={action.id}
+                        type="button"
+                        onClick={() => handleAskCoach(action.prompt)}
+                        disabled={!coachCanAsk}
+                        className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+                      >
+                        {action.label}
+                      </button>
+                    ))}
                     <button
                       type="button"
-                      onClick={() => {
-                        setCoachQuestion(defaultCoachQuestion)
-                        void runAiCoach(defaultCoachQuestion)
-                      }}
-                      disabled={coachLoading}
-                      className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+                      onClick={() => handleAskCoach(defaultCoachQuestion)}
+                      disabled={!coachCanAsk}
+                      className="rounded-full border border-emerald-300/35 bg-emerald-300/10 px-3 py-1.5 text-[11px] text-emerald-100/90 hover:bg-emerald-300/20 disabled:opacity-60"
                     >
-                      {defaultCoachQuestion}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCoachQuestion("What role does this word play in the sentence?")
-                        void runAiCoach("What role does this word play in the sentence?")
-                      }}
-                      disabled={coachLoading}
-                      className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
-                    >
-                      What role is this word playing?
+                      Deep dive this form
                     </button>
                   </div>
                 </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAskCoach(coachHistory[0]?.question)}
+                    disabled={!coachCanAsk || coachHistory.length === 0}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
+                  >
+                    <RefreshCw className="size-3.5" />
+                    Re-ask latest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void copyCoachInsight()}
+                    disabled={!coachPayload}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
+                  >
+                    <Copy className="size-3.5" />
+                    {coachCopied ? "Copied" : "Copy insight"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearCoachHistory}
+                    disabled={coachHistory.length === 0}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Clear history
+                  </button>
+                </div>
+
+                {coachHistory.length > 0 ? (
+                  <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Recent coach prompts</p>
+                      <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
+                        {coachHistory.length}/{COACH_HISTORY_LIMIT}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {coachHistory.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleAskCoach(item.question)}
+                          disabled={!coachCanAsk}
+                          className="w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-left hover:bg-black/30 disabled:opacity-60"
+                        >
+                          <p className="text-[11px] text-white/85">{item.question}</p>
+                          <p className="mt-0.5 text-[10px] text-white/55 line-clamp-2">{item.insight}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {coachError ? (
                   <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
@@ -1294,12 +1440,20 @@ export function GreekOneVerseClient() {
                     className="mt-3 space-y-2 rounded-xl border border-emerald-200/25 bg-black/25 p-3"
                   >
                     <p className="text-sm leading-relaxed text-white/92">{coachPayload.insight}</p>
+                    {coachPayload.grammarHook ? (
+                      <p className="text-xs leading-relaxed text-cyan-100/90">Grammar hook: {coachPayload.grammarHook}</p>
+                    ) : null}
+                    {coachPayload.microGloss ? (
+                      <p className="text-xs leading-relaxed text-white/70">Micro gloss: {coachPayload.microGloss}</p>
+                    ) : null}
                     <p className="text-xs leading-relaxed text-emerald-100/95">{coachPayload.prayerPrompt}</p>
+                    {coachPayload.reflectionPrompt ? (
+                      <p className="text-xs leading-relaxed text-emerald-200/85">Reflection: {coachPayload.reflectionPrompt}</p>
+                    ) : null}
                   </motion.div>
                 ) : !coachLoading && !coachError ? (
                   <p className="mt-3 text-xs text-white/62 leading-relaxed">
-                    Tip: ask concrete questions like <span className="text-white/78">“Why dative?”</span> or{" "}
-                    <span className="text-white/78">“What is this article doing?”</span>
+                    Tap quick actions to drill grammar, syntax, and prayer applications for this exact word.
                   </p>
                 ) : null}
               </div>
