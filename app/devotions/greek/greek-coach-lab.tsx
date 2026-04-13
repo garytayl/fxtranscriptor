@@ -226,7 +226,7 @@ export function GreekCoachLab({
   return (
     <div
       className={clsx(
-        "flex flex-col gap-5 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-4 shadow-[0_10px_30px_rgba(16,185,129,0.12)]",
+        "mb-1 flex flex-col gap-4 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-3.5 shadow-[0_6px_24px_rgba(16,185,129,0.1)]",
         className,
       )}
     >
