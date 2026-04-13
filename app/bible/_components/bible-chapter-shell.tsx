@@ -4,7 +4,7 @@ import { useState, useCallback } from "react"
 import Link from "next/link"
 import { Suspense } from "react"
 import { ArrowLeft, X, ChevronDown } from "lucide-react"
-import { motion, AnimatePresence, useMotionValue, useTransform, useDragControls, type PanInfo } from "framer-motion"
+import { motion, AnimatePresence, useMotionValue, useTransform, type PanInfo } from "framer-motion"
 
 import { ChapterJump } from "@/app/bible/_components/chapter-jump"
 import { ScrollToVerse } from "@/app/bible/_components/scroll-to-verse"
@@ -43,7 +43,6 @@ function MobileChapterStudySheet({
 }) {
   const sheetY = useMotionValue(0)
   const backdropOpacity = useTransform(sheetY, [0, 300], [1, 0])
-  const dragControls = useDragControls()
 
   const handleDragEnd = useCallback(
     (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -72,26 +71,17 @@ function MobileChapterStudySheet({
         transition={{ type: "spring", damping: 30, stiffness: 350 }}
         style={{ y: sheetY }}
         drag="y"
-        dragControls={dragControls}
-        dragListener={false}
         dragConstraints={{ top: 0 }}
         dragElastic={{ top: 0.05, bottom: 0.8 }}
+        dragMomentum={false}
         onDragEnd={handleDragEnd}
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0c0c0c] border-t border-white/10 rounded-t-[20px] max-h-[75vh] flex flex-col shadow-[0_-4px_40px_rgba(0,0,0,0.5)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0c0c0c] border-t border-white/10 rounded-t-[20px] max-h-[75vh] flex flex-col shadow-[0_-4px_40px_rgba(0,0,0,0.5)] cursor-grab active:cursor-grabbing"
         data-lenis-prevent
       >
-        <div
-          className="shrink-0 flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
-          style={{ touchAction: "none" }}
-          onPointerDown={(e) => dragControls.start(e)}
-        >
+        <div className="shrink-0 flex flex-col items-center pt-3 pb-2 select-none">
           <div className="w-14 h-1.5 rounded-full bg-white/30 active:bg-white/50 transition-colors" />
         </div>
-        <div
-          className="shrink-0 px-5 pb-3 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing select-none"
-          style={{ touchAction: "none" }}
-          onPointerDown={(e) => dragControls.start(e)}
-        >
+        <div className="shrink-0 px-5 pb-3 flex items-center justify-between gap-3 select-none">
           <p className="font-mono text-[11px] tracking-[0.2em] text-amber-200/80 uppercase truncate">
             {selection?.kind === "strongs"
               ? `KJV · Strong's · ${selection.code}`
@@ -99,21 +89,19 @@ function MobileChapterStudySheet({
                 ? `Greek grammar · v.${selection.verse}`
                 : "Word study"}
           </p>
-          <div onPointerDown={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/8 active:bg-white/15 transition-colors"
-              aria-label="Close word study"
-            >
-              <X className="size-3.5 text-white/60" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/8 active:bg-white/15 transition-colors cursor-pointer"
+            aria-label="Close word study"
+          >
+            <X className="size-3.5 text-white/60" />
+          </button>
         </div>
         <div className="mx-5 h-px bg-white/8" />
         <div
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] cursor-auto"
+          style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
         >
           <ChapterStudySidebar
             bookSlug={bookSlug}
@@ -418,7 +406,7 @@ export function BibleChapterShell(props: BibleChapterShellProps) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {!sheetOpen && selection && (
+        {!sheetOpen && selection && selection.kind !== "greekMorph" && (
           <MobileChapterStudyPill selection={selection} onTap={onReopenSheet} />
         )}
       </AnimatePresence>
