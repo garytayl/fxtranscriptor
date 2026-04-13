@@ -615,7 +615,7 @@ export function GreekGrammarReaderClient() {
         ) : null}
       </AnimatePresence>
 
-      <footer className="relative z-[72] shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+      <footer className="relative z-[62] shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
         <div className="mx-auto flex max-w-lg gap-3">
           <button
             type="button"
