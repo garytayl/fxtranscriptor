@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, Target, X, Zap } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Flame, Lightbulb, Menu, Sparkles, Target, X, Zap } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
@@ -43,6 +43,7 @@ const PERFECT_LEVEL_BONUS_XP = 10
 const QUEST_MIN_TARGETS = 3
 const QUEST_MAX_TARGETS = 5
 const DAILY_VERSE_RUN_KEY = "daily-verse-run"
+const DAILY_VERSE_RUN_STATE_KEY = "fx_devotions_greek_v1_daily_run_state"
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
@@ -58,6 +59,110 @@ type LevelCompleteState = {
   correctWords: number
   learnedWords: number
   encouragement: string
+}
+type DailyVerseRunState = {
+  date: string
+  levelKey: string
+  completed: boolean
+}
+type DailyVerseAssignment = {
+  pilotIdx: number
+  verse: number
+  levelKey: string
+  label: string
+}
+type GreekCoachPayload = {
+  insight: string
+  microGloss?: string
+  grammarHook?: string
+}
+
+function todayDateKey(date = new Date()): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function dayNumberFromDateKey(dateKey: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey)
+  if (!match) return Math.floor(Date.now() / 86400000)
+  const y = Number.parseInt(match[1], 10)
+  const m = Number.parseInt(match[2], 10)
+  const d = Number.parseInt(match[3], 10)
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return Math.floor(Date.now() / 86400000)
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000)
+}
+
+function normalizeModulo(value: number, mod: number): number {
+  if (mod <= 0) return 0
+  const rem = value % mod
+  return rem < 0 ? rem + mod : rem
+}
+
+function buildDailyVerseAssignment(dateKey: string): DailyVerseAssignment {
+  if (MORPH_PILOT_CHAPTERS.length === 0) {
+    return {
+      pilotIdx: 0,
+      verse: 1,
+      levelKey: "john-1-1",
+      label: "John 1",
+    }
+  }
+  const totalVerses = MORPH_PILOT_CHAPTERS.reduce((sum, item) => sum + Math.max(1, item.maxVerse), 0)
+  const dayIndex = normalizeModulo(dayNumberFromDateKey(dateKey), Math.max(1, totalVerses))
+  let cursor = dayIndex
+  for (let i = 0; i < MORPH_PILOT_CHAPTERS.length; i++) {
+    const chapter = MORPH_PILOT_CHAPTERS[i]
+    if (cursor < chapter.maxVerse) {
+      const verse = cursor + 1
+      return {
+        pilotIdx: i,
+        verse,
+        levelKey: `${chapter.bookSlug}-${chapter.chapter}-${verse}`,
+        label: chapter.label,
+      }
+    }
+    cursor -= chapter.maxVerse
+  }
+  const fallback = MORPH_PILOT_CHAPTERS[0]
+  return {
+    pilotIdx: 0,
+    verse: 1,
+    levelKey: `${fallback.bookSlug}-${fallback.chapter}-1`,
+    label: fallback.label,
+  }
+}
+
+function parseDailyVerseRunState(raw: string | null): DailyVerseRunState | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<DailyVerseRunState>
+    if (
+      typeof parsed.date !== "string" ||
+      typeof parsed.levelKey !== "string" ||
+      typeof parsed.completed !== "boolean"
+    ) {
+      return null
+    }
+    return {
+      date: parsed.date,
+      levelKey: parsed.levelKey,
+      completed: parsed.completed,
+    }
+  } catch {
+    return null
+  }
+}
+
+function getDailyVerseRunState(): DailyVerseRunState | null {
+  if (typeof window === "undefined") return null
+  return parseDailyVerseRunState(window.localStorage.getItem(DAILY_VERSE_RUN_STATE_KEY))
+}
+
+function saveDailyVerseRunState(state: DailyVerseRunState): void {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(DAILY_VERSE_RUN_STATE_KEY, JSON.stringify(state))
 }
 
 function loadPlace(): StoredPlace | null {
@@ -157,10 +262,16 @@ export function GreekOneVerseClient() {
   const [dailyVerseRunDone, setDailyVerseRunDone] = useState(false)
   const [levelComplete, setLevelComplete] = useState<LevelCompleteState | null>(null)
   const [microWinBurst, setMicroWinBurst] = useState<string | null>(null)
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [coachError, setCoachError] = useState<string | null>(null)
+  const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
+  const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
   const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
     getGreekProgressSnapshot(getGreekStudyProgress()),
   )
   const [xpBurst, setXpBurst] = useState<number | null>(null)
+  const todayKey = useMemo(() => todayDateKey(), [])
+  const dailyVerseAssignment = useMemo(() => buildDailyVerseAssignment(todayKey), [todayKey])
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
   const passageRef = useMemo(() => morphPilotPassageRef(pilot, verse), [pilot, verse])
@@ -169,6 +280,7 @@ export function GreekOneVerseClient() {
     [pilot.bookSlug, pilot.chapter, verse],
   )
   const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
+  const onDailyVerse = levelKey === dailyVerseAssignment.levelKey
   const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 2), [wordMemory])
   const levelProgressPct = questTargetIndexes.length
     ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
@@ -280,7 +392,26 @@ export function GreekOneVerseClient() {
     if (!hydrated) return
     if (initializedDailySession.current) return
     initializedDailySession.current = true
-  }, [hydrated])
+    const stored = getDailyVerseRunState()
+    const doneToday =
+      stored?.date === todayKey &&
+      stored.levelKey === dailyVerseAssignment.levelKey &&
+      stored.completed === true
+    setDailyVerseRunDone(doneToday)
+    saveDailyVerseRunState({
+      date: todayKey,
+      levelKey: dailyVerseAssignment.levelKey,
+      completed: doneToday,
+    })
+    setPilotIdx(dailyVerseAssignment.pilotIdx)
+    setVerse(dailyVerseAssignment.verse)
+  }, [
+    hydrated,
+    todayKey,
+    dailyVerseAssignment.levelKey,
+    dailyVerseAssignment.pilotIdx,
+    dailyVerseAssignment.verse,
+  ])
 
   useEffect(() => {
     if (!hydrated) return
@@ -379,6 +510,10 @@ export function GreekOneVerseClient() {
   const closeDetails = useCallback(() => {
     setSelectedWordIndex(null)
     setQuestStage("challenge")
+    setCoachPayload(null)
+    setCoachError(null)
+    setCoachLoading(false)
+    setCoachTokenKey(null)
   }, [])
 
   useEffect(() => {
@@ -400,6 +535,12 @@ export function GreekOneVerseClient() {
     applyRolodexSelection()
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
+
+  const jumpToDailyVerse = useCallback(() => {
+    setPilotIdx(dailyVerseAssignment.pilotIdx)
+    setVerse(dailyVerseAssignment.verse)
+    setMenuOpen(false)
+  }, [dailyVerseAssignment.pilotIdx, dailyVerseAssignment.verse])
 
   const finishVerseIfComplete = useCallback(
     (nextCompleted: number[], nextCorrect: number[]) => {
@@ -439,13 +580,35 @@ export function GreekOneVerseClient() {
         encouragement,
       })
       setMicroWinBurst(correctWords > 0 ? "Level complete" : "Level complete - no XP")
-      const runKey = `${levelKey}-${new Date().toISOString().slice(0, 10)}`
-      if (!dailyVerseRunDone && correctWords === questTargetIndexes.length) {
-        awardProgress({ kind: "session", key: `${DAILY_VERSE_RUN_KEY}-${runKey}`, xp: PERFECT_LEVEL_BONUS_XP })
+      if (!dailyVerseRunDone && levelKey === dailyVerseAssignment.levelKey) {
+        const perfectDailyRun = correctWords === questTargetIndexes.length
+        if (perfectDailyRun) {
+          awardProgress({
+            kind: "session",
+            key: `${DAILY_VERSE_RUN_KEY}-${todayKey}-${dailyVerseAssignment.levelKey}`,
+            xp: PERFECT_LEVEL_BONUS_XP,
+          })
+        }
         setDailyVerseRunDone(true)
+        saveDailyVerseRunState({
+          date: todayKey,
+          levelKey: dailyVerseAssignment.levelKey,
+          completed: true,
+        })
+        setMicroWinBurst(perfectDailyRun ? "Daily run complete + bonus XP" : "Daily run complete")
       }
     },
-    [questTargetIndexes, levelComplete?.levelKey, levelKey, greekTokens, wordMemory, awardProgress, dailyVerseRunDone],
+    [
+      questTargetIndexes,
+      levelComplete?.levelKey,
+      levelKey,
+      greekTokens,
+      wordMemory,
+      awardProgress,
+      dailyVerseRunDone,
+      todayKey,
+      dailyVerseAssignment.levelKey,
+    ],
   )
 
   const handleSelectGreekWord = useCallback(
@@ -453,6 +616,10 @@ export function GreekOneVerseClient() {
       if (!questTargetIndexes.includes(wordIndex)) return
       setSelectedWordIndex(wordIndex)
       setQuestStage("challenge")
+      setCoachPayload(null)
+      setCoachError(null)
+      setCoachLoading(false)
+      setCoachTokenKey(null)
       const challenge = buildChallengeForTarget(greekTokens, wordIndex)
       setQuestChallenge(challenge)
     },
@@ -667,6 +834,50 @@ export function GreekOneVerseClient() {
   const selectedMemory = selectedToken ? wordMemory[wordFormKey(selectedToken)] : null
   const selectedFamiliarity: GreekWordFamiliarity = selectedMemory?.familiarity ?? "new"
   const selectedFamiliarityLabel = getWordFamiliarityLabel(selectedFamiliarity)
+  const activeCoachKey =
+    selectedToken && selectedWordIndex != null
+      ? `${levelKey}-${selectedWordIndex}-${selectedToken.word}`
+      : null
+
+  const runCoach = useCallback(async () => {
+    if (!selectedToken || !activeCoachKey || coachLoading) return
+    if (coachTokenKey === activeCoachKey && coachPayload) return
+    setCoachLoading(true)
+    setCoachError(null)
+    try {
+      const response = await fetch("/api/devotions/greek-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: passageRef,
+          greekWord: selectedToken.word,
+          lemma: selectedToken.lemma,
+          parse: selectedToken.parse,
+          category: selectedToken.pos,
+          parseSummary: selectedToken.parse,
+          english,
+          verseGreek: greekTokens.map((tok) => tok.word).join(" "),
+          userQuestion: "Give me a 1-2 sentence learning hint for this exact form.",
+        }),
+      })
+      const data = (await response.json()) as
+        | { insight?: string; microGloss?: string; grammarHook?: string; error?: string }
+        | undefined
+      if (!response.ok || !data?.insight) {
+        throw new Error(data?.error || "Coach insight unavailable right now.")
+      }
+      setCoachPayload({
+        insight: data.insight,
+        microGloss: data.microGloss,
+        grammarHook: data.grammarHook,
+      })
+      setCoachTokenKey(activeCoachKey)
+    } catch (err) {
+      setCoachError(err instanceof Error ? err.message : "Coach insight unavailable right now.")
+    } finally {
+      setCoachLoading(false)
+    }
+  }, [selectedToken, activeCoachKey, coachLoading, coachTokenKey, coachPayload, passageRef, english, greekTokens])
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
 
   return (
@@ -878,6 +1089,23 @@ export function GreekOneVerseClient() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
+                    onClick={jumpToDailyVerse}
+                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                      onDailyVerse
+                        ? dailyVerseRunDone
+                          ? "border-emerald-300/45 bg-emerald-400/18 text-emerald-50"
+                          : "border-emerald-300/45 bg-emerald-300/12 text-emerald-100"
+                        : "border-emerald-300/40 bg-emerald-400/12 text-emerald-100 hover:bg-emerald-400/20"
+                    }`}
+                  >
+                    {onDailyVerse
+                      ? dailyVerseRunDone
+                        ? "Daily run complete"
+                        : "Today's run active"
+                      : `Daily verse ${dailyVerseAssignment.label}:${dailyVerseAssignment.verse}`}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setReviewMode((v) => !v)}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       reviewMode
@@ -939,6 +1167,22 @@ export function GreekOneVerseClient() {
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
           <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
+            <span
+              className={`rounded-full border px-2.5 py-1 ${
+                onDailyVerse
+                  ? dailyVerseRunDone
+                    ? "border-emerald-300/45 bg-emerald-400/14 text-emerald-50"
+                    : "border-emerald-300/35 bg-emerald-300/10 text-emerald-100"
+                  : "border-white/20 bg-white/[0.03] text-white/70"
+              }`}
+            >
+              <Target className="mr-1 inline size-3.5" />
+              {onDailyVerse
+                ? dailyVerseRunDone
+                  ? "Daily run done"
+                  : "Daily run in progress"
+                : `Today ${dailyVerseAssignment.label}:${dailyVerseAssignment.verse}`}
+            </span>
             <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1">
               Targets {completedTargetIndexes.length}/{questTargetIndexes.length}
             </span>
@@ -962,6 +1206,13 @@ export function GreekOneVerseClient() {
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
               Verse {verse} of {pilot.maxVerse}
             </p>
+            {onDailyVerse ? (
+              <p className="font-mono text-[10px] uppercase tracking-[0.17em] text-emerald-200/70">
+                {dailyVerseRunDone
+                  ? "Daily run completed. Keep reviewing for mastery."
+                  : "Daily verse run active. Clear all targets to complete today."}
+              </p>
+            ) : null}
           </div>
 
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
@@ -1147,6 +1398,34 @@ export function GreekOneVerseClient() {
                       {selectedTokenLearningClues?.quickReason ??
                         `Lemma ${selectedToken.lemma} · parse ${selectedToken.parse}`}
                     </p>
+                    <div className="mt-2 rounded-lg border border-emerald-200/25 bg-black/25 p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-100/85">
+                          AI Coach
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void runCoach()}
+                          disabled={coachLoading}
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-300/40 bg-emerald-400/20 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-50 hover:bg-emerald-400/30 disabled:opacity-60"
+                        >
+                          <Lightbulb className="size-3.5" />
+                          {coachLoading ? "Thinking" : "Hint"}
+                        </button>
+                      </div>
+                      {coachError ? <p className="mt-2 text-xs text-red-200/90">{coachError}</p> : null}
+                      {coachPayload ? (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-white/88">{coachPayload.insight}</p>
+                          {coachPayload.grammarHook ? (
+                            <p className="text-[11px] text-cyan-100/90">Grammar hook: {coachPayload.grammarHook}</p>
+                          ) : null}
+                          {coachPayload.microGloss ? (
+                            <p className="text-[11px] text-white/70">Micro gloss: {coachPayload.microGloss}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                     <button
                       type="button"
                       onClick={continueQuest}
