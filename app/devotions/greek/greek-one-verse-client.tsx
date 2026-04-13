@@ -37,10 +37,9 @@ const VERSE_SWIPE_HORIZONTAL_RATIO = 1.35
 const MENU_SWIPE_CLOSE_THRESHOLD = 72
 const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
 const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
-const SESSION_XP = 14
-const VERSE_XP = 8
 const WORD_XP = 12
 const LEVEL_COMPLETE_XP = 24
+const PERFECT_LEVEL_BONUS_XP = 10
 const QUEST_MIN_TARGETS = 3
 const QUEST_MAX_TARGETS = 5
 const DAILY_VERSE_RUN_KEY = "daily-verse-run"
@@ -56,6 +55,7 @@ type QuestWordChallenge = {
 type LevelCompleteState = {
   levelKey: string
   xpGained: number
+  correctWords: number
   learnedWords: number
   encouragement: string
 }
@@ -153,6 +153,7 @@ export function GreekOneVerseClient() {
   const [questChallenge, setQuestChallenge] = useState<QuestWordChallenge | null>(null)
   const [questTargetIndexes, setQuestTargetIndexes] = useState<number[]>([])
   const [completedTargetIndexes, setCompletedTargetIndexes] = useState<number[]>([])
+  const [correctTargetIndexes, setCorrectTargetIndexes] = useState<number[]>([])
   const [dailyVerseRunDone, setDailyVerseRunDone] = useState(false)
   const [levelComplete, setLevelComplete] = useState<LevelCompleteState | null>(null)
   const [microWinBurst, setMicroWinBurst] = useState<string | null>(null)
@@ -279,17 +280,7 @@ export function GreekOneVerseClient() {
     if (!hydrated) return
     if (initializedDailySession.current) return
     initializedDailySession.current = true
-    awardProgress({ kind: "session", key: "daily-open", xp: SESSION_XP })
-  }, [hydrated, awardProgress])
-
-  useEffect(() => {
-    if (!hydrated) return
-    awardProgress({
-      kind: "verse",
-      key: `${pilot.bookSlug}-${pilot.chapter}-${verse}`,
-      xp: VERSE_XP,
-    })
-  }, [hydrated, pilot.bookSlug, pilot.chapter, verse, awardProgress])
+  }, [hydrated])
 
   useEffect(() => {
     if (!hydrated) return
@@ -304,6 +295,7 @@ export function GreekOneVerseClient() {
     setQuestStage("challenge")
     setQuestChallenge(null)
     setCompletedTargetIndexes([])
+    setCorrectTargetIndexes([])
     setLevelComplete(null)
 
     const load = async () => {
@@ -410,8 +402,9 @@ export function GreekOneVerseClient() {
   }, [applyRolodexSelection, closeMenu])
 
   const finishVerseIfComplete = useCallback(
-    (nextCompleted: number[]) => {
+    (nextCompleted: number[], nextCorrect: number[]) => {
       const uniqueDone = Array.from(new Set(nextCompleted))
+      const uniqueCorrect = Array.from(new Set(nextCorrect))
       if (questTargetIndexes.length === 0) return
       if (uniqueDone.length < questTargetIndexes.length) return
       if (levelComplete?.levelKey === levelKey) return
@@ -421,25 +414,34 @@ export function GreekOneVerseClient() {
         const familiarity = wordMemory[wordFormKey(token)]?.familiarity
         return familiarity === "learned" ? acc + 1 : acc
       }, 0)
+      const correctWords = uniqueCorrect.length
+      const accuracy = correctWords / questTargetIndexes.length
+      const levelXp = correctWords > 0 ? Math.max(4, Math.round(LEVEL_COMPLETE_XP * accuracy)) : 0
       const encouragement =
-        learnedWords >= Math.ceil(questTargetIndexes.length / 2)
+        correctWords === 0
+          ? "Level complete - answer correctly to earn XP."
+          : learnedWords >= Math.ceil(questTargetIndexes.length / 2)
           ? "Strong verse run - your recall is improving."
           : "Level complete - keep tapping and these forms will stick."
-      const awarded = awardProgress({
-        kind: "verse",
-        key: `${levelKey}-quest-complete`,
-        xp: LEVEL_COMPLETE_XP,
-      })
+      const awarded =
+        levelXp > 0
+          ? awardProgress({
+              kind: "verse",
+              key: `${levelKey}-quest-complete`,
+              xp: levelXp,
+            })
+          : 0
       setLevelComplete({
         levelKey,
         xpGained: awarded,
+        correctWords,
         learnedWords,
         encouragement,
       })
-      setMicroWinBurst("Level complete")
+      setMicroWinBurst(correctWords > 0 ? "Level complete" : "Level complete - no XP")
       const runKey = `${levelKey}-${new Date().toISOString().slice(0, 10)}`
-      if (!dailyVerseRunDone) {
-        awardProgress({ kind: "session", key: `${DAILY_VERSE_RUN_KEY}-${runKey}`, xp: 10 })
+      if (!dailyVerseRunDone && correctWords === questTargetIndexes.length) {
+        awardProgress({ kind: "session", key: `${DAILY_VERSE_RUN_KEY}-${runKey}`, xp: PERFECT_LEVEL_BONUS_XP })
         setDailyVerseRunDone(true)
       }
     },
@@ -467,14 +469,18 @@ export function GreekOneVerseClient() {
       setWordMemory(memory)
       setQuestStage("revealed")
 
-      awardProgress({
-        kind: "word",
-        key: `${levelKey}-${selectedWordIndex}-${entry.familiarity}`,
-        xp: WORD_XP,
-        wordFormKey: key,
-      })
+      if (wasCorrect) {
+        awardProgress({
+          kind: "word",
+          key: `${levelKey}-${selectedWordIndex}-quiz-correct`,
+          xp: WORD_XP,
+          wordFormKey: key,
+        })
+      }
 
-      if (entry.familiarity === "learned") {
+      if (!wasCorrect) {
+        setMicroWinBurst(`Not quite: ${token.word}`)
+      } else if (entry.familiarity === "learned") {
         setMicroWinBurst(`Learned: ${token.word}`)
       } else if (previouslySeen || entry.familiarity === "seen") {
         setMicroWinBurst(`Seen again: ${token.word}`)
@@ -482,13 +488,29 @@ export function GreekOneVerseClient() {
         setMicroWinBurst(`New form: ${token.word}`)
       }
 
-      setCompletedTargetIndexes((prev) => {
-        const next = prev.includes(selectedWordIndex) ? prev : [...prev, selectedWordIndex]
-        finishVerseIfComplete(next)
-        return next
-      })
+      const nextCompleted = completedTargetIndexes.includes(selectedWordIndex)
+        ? completedTargetIndexes
+        : [...completedTargetIndexes, selectedWordIndex]
+      setCompletedTargetIndexes(nextCompleted)
+      const nextCorrect = wasCorrect
+        ? correctTargetIndexes.includes(selectedWordIndex)
+          ? correctTargetIndexes
+          : [...correctTargetIndexes, selectedWordIndex]
+        : correctTargetIndexes
+      if (wasCorrect) {
+        setCorrectTargetIndexes(nextCorrect)
+      }
+      finishVerseIfComplete(nextCompleted, nextCorrect)
     },
-    [selectedWordIndex, greekTokens, awardProgress, levelKey, finishVerseIfComplete],
+    [
+      selectedWordIndex,
+      greekTokens,
+      awardProgress,
+      levelKey,
+      completedTargetIndexes,
+      correctTargetIndexes,
+      finishVerseIfComplete,
+    ],
   )
 
   const continueQuest = useCallback(() => {
