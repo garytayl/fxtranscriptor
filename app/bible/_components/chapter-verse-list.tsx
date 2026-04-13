@@ -1,9 +1,12 @@
 "use client"
 
 import { VerseWords } from "./verse-words"
+import { GreekMorphWords } from "@/app/bible/_components/greek-morph-words"
 import { isVerseInRange } from "@/lib/bible/reference"
 import type { VerseRange } from "@/lib/bible/reference"
+import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
+import type { ChapterStudySelection } from "@/app/bible/_components/chapter-study-sidebar"
 
 export type FootnoteEntry = string | { text: string; href?: string }
 
@@ -14,6 +17,11 @@ type ChapterVerseListProps = {
   strongsWordsByVerse?: Record<number, StrongsWordAndCode[]>
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
   onSelectStrongs?: (code: string) => void
+  /** Greek morph tokens per verse (pilot: John 1). */
+  greekMorphByVerse?: Record<number, GreekMorphToken[]>
+  /** Current sidebar selection (highlights Greek word). */
+  studySelection?: ChapterStudySelection
+  onSelectGreekMorph?: (verseNumber: number, wordIndex: number) => void
   /** Footnote by verse and marker; may include kind/target for cross-ref links. */
   footnotes?: {
     verseNumber: number
@@ -49,6 +57,9 @@ export function ChapterVerseList({
   highlightRange,
   strongsWordsByVerse = {},
   onSelectStrongs,
+  greekMorphByVerse = {},
+  studySelection,
+  onSelectGreekMorph,
   footnotes,
 }: ChapterVerseListProps) {
   const footnotesByVerse = footnotes ? buildFootnotesByVerse(footnotes) : {}
@@ -58,6 +69,11 @@ export function ChapterVerseList({
         const isHighlighted = highlightRange ? isVerseInRange(verse.number, highlightRange) : false
         const wordsWithCodes = strongsWordsByVerse[verse.number]
         const footnotesForVerse = footnotesByVerse[verse.number]
+        const greekTokens = greekMorphByVerse[verse.number]
+        const greekSel =
+          studySelection?.kind === "greekMorph" && studySelection.verse === verse.number
+            ? studySelection.wordIndex
+            : null
         return (
           <li
             key={verse.number}
@@ -85,6 +101,14 @@ export function ChapterVerseList({
               onSelectStrongs={onSelectStrongs}
               footnotesForVerse={footnotesForVerse}
             />
+            {greekTokens && greekTokens.length > 0 && onSelectGreekMorph ? (
+              <GreekMorphWords
+                verseNumber={verse.number}
+                tokens={greekTokens}
+                selectedIndex={greekSel}
+                onSelect={onSelectGreekMorph}
+              />
+            ) : null}
           </li>
         )
       })}

@@ -8,6 +8,7 @@ import {
   getResolvedTranslationByKey,
   isKjvTranslationKey,
 } from "@/lib/bible/translations"
+import { getGreekMorphTokensForChapter } from "@/lib/bible/morph-lookup"
 import { getStrongsWordsForChapter } from "@/lib/bible/verse-strongs"
 import { getKeyTermsForChapter } from "@/lib/bible/chapter-key-terms"
 
@@ -79,6 +80,8 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       ? await getStrongsWordsForChapter({ slug: book.slug, id: book.id }, chapterNumber)
       : {}
 
+  const greekMorphByVerse = getGreekMorphTokensForChapter(book.slug, chapterNumber) ?? {}
+
   return (
     <BibleChapterShell
       book={{ slug: book.slug, name: book.name }}
@@ -96,6 +99,7 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       translations={translations}
       activeKey={activeKey}
       footnotes={footnotes}
+      greekMorphByVerse={greekMorphByVerse}
     />
   )
 }

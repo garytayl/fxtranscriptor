@@ -49,6 +49,7 @@ function VerseBadgeComponent({
     error?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [grammarReaderUrl, setGrammarReaderUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const badge = badgeRef.current;
@@ -87,6 +88,7 @@ function VerseBadgeComponent({
     if (loading || response) return;
     setLoading(true);
     setError(null);
+    setGrammarReaderUrl(null);
     try {
       const params = new URLSearchParams({ ref: verse.full_reference });
       const res = await fetch(`/api/bible/passage?${params.toString()}`);
@@ -99,6 +101,16 @@ function VerseBadgeComponent({
         throw new Error(data.error || "Unable to load passage.");
       }
       setResponse(data);
+
+      try {
+        const mRes = await fetch(`/api/bible/morph?${new URLSearchParams({ ref: verse.full_reference }).toString()}`);
+        const morph = (await mRes.json()) as { available?: boolean; readerGrammarUrl?: string | null };
+        if (mRes.ok && morph.available && morph.readerGrammarUrl) {
+          setGrammarReaderUrl(morph.readerGrammarUrl);
+        }
+      } catch {
+        /* optional pilot link */
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load passage.");
       setResponse(null);
@@ -177,7 +189,7 @@ function VerseBadgeComponent({
             <p className="text-xs text-muted-foreground">No verses returned for this passage.</p>
           )}
           {readerUrl && (
-            <div className="pt-1">
+            <div className="pt-1 flex flex-col gap-2">
               <a
                 href={readerUrl}
                 className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-accent hover:text-accent/80"
@@ -185,6 +197,14 @@ function VerseBadgeComponent({
                 <BookOpen className="size-3.5" />
                 <span>Open in reader</span>
               </a>
+              {grammarReaderUrl && (
+                <a
+                  href={grammarReaderUrl}
+                  className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
+                >
+                  Greek grammar (John 1 pilot)
+                </a>
+              )}
             </div>
           )}
         </div>

@@ -12,9 +12,13 @@ import { TranslationSettings } from "@/app/bible/_components/translation-setting
 import { ChapterWordStudy } from "@/app/bible/_components/chapter-word-study"
 import { ChapterVerseList } from "@/app/bible/_components/chapter-verse-list"
 import { LexiconCacheProvider } from "@/app/bible/_components/lexicon-cache-context"
-import { WordStudySidebarPanel } from "@/app/bible/_components/word-study-sidebar"
+import {
+  ChapterStudySidebar,
+  type ChapterStudySelection,
+} from "@/app/bible/_components/chapter-study-sidebar"
 import type { VerseRange } from "@/lib/bible/reference"
 import type { BibleTranslation } from "@/lib/bible/translations"
+import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 const DISMISS_THRESHOLD = 60
@@ -22,13 +26,19 @@ const DISMISS_THRESHOLD = 60
 type BookInfo = { slug: string; name: string }
 type ChapterOption = { id: string; number: number }
 
-function MobileWordStudySheet({
-  code,
+function MobileChapterStudySheet({
+  bookSlug,
+  chapterNumber,
+  selection,
   hasStrongsForChapter,
+  hasGreekMorph,
   onDismiss,
 }: {
-  code: string
+  bookSlug: string
+  chapterNumber: number
+  selection: ChapterStudySelection
   hasStrongsForChapter: boolean
+  hasGreekMorph: boolean
   onDismiss: () => void
 }) {
   const sheetY = useMotionValue(0)
@@ -83,7 +93,11 @@ function MobileWordStudySheet({
           onPointerDown={(e) => dragControls.start(e)}
         >
           <p className="font-mono text-[11px] tracking-[0.2em] text-amber-200/80 uppercase truncate">
-            KJV · Greek & Hebrew · {code}
+            {selection?.kind === "strongs"
+              ? `KJV · Strong's · ${selection.code}`
+              : selection?.kind === "greekMorph"
+                ? `Greek grammar · v.${selection.verse}`
+                : "Word study"}
           </p>
           <div onPointerDown={(e) => e.stopPropagation()}>
             <button
@@ -101,7 +115,13 @@ function MobileWordStudySheet({
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <WordStudySidebarPanel code={code} hasStrongsForChapter={hasStrongsForChapter} />
+          <ChapterStudySidebar
+            bookSlug={bookSlug}
+            chapterNumber={chapterNumber}
+            selection={selection}
+            hasStrongsForChapter={hasStrongsForChapter}
+            hasGreekMorph={hasGreekMorph}
+          />
         </div>
         <div className="shrink-0 flex items-center justify-center gap-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
           <ChevronDown className="size-3 text-white/25" />
@@ -114,7 +134,13 @@ function MobileWordStudySheet({
   )
 }
 
-function MobileWordStudyPill({ code, onTap }: { code: string; onTap: () => void }) {
+function MobileChapterStudyPill({ selection, onTap }: { selection: ChapterStudySelection; onTap: () => void }) {
+  const label =
+    selection?.kind === "strongs"
+      ? `Strong's · ${selection.code}`
+      : selection?.kind === "greekMorph"
+        ? `Greek · v.${selection.verse}`
+        : "Word study"
   return (
     <motion.button
       initial={{ y: 20, opacity: 0, scale: 0.9 }}
@@ -126,7 +152,7 @@ function MobileWordStudyPill({ code, onTap }: { code: string; onTap: () => void 
       className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-[#1a1a1a] border border-white/15 rounded-full pl-3.5 pr-4 py-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
     >
       <span className="font-mono text-[11px] tracking-wider text-amber-200/90 uppercase whitespace-nowrap">
-        KJV · Greek & Hebrew · {code}
+        {label}
       </span>
     </motion.button>
   )
@@ -159,6 +185,8 @@ export type BibleChapterShellProps = {
     targetChapter?: number | null
     targetVerse?: number | null
   }[]
+  /** Greek morphology tokens per verse (MorphGNT pilot: John 1). */
+  greekMorphByVerse?: Record<number, GreekMorphToken[]>
 }
 
 function ChapterBody({
@@ -177,10 +205,18 @@ function ChapterBody({
   translations,
   activeKey,
   footnotes,
+  greekMorphByVerse = {},
   onSelectStrongs,
-}: BibleChapterShellProps & { onSelectStrongs?: (code: string) => void }) {
+  studySelection,
+  onSelectGreekMorph,
+}: BibleChapterShellProps & {
+  onSelectStrongs?: (code: string) => void
+  studySelection?: ChapterStudySelection
+  onSelectGreekMorph?: (verseNumber: number, wordIndex: number) => void
+}) {
   const hasStrongsForChapter =
     kjvWordStudyEnabled && Object.values(strongsWordsByVerse).some((pairs) => pairs.length > 0)
+  const hasGreekMorph = Object.keys(greekMorphByVerse).length > 0
 
   return (
     <>
@@ -222,11 +258,19 @@ function ChapterBody({
         </div>
       )}
 
-      {!kjvWordStudyEnabled && verses.length > 0 && (
+      {!kjvWordStudyEnabled && verses.length > 0 && !hasGreekMorph && (
         <p className="text-[11px] sm:text-xs leading-relaxed text-muted-foreground border border-border/60 bg-muted/15 rounded-md px-3 py-2">
           Per-word Greek and Hebrew (Strong&apos;s) in the verse text is only available when you select{" "}
           <span className="text-foreground/90">King James Version</span> in the translation menu. Other translations
           show the reader text without that layer.
+        </p>
+      )}
+
+      {hasGreekMorph && verses.length > 0 && (
+        <p className="text-[11px] sm:text-xs leading-relaxed text-muted-foreground border border-amber-500/25 bg-amber-500/5 rounded-md px-3 py-2">
+          <span className="text-foreground/90 font-medium">Greek grammar (pilot):</span> the line under each verse is
+          the Greek text (SBL) in sentence order. Tap a word for parsing and short grammar notes. This is separate from
+          KJV Strong&apos;s alignment (English word order).
         </p>
       )}
 
@@ -252,6 +296,9 @@ function ChapterBody({
           highlightRange={highlightRange}
           strongsWordsByVerse={kjvWordStudyEnabled ? strongsWordsByVerse : {}}
           onSelectStrongs={kjvWordStudyEnabled ? onSelectStrongs : undefined}
+          greekMorphByVerse={greekMorphByVerse}
+          studySelection={studySelection}
+          onSelectGreekMorph={onSelectGreekMorph}
           footnotes={footnotes}
         />
       )}
@@ -286,23 +333,99 @@ function ChapterBody({
 }
 
 export function BibleChapterShell(props: BibleChapterShellProps) {
-  const { kjvWordStudyEnabled, strongsWordsByVerse } = props
+  const { kjvWordStudyEnabled, strongsWordsByVerse, greekMorphByVerse = {}, book, chapterNumber } = props
 
-  const [selectedStrongsCode, setSelectedStrongsCode] = useState<string | null>(null)
+  const [selection, setSelection] = useState<ChapterStudySelection>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
   const hasStrongsForChapter =
     kjvWordStudyEnabled && Object.values(strongsWordsByVerse).some((pairs) => pairs.length > 0)
+  const hasGreekMorph = Object.keys(greekMorphByVerse).length > 0
+  const useStudyLayout = kjvWordStudyEnabled || hasGreekMorph
+  const needsLexiconProvider = kjvWordStudyEnabled
 
   const onSelectStrongs = useCallback((code: string) => {
-    setSelectedStrongsCode(code)
+    setSelection({ kind: "strongs", code })
+    setSheetOpen(true)
+  }, [])
+
+  const onSelectGreekMorph = useCallback((verseNumber: number, wordIndex: number) => {
+    setSelection({ kind: "greekMorph", verse: verseNumber, wordIndex })
     setSheetOpen(true)
   }, [])
 
   const onDismissSheet = useCallback(() => setSheetOpen(false), [])
   const onReopenSheet = useCallback(() => setSheetOpen(true), [])
 
-  if (!kjvWordStudyEnabled) {
+  const studyMain = (
+    <main className="min-h-screen bg-background text-foreground">
+      {props.highlightRange && <ScrollToVerse verseNumber={props.highlightRange.start} />}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:flex-row lg:gap-12 lg:items-start lg:pr-[22rem]">
+        <div className="min-w-0 flex-1 flex flex-col gap-4 sm:gap-6">
+          <ChapterBody
+            {...props}
+            onSelectStrongs={kjvWordStudyEnabled ? onSelectStrongs : undefined}
+            studySelection={selection}
+            onSelectGreekMorph={hasGreekMorph ? onSelectGreekMorph : undefined}
+          />
+        </div>
+
+        <aside
+          className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-[var(--navbar-offset)] lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] bg-[#050505] z-10 pt-6"
+          aria-label="Scripture word study and Greek grammar"
+        >
+          <div className="shrink-0 px-6 pb-2">
+            <p className="font-mono text-xs tracking-[0.25em] text-white/50 uppercase">
+              {kjvWordStudyEnabled && hasGreekMorph
+                ? "KJV · Strong's · Greek grammar"
+                : kjvWordStudyEnabled
+                  ? "KJV · Greek & Hebrew"
+                  : "Greek grammar"}
+            </p>
+          </div>
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
+            style={{ WebkitOverflowScrolling: "touch" }}
+            data-lenis-prevent
+          >
+            <ChapterStudySidebar
+              bookSlug={book.slug}
+              chapterNumber={chapterNumber}
+              selection={selection}
+              hasStrongsForChapter={hasStrongsForChapter}
+              hasGreekMorph={hasGreekMorph}
+            />
+          </div>
+        </aside>
+      </div>
+
+      <AnimatePresence>
+        {sheetOpen && selection && (
+          <MobileChapterStudySheet
+            key={
+              selection.kind === "strongs"
+                ? `s-${selection.code}`
+                : `g-${selection.verse}-${selection.wordIndex}`
+            }
+            bookSlug={book.slug}
+            chapterNumber={chapterNumber}
+            selection={selection}
+            hasStrongsForChapter={hasStrongsForChapter}
+            hasGreekMorph={hasGreekMorph}
+            onDismiss={onDismissSheet}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!sheetOpen && selection && (
+          <MobileChapterStudyPill selection={selection} onTap={onReopenSheet} />
+        )}
+      </AnimatePresence>
+    </main>
+  )
+
+  if (!useStudyLayout) {
     return (
       <main className="min-h-screen bg-background text-foreground">
         {props.highlightRange && <ScrollToVerse verseNumber={props.highlightRange.start} />}
@@ -315,52 +438,9 @@ export function BibleChapterShell(props: BibleChapterShellProps) {
     )
   }
 
-  return (
-    <LexiconCacheProvider>
-      <main className="min-h-screen bg-background text-foreground">
-        {props.highlightRange && <ScrollToVerse verseNumber={props.highlightRange.start} />}
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-6 px-4 pb-16 pt-[var(--navbar-offset)] lg:max-w-none lg:flex-row lg:gap-12 lg:items-start lg:pr-[22rem]">
-          <div className="min-w-0 flex-1 flex flex-col gap-4 sm:gap-6">
-            <ChapterBody {...props} onSelectStrongs={onSelectStrongs} />
-          </div>
+  if (needsLexiconProvider) {
+    return <LexiconCacheProvider>{studyMain}</LexiconCacheProvider>
+  }
 
-          <aside
-            className="hidden lg:flex lg:flex-col lg:fixed lg:right-0 lg:top-[var(--navbar-offset)] lg:w-[22rem] lg:max-h-[calc(100dvh-var(--navbar-offset)-1rem)] bg-[#050505] z-10 pt-6"
-            aria-label="Greek and Hebrew word study for King James Version"
-          >
-            <div className="shrink-0 px-6 pb-2">
-              <p className="font-mono text-xs tracking-[0.25em] text-white/50 uppercase">KJV · Greek & Hebrew</p>
-            </div>
-            <div
-              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6"
-              style={{ WebkitOverflowScrolling: "touch" }}
-              data-lenis-prevent
-            >
-              <WordStudySidebarPanel
-                code={selectedStrongsCode}
-                hasStrongsForChapter={hasStrongsForChapter}
-              />
-            </div>
-          </aside>
-        </div>
-
-        <AnimatePresence>
-          {sheetOpen && selectedStrongsCode && (
-            <MobileWordStudySheet
-              key={selectedStrongsCode}
-              code={selectedStrongsCode}
-              hasStrongsForChapter={hasStrongsForChapter}
-              onDismiss={onDismissSheet}
-            />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {!sheetOpen && selectedStrongsCode && (
-            <MobileWordStudyPill code={selectedStrongsCode} onTap={onReopenSheet} />
-          )}
-        </AnimatePresence>
-      </main>
-    </LexiconCacheProvider>
-  )
+  return studyMain
 }
