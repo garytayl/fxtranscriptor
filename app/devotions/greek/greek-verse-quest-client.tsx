@@ -625,7 +625,9 @@ export function GreekVerseQuestClient() {
     } else {
       setQuestChallenge(null)
     }
-  }, [hydrated, loading, verse, pilot.bookSlug, pilot.chapter, greekTokens, reviewMode, weakWordSet, wordMemory])
+    // Intentionally omit weakWordSet / wordMemory: updates from quiz taps must not reset
+    // the word sheet (setSelectedWordIndex(null)) or verse progress mid-session.
+  }, [hydrated, loading, verse, pilot.bookSlug, pilot.chapter, greekTokens, reviewMode])
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeDetails = useCallback(() => {
