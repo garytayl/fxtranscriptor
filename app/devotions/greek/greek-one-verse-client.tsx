@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X } from "lucide-react"
+import { AnimatePresence, motion } from "framer-motion"
 
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
@@ -19,7 +20,8 @@ import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation
 
 const STORAGE_KEY = "fx_devotions_greek_place_v1"
 const MENU_SWIPE_CLOSE_THRESHOLD = 72
-const DETAIL_SWIPE_CLOSE_THRESHOLD = 150
+const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
+const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
@@ -84,6 +86,9 @@ export function GreekOneVerseClient() {
   const detailSwipeCurrentY = useRef<number | null>(null)
   const detailSwipeStartX = useRef<number | null>(null)
   const detailSwipeCurrentX = useRef<number | null>(null)
+  const detailSwipeStartedAt = useRef<number | null>(null)
+  const detailContentRef = useRef<HTMLDivElement | null>(null)
+  const [detailDragOffsetY, setDetailDragOffsetY] = useState(0)
 
   useEffect(() => {
     const s = loadPlace()
@@ -193,6 +198,10 @@ export function GreekOneVerseClient() {
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeDetails = useCallback(() => setSelectedWordIndex(null), [])
+
+  useEffect(() => {
+    if (selectedWordIndex == null) setDetailDragOffsetY(0)
+  }, [selectedWordIndex])
 
   const selectPilot = useCallback((idx: number) => {
     setPilotIdx(idx)
@@ -350,14 +359,6 @@ export function GreekOneVerseClient() {
   )
 
   const onDetailTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
-    const targetEl = e.target as HTMLElement | null
-    if (!targetEl?.closest("[data-detail-swipe-handle]")) {
-      detailSwipeStartY.current = null
-      detailSwipeCurrentY.current = null
-      detailSwipeStartX.current = null
-      detailSwipeCurrentX.current = null
-      return
-    }
     const y = e.changedTouches[0]?.clientY
     const x = e.changedTouches[0]?.clientX
     if (typeof y !== "number" || typeof x !== "number") return
@@ -365,6 +366,7 @@ export function GreekOneVerseClient() {
     detailSwipeCurrentY.current = y
     detailSwipeStartX.current = x
     detailSwipeCurrentX.current = x
+    detailSwipeStartedAt.current = Date.now()
   }, [])
 
   const onDetailTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
@@ -373,7 +375,19 @@ export function GreekOneVerseClient() {
     if (typeof y !== "number" || typeof x !== "number") return
     detailSwipeCurrentY.current = y
     detailSwipeCurrentX.current = x
-  }, [])
+    const startY = detailSwipeStartY.current
+    const startX = detailSwipeStartX.current
+    if (startY == null || startX == null) return
+    const deltaY = y - startY
+    const deltaX = Math.abs(x - startX)
+    const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
+    const mostlyVertical = deltaY > 0 && deltaY > deltaX * 1.15
+    if (atTop && mostlyVertical) {
+      setDetailDragOffsetY(Math.min(170, deltaY * 0.85))
+    } else if (detailDragOffsetY !== 0) {
+      setDetailDragOffsetY(0)
+    }
+  }, [detailDragOffsetY])
 
   const onDetailTouchEnd = useCallback(
     (e: TouchEvent<HTMLDivElement>) => {
@@ -381,14 +395,25 @@ export function GreekOneVerseClient() {
       const endY = detailSwipeCurrentY.current ?? e.changedTouches[0]?.clientY ?? null
       const startX = detailSwipeStartX.current
       const endX = detailSwipeCurrentX.current ?? e.changedTouches[0]?.clientX ?? null
+      const startedAt = detailSwipeStartedAt.current
       detailSwipeStartY.current = null
       detailSwipeCurrentY.current = null
       detailSwipeStartX.current = null
       detailSwipeCurrentX.current = null
+      detailSwipeStartedAt.current = null
       if (startY == null || endY == null || startX == null || endX == null) return
       const deltaY = endY - startY
       const deltaX = Math.abs(endX - startX)
-      if (deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD && deltaY > deltaX * 1.2) closeDetails()
+      const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
+      const elapsedMs = startedAt == null ? 999 : Math.max(1, Date.now() - startedAt)
+      const velocity = deltaY / elapsedMs
+      const shouldClose =
+        atTop &&
+        deltaY > 0 &&
+        deltaY > deltaX * 1.15 &&
+        (deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD || velocity > DETAIL_SWIPE_CLOSE_VELOCITY)
+      if (shouldClose) closeDetails()
+      setDetailDragOffsetY(0)
     },
     [closeDetails],
   )
@@ -412,6 +437,18 @@ export function GreekOneVerseClient() {
 
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <motion.div
+          className="absolute -top-24 -left-20 h-64 w-64 rounded-full bg-emerald-300/10 blur-3xl"
+          animate={{ opacity: [0.35, 0.65, 0.35], scale: [1, 1.08, 1] }}
+          transition={{ duration: 7.5, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl"
+          animate={{ opacity: [0.3, 0.58, 0.3], scale: [1, 1.06, 1] }}
+          transition={{ duration: 8.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
       <header className="shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
           <Link
@@ -437,20 +474,29 @@ export function GreekOneVerseClient() {
         </div>
       </header>
 
-      {menuOpen ? (
-        <div
-          className="absolute inset-0 z-[70] bg-black/65 px-3 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.35rem))] backdrop-blur-sm sm:px-6"
-          onClick={closeMenu}
-        >
-          <div
-            className="mx-auto w-full max-w-2xl rounded-3xl border border-white/20 bg-[#0a1020]/95 p-4 sm:p-5 shadow-[0_20px_80px_rgba(0,0,0,0.55)]"
-            role="dialog"
-            aria-label="Study controls"
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={onMenuTouchStart}
-            onTouchMove={onMenuTouchMove}
-            onTouchEnd={onMenuTouchEnd}
+      <AnimatePresence>
+        {menuOpen ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-[70] bg-black/65 px-3 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.35rem))] backdrop-blur-sm sm:px-6"
+            onClick={closeMenu}
           >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.985 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="mx-auto w-full max-w-2xl rounded-3xl border border-white/20 bg-[#0a1020]/95 p-4 sm:p-5 shadow-[0_20px_80px_rgba(0,0,0,0.55)]"
+              role="dialog"
+              aria-label="Study controls"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={onMenuTouchStart}
+              onTouchMove={onMenuTouchMove}
+              onTouchEnd={onMenuTouchEnd}
+            >
             <div className="mb-4 flex items-center justify-between">
               <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-200/80">
                 <Sparkles className="size-3.5" />
@@ -552,9 +598,10 @@ export function GreekOneVerseClient() {
                 Done
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <main
         className="flex-1 min-h-0 overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
@@ -580,44 +627,65 @@ export function GreekOneVerseClient() {
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
 
           <section className="min-h-[56vh] sm:min-h-[60vh] flex items-center justify-center">
-            {loading ? (
-              <div className="w-full max-w-3xl space-y-4 animate-pulse">
-                <div className="h-10 rounded-xl bg-white/10" />
-                <div className="h-10 rounded-xl bg-white/10" />
-                <div className="h-10 rounded-xl bg-white/10" />
-              </div>
-            ) : greekTokens.length > 0 ? (
-              <div
-                lang="el"
-                className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
-                style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
-              >
-                {greekTokens.map((tok, wi) => {
-                  const selected = selectedWordIndex === wi
-                  const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
-                  return (
-                    <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectGreekWord(wi)}
-                        className={
-                          selected
-                            ? "border-b-2 border-amber-300/85 text-amber-200"
-                            : "border-b border-dashed border-amber-300/35 text-amber-100/95 hover:border-amber-300/70 hover:text-amber-50"
-                        }
-                      >
-                        {tok.word}
-                      </button>
-                      {hint ? (
-                        <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
-                      ) : null}
-                    </span>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-center text-sm text-white/45">Greek text unavailable for this verse.</p>
-            )}
+            <AnimatePresence mode="wait">
+              {loading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full max-w-3xl space-y-4 animate-pulse"
+                >
+                  <div className="h-10 rounded-xl bg-white/10" />
+                  <div className="h-10 rounded-xl bg-white/10" />
+                  <div className="h-10 rounded-xl bg-white/10" />
+                </motion.div>
+              ) : greekTokens.length > 0 ? (
+                <motion.div
+                  key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
+                  initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
+                  lang="el"
+                  className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
+                  style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
+                >
+                  {greekTokens.map((tok, wi) => {
+                    const selected = selectedWordIndex === wi
+                    const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
+                    return (
+                      <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectGreekWord(wi)}
+                          className={
+                            selected
+                              ? "border-b-2 border-amber-300/85 text-amber-200"
+                              : "border-b border-dashed border-amber-300/35 text-amber-100/95 hover:border-amber-300/70 hover:text-amber-50"
+                          }
+                        >
+                          {tok.word}
+                        </button>
+                        {hint ? (
+                          <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
+                        ) : null}
+                      </span>
+                    )
+                  })}
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="text-center text-sm text-white/45"
+                >
+                  Greek text unavailable for this verse.
+                </motion.p>
+              )}
+            </AnimatePresence>
           </section>
 
           {showEnglish && english ? (
@@ -628,27 +696,42 @@ export function GreekOneVerseClient() {
         </div>
       </main>
 
-      {selectedToken ? (
-        <div className="absolute inset-0 z-[66] flex items-end">
-          <button
-            type="button"
-            aria-label="Close word details"
-            className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
-            onClick={closeDetails}
-          />
-          <section
-            className="relative z-[67] w-full rounded-t-3xl border-t border-white/20 bg-[#060b14]/95 shadow-[0_-20px_60px_rgba(0,0,0,0.55)]"
-            onTouchStart={onDetailTouchStart}
-            onTouchMove={onDetailTouchMove}
-            onTouchEnd={onDetailTouchEnd}
-            onTouchCancel={() => {
-              detailSwipeStartY.current = null
-              detailSwipeCurrentY.current = null
-              detailSwipeStartX.current = null
-              detailSwipeCurrentX.current = null
-            }}
+      <AnimatePresence>
+        {selectedToken ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[66] flex items-end"
           >
-            <div className="mx-auto max-h-[68vh] w-full max-w-4xl overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+            <button
+              type="button"
+              aria-label="Close word details"
+              className="absolute inset-0 bg-black/45 backdrop-blur-[1px]"
+              onClick={closeDetails}
+            />
+            <motion.section
+              initial={{ y: "100%" }}
+              animate={{ y: detailDragOffsetY }}
+              exit={{ y: "100%" }}
+              transition={detailDragOffsetY > 0 ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
+              className="relative z-[67] w-full rounded-t-3xl border-t border-white/20 bg-[#060b14]/95 shadow-[0_-20px_60px_rgba(0,0,0,0.55)]"
+              onTouchStart={onDetailTouchStart}
+              onTouchMove={onDetailTouchMove}
+              onTouchEnd={onDetailTouchEnd}
+              onTouchCancel={() => {
+                detailSwipeStartY.current = null
+                detailSwipeCurrentY.current = null
+                detailSwipeStartX.current = null
+                detailSwipeCurrentX.current = null
+                detailSwipeStartedAt.current = null
+                setDetailDragOffsetY(0)
+              }}
+            >
+              <div
+                ref={detailContentRef}
+                className="mx-auto max-h-[68vh] w-full max-w-4xl overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6"
+              >
               <div
                 data-detail-swipe-handle
                 className="mb-2 flex flex-col items-center gap-1.5 pb-1 text-center select-none"
@@ -755,15 +838,38 @@ export function GreekOneVerseClient() {
                     <p className="text-xs leading-relaxed text-emerald-100/90">{coachPayload.prayerPrompt}</p>
                   </div>
                 ) : !coachLoading && !coachError ? (
-                  <p className="mt-2 text-xs text-white/60">
-                    One concise Greek insight plus a prayer prompt from this exact form.
-                  </p>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-white/60">Ask anything about this exact form in this verse.</p>
+                    <div className="flex gap-2">
+                      <input
+                        value={coachQuestion}
+                        onChange={(e) => setCoachQuestion(e.target.value)}
+                        placeholder="e.g. What is the article doing here?"
+                        className="flex-1 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-xs text-white placeholder:text-white/35 focus:border-emerald-300/50 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => runAiCoach(coachQuestion)}
+                        className="rounded-lg border border-emerald-300/45 bg-emerald-400/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-100 hover:bg-emerald-400/30"
+                      >
+                        Ask
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => runAiCoach("What is the article doing here?")}
+                      className="text-left text-[11px] text-emerald-100/90 underline decoration-dotted underline-offset-2 hover:text-emerald-50"
+                    >
+                      Quick: What is the article doing here?
+                    </button>
+                  </div>
                 ) : null}
               </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
+              </div>
+            </motion.section>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <footer className="shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
         <div className="mx-auto flex max-w-lg gap-3">
