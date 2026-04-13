@@ -8,6 +8,7 @@ import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sideb
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import { expandGreekMorphToken } from "@/lib/bible/robinson-greek"
+import { buildGreekWordLearningClues } from "@/lib/bible/greek-word-learning-clues"
 import {
   MORPH_PILOT_CHAPTERS,
   morphPilotPassageRef,
@@ -17,7 +18,8 @@ import {
 import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 
 const STORAGE_KEY = "fx_devotions_greek_place_v1"
-const SWIPE_CLOSE_THRESHOLD = 68
+const MENU_SWIPE_CLOSE_THRESHOLD = 72
+const DETAIL_SWIPE_CLOSE_THRESHOLD = 150
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
@@ -79,6 +81,8 @@ export function GreekOneVerseClient() {
   const menuSwipeCurrentY = useRef<number | null>(null)
   const detailSwipeStartY = useRef<number | null>(null)
   const detailSwipeCurrentY = useRef<number | null>(null)
+  const detailSwipeStartX = useRef<number | null>(null)
+  const detailSwipeCurrentX = useRef<number | null>(null)
 
   useEffect(() => {
     const s = loadPlace()
@@ -228,6 +232,7 @@ export function GreekOneVerseClient() {
   const selectedToken =
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
   const selectedTokenExpanded = selectedToken ? expandGreekMorphToken(selectedToken) : null
+  const selectedTokenLearningClues = selectedToken ? buildGreekWordLearningClues(selectedToken) : null
 
   const activeTokenKey =
     selectedToken && selectedWordIndex != null
@@ -326,32 +331,51 @@ export function GreekOneVerseClient() {
       menuSwipeStartY.current = null
       menuSwipeCurrentY.current = null
       if (startY == null || endY == null) return
-      if (endY - startY > SWIPE_CLOSE_THRESHOLD) closeMenu()
+      if (endY - startY > MENU_SWIPE_CLOSE_THRESHOLD) closeMenu()
     },
     [closeMenu],
   )
 
   const onDetailTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    const targetEl = e.target as HTMLElement | null
+    if (!targetEl?.closest("[data-detail-swipe-handle]")) {
+      detailSwipeStartY.current = null
+      detailSwipeCurrentY.current = null
+      detailSwipeStartX.current = null
+      detailSwipeCurrentX.current = null
+      return
+    }
     const y = e.changedTouches[0]?.clientY
-    if (typeof y !== "number") return
+    const x = e.changedTouches[0]?.clientX
+    if (typeof y !== "number" || typeof x !== "number") return
     detailSwipeStartY.current = y
     detailSwipeCurrentY.current = y
+    detailSwipeStartX.current = x
+    detailSwipeCurrentX.current = x
   }, [])
 
   const onDetailTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const y = e.changedTouches[0]?.clientY
-    if (typeof y !== "number") return
+    const x = e.changedTouches[0]?.clientX
+    if (typeof y !== "number" || typeof x !== "number") return
     detailSwipeCurrentY.current = y
+    detailSwipeCurrentX.current = x
   }, [])
 
   const onDetailTouchEnd = useCallback(
     (e: TouchEvent<HTMLDivElement>) => {
       const startY = detailSwipeStartY.current
       const endY = detailSwipeCurrentY.current ?? e.changedTouches[0]?.clientY ?? null
+      const startX = detailSwipeStartX.current
+      const endX = detailSwipeCurrentX.current ?? e.changedTouches[0]?.clientX ?? null
       detailSwipeStartY.current = null
       detailSwipeCurrentY.current = null
-      if (startY == null || endY == null) return
-      if (endY - startY > SWIPE_CLOSE_THRESHOLD) closeDetails()
+      detailSwipeStartX.current = null
+      detailSwipeCurrentX.current = null
+      if (startY == null || endY == null || startX == null || endX == null) return
+      const deltaY = endY - startY
+      const deltaX = Math.abs(endX - startX)
+      if (deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD && deltaY > deltaX * 1.2) closeDetails()
     },
     [closeDetails],
   )
@@ -604,8 +628,21 @@ export function GreekOneVerseClient() {
             onTouchStart={onDetailTouchStart}
             onTouchMove={onDetailTouchMove}
             onTouchEnd={onDetailTouchEnd}
+            onTouchCancel={() => {
+              detailSwipeStartY.current = null
+              detailSwipeCurrentY.current = null
+              detailSwipeStartX.current = null
+              detailSwipeCurrentX.current = null
+            }}
           >
             <div className="mx-auto max-h-[68vh] w-full max-w-4xl overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+              <div
+                data-detail-swipe-handle
+                className="mb-2 flex flex-col items-center gap-1.5 pb-1 text-center select-none"
+              >
+                <div className="h-1.5 w-14 rounded-full bg-white/25" />
+                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Swipe down from here to close</p>
+              </div>
               <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Word details</p>
@@ -628,6 +665,31 @@ export function GreekOneVerseClient() {
                 verseNumber={verse}
                 wordIndex={selectedWordIndex ?? 0}
               />
+
+              {selectedTokenLearningClues ? (
+                <div className="mt-3 rounded-xl border border-blue-300/25 bg-blue-400/[0.07] p-3">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-blue-100/80">Why this form?</p>
+                  {selectedTokenLearningClues.quickReason ? (
+                    <p className="mt-2 text-sm text-white/90 leading-relaxed">{selectedTokenLearningClues.quickReason}</p>
+                  ) : (
+                    <p className="mt-2 text-sm text-white/70 leading-relaxed">
+                      Parse template: <span className="font-mono text-white/85">{selectedTokenLearningClues.parseTemplate}</span>
+                    </p>
+                  )}
+                  {selectedTokenLearningClues.slotClues.length > 0 ? (
+                    <ul className="mt-2 list-disc pl-4 space-y-1 text-xs text-white/75">
+                      {selectedTokenLearningClues.slotClues.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {selectedTokenLearningClues.articleFunctionHint ? (
+                    <p className="mt-2 text-xs text-blue-100/85 leading-relaxed">
+                      Article note: {selectedTokenLearningClues.articleFunctionHint}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="mt-3 rounded-xl border border-emerald-300/25 bg-emerald-400/[0.07] p-3">
                 <div className="flex items-center justify-between gap-2">
