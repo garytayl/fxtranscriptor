@@ -37,6 +37,8 @@ import {
 import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 
 const STORAGE_KEY = "fx_devotions_greek_place_v1"
+const VERSE_SWIPE_MIN_X = 84
+const VERSE_SWIPE_HORIZONTAL_RATIO = 1.35
 const MENU_SWIPE_CLOSE_THRESHOLD = 72
 const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
 const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
@@ -132,6 +134,7 @@ export function GreekOneVerseClient() {
   const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
 
   const verseSwipeStartX = useRef<number | null>(null)
+  const verseSwipeStartY = useRef<number | null>(null)
   const menuSwipeStartY = useRef<number | null>(null)
   const menuSwipeCurrentY = useRef<number | null>(null)
   const detailSwipeStartY = useRef<number | null>(null)
@@ -345,21 +348,30 @@ export function GreekOneVerseClient() {
 
   const onVerseTouchStart = useCallback((e: TouchEvent) => {
     verseSwipeStartX.current = e.changedTouches[0]?.clientX ?? null
+    verseSwipeStartY.current = e.changedTouches[0]?.clientY ?? null
   }, [])
 
   const onVerseTouchEnd = useCallback(
     (e: TouchEvent) => {
-      if (menuOpen || selectedWordIndex != null) return
+      if (page !== "study" || menuOpen || selectedWordIndex != null) return
       const start = verseSwipeStartX.current
+      const startY = verseSwipeStartY.current
       verseSwipeStartX.current = null
-      if (start == null) return
+      verseSwipeStartY.current = null
+      if (start == null || startY == null) return
       const end = e.changedTouches[0]?.clientX
-      if (end == null) return
+      const endY = e.changedTouches[0]?.clientY
+      if (end == null || endY == null) return
       const dx = end - start
-      if (dx > 56) prevVerse()
-      else if (dx < -56) nextVerse()
+      const dy = endY - startY
+      const absDx = Math.abs(dx)
+      const absDy = Math.abs(dy)
+      const mostlyHorizontal = absDx >= absDy * VERSE_SWIPE_HORIZONTAL_RATIO
+      if (!mostlyHorizontal || absDx < VERSE_SWIPE_MIN_X) return
+      if (dx > 0) prevVerse()
+      else nextVerse()
     },
-    [menuOpen, selectedWordIndex, prevVerse, nextVerse],
+    [page, menuOpen, selectedWordIndex, prevVerse, nextVerse],
   )
 
   const selectedToken =
