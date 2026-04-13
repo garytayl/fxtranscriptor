@@ -1,11 +1,11 @@
-import { GreekOneVerseClient } from "./greek-one-verse-client"
+import { GreekGrammarReaderClient } from "./greek-grammar-reader-client"
 
 export const metadata = {
-  title: "Learn Greek · Devotions",
+  title: "Learn Greek · Grammar reader",
   description:
-    "Step through John 1 or Luke 6 one verse at a time with in-page Greek grammar, morphology hints, and tap-to-learn word breakdowns.",
+    "Read pilot NT verses one at a time: tap any word for morphology, grammar notes, and optional hints—without quizzes or XP.",
 }
 
 export default function DevotionsGreekPage() {
-  return <GreekOneVerseClient />
+  return <GreekGrammarReaderClient />
 }

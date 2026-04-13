@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, Target, X, Zap } from "lucide-react"
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, X } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
@@ -23,20 +23,17 @@ import {
   type GreekWordFamiliarity,
   type GreekWordMemory,
 } from "@/lib/devotions-greek-word-memory"
-import {
-  MORPH_PILOT_CHAPTERS,
-  morphPilotPassageRef,
-  morphPilotReaderUrl,
-  type MorphPilotChapterMenuItem,
-} from "@/lib/bible/morph-pilot-menu"
-import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
+import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
 
-const STORAGE_KEY = "fx_devotions_greek_place_v1"
-const VERSE_SWIPE_MIN_X = 84
-const VERSE_SWIPE_HORIZONTAL_RATIO = 1.35
-const MENU_SWIPE_CLOSE_THRESHOLD = 72
-const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
-const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
+import {
+  DETAIL_SWIPE_CLOSE_THRESHOLD,
+  DETAIL_SWIPE_CLOSE_VELOCITY,
+  MENU_SWIPE_CLOSE_THRESHOLD,
+  useGreekPilotVerse,
+  VERSE_SWIPE_HORIZONTAL_RATIO,
+  VERSE_SWIPE_MIN_X,
+} from "@/app/devotions/greek/greek-pilot-verse-shared"
+
 const WORD_XP = 12
 const LEVEL_COMPLETE_XP = 24
 const PERFECT_LEVEL_BONUS_XP = 10
@@ -44,8 +41,6 @@ const QUEST_MIN_TARGETS = 3
 const QUEST_MAX_TARGETS = 5
 const DAILY_VERSE_RUN_KEY = "daily-verse-run"
 
-type StoredPlace = { bookSlug: string; chapter: number; verse: number }
-type PassageVerse = { number: number; text: string }
 type QuestWordStage = "challenge" | "revealed"
 type QuestWordChallenge = {
   targetIndex: number
@@ -58,31 +53,6 @@ type LevelCompleteState = {
   correctWords: number
   learnedWords: number
   encouragement: string
-}
-
-function loadPlace(): StoredPlace | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const p = JSON.parse(raw) as StoredPlace
-    if (!p?.bookSlug || typeof p.chapter !== "number" || typeof p.verse !== "number") return null
-    return p
-  } catch {
-    return null
-  }
-}
-
-function savePlace(p: StoredPlace) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(p))
-  } catch {
-    /* ignore */
-  }
-}
-
-function stripHtmlTags(s: string): string {
-  return s.replace(/<[^>]+>/g, "")
 }
 
 function wordFormKey(token: GreekMorphToken): string {
@@ -132,18 +102,33 @@ function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number)
   return { targetIndex, options, correctOptionIndex }
 }
 
-export function GreekOneVerseClient() {
-  const [pilotIdx, setPilotIdx] = useState(0)
-  const [verse, setVerse] = useState(1)
+export function GreekVerseQuestClient() {
+  const {
+    pilot,
+    passageRef,
+    readerUrl,
+    hydrated,
+    loading,
+    error,
+    english,
+    greekTokens,
+    verse,
+    prevVerse,
+    nextVerse,
+    rolodexBookSlug,
+    setRolodexBookSlug,
+    rolodexChapter,
+    setRolodexChapter,
+    rolodexVerse,
+    setRolodexVerse,
+    rolodexBooks,
+    rolodexChapters,
+    selectedRolodexChapter,
+    rolodexVerseOptions,
+    applyRolodexSelection,
+  } = useGreekPilotVerse()
+
   const [menuOpen, setMenuOpen] = useState(false)
-  const [rolodexBookSlug, setRolodexBookSlug] = useState(MORPH_PILOT_CHAPTERS[0]?.bookSlug ?? "john")
-  const [rolodexChapter, setRolodexChapter] = useState(MORPH_PILOT_CHAPTERS[0]?.chapter ?? 1)
-  const [rolodexVerse, setRolodexVerse] = useState(1)
-  const [hydrated, setHydrated] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [english, setEnglish] = useState("")
-  const [greekTokens, setGreekTokens] = useState<GreekMorphToken[]>([])
   const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
   const [showEnglish, setShowEnglish] = useState(false)
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
@@ -162,40 +147,12 @@ export function GreekOneVerseClient() {
   )
   const [xpBurst, setXpBurst] = useState<number | null>(null)
 
-  const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
-  const passageRef = useMemo(() => morphPilotPassageRef(pilot, verse), [pilot, verse])
-  const readerUrl = useMemo(
-    () => morphPilotReaderUrl(pilot.bookSlug, pilot.chapter, verse),
-    [pilot.bookSlug, pilot.chapter, verse],
-  )
   const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
   const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 2), [wordMemory])
   const levelProgressPct = questTargetIndexes.length
     ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
     : 0
   const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
-
-  const rolodexBooks = useMemo(() => {
-    const seen = new Set<string>()
-    return MORPH_PILOT_CHAPTERS.filter((item) => {
-      if (seen.has(item.bookSlug)) return false
-      seen.add(item.bookSlug)
-      return true
-    }).map((item) => ({
-      bookSlug: item.bookSlug,
-      bookName: item.bookName,
-    }))
-  }, [])
-  const rolodexChapters = useMemo(
-    () => MORPH_PILOT_CHAPTERS.filter((item) => item.bookSlug === rolodexBookSlug),
-    [rolodexBookSlug],
-  )
-  const selectedRolodexChapter =
-    rolodexChapters.find((item) => item.chapter === rolodexChapter) ?? rolodexChapters[0] ?? pilot
-  const rolodexVerseOptions = useMemo(
-    () => Array.from({ length: selectedRolodexChapter.maxVerse }, (_, idx) => idx + 1),
-    [selectedRolodexChapter.maxVerse],
-  )
 
   const verseSwipeStartX = useRef<number | null>(null)
   const verseSwipeStartY = useRef<number | null>(null)
@@ -229,21 +186,6 @@ export function GreekOneVerseClient() {
   )
 
   useEffect(() => {
-    const s = loadPlace()
-    if (s) {
-      const idx = MORPH_PILOT_CHAPTERS.findIndex(
-        (c) => c.bookSlug === s.bookSlug && c.chapter === s.chapter,
-      )
-      if (idx >= 0) {
-        setPilotIdx(idx)
-        const max = MORPH_PILOT_CHAPTERS[idx].maxVerse
-        setVerse(Math.min(Math.max(1, s.verse), max))
-      }
-    }
-    setHydrated(true)
-  }, [])
-
-  useEffect(() => {
     if (typeof window === "undefined") return
     const onStorage = (e: StorageEvent) => {
       if (!e.key || e.key === "fx_devotions_greek_v1_progress") refreshProgress()
@@ -267,113 +209,37 @@ export function GreekOneVerseClient() {
 
   useEffect(() => {
     if (!hydrated) return
-    savePlace({ bookSlug: pilot.bookSlug, chapter: pilot.chapter, verse })
-  }, [hydrated, pilot.bookSlug, pilot.chapter, verse])
-
-  useEffect(() => {
-    setRolodexBookSlug(pilot.bookSlug)
-    setRolodexChapter(pilot.chapter)
-    setRolodexVerse(verse)
-  }, [pilot.bookSlug, pilot.chapter, verse])
-
-  useEffect(() => {
-    if (!hydrated) return
     if (initializedDailySession.current) return
     initializedDailySession.current = true
   }, [hydrated])
 
   useEffect(() => {
-    if (!hydrated) return
+    if (loading) {
+      setSelectedWordIndex(null)
+      setQuestStage("challenge")
+      setQuestChallenge(null)
+      setCompletedTargetIndexes([])
+      setCorrectTargetIndexes([])
+      setLevelComplete(null)
+    }
+  }, [loading])
 
-    const controller = new AbortController()
-    const ref = passageRef
-    const t = FX_GREEK_GRAMMAR_TRANSLATION_KEY
-
-    setLoading(true)
-    setError(null)
+  useEffect(() => {
+    if (!hydrated || loading) return
     setSelectedWordIndex(null)
     setQuestStage("challenge")
     setQuestChallenge(null)
     setCompletedTargetIndexes([])
     setCorrectTargetIndexes([])
     setLevelComplete(null)
-
-    const load = async () => {
-      try {
-        const [passRes, morphRes] = await Promise.all([
-          fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}&t=${encodeURIComponent(t)}`, {
-            signal: controller.signal,
-          }),
-          fetch(`/api/bible/morph?ref=${encodeURIComponent(ref)}`, { signal: controller.signal }),
-        ])
-        const pass = (await passRes.json()) as Record<string, unknown>
-        const morph = (await morphRes.json()) as Record<string, unknown>
-
-        let passError: string | null = null
-        let nextEnglish = ""
-        if (!passRes.ok) {
-          passError = typeof pass.error === "string" ? pass.error : "Could not load this verse."
-        } else if (typeof pass.error === "string" && pass.error) {
-          passError = pass.error
-        } else {
-          const verses = pass.verses as PassageVerse[] | undefined
-          const row = verses?.find((v) => v.number === verse) ?? verses?.[0]
-          nextEnglish = row?.text ? stripHtmlTags(row.text).replace(/\s+/g, " ").trim() : ""
-        }
-
-        let morphError: string | null = null
-        let nextGreekTokens: GreekMorphToken[] = []
-        if (!morphRes.ok) {
-          morphError = typeof morph.error === "string" ? morph.error : "Could not load Greek morphology."
-        } else if (typeof morph.error === "string" && morph.error && morph.available === false) {
-          morphError = morph.error
-        } else {
-          const mVerses = morph.verses as { number: number; tokens: GreekMorphToken[] }[] | undefined
-          const mv = mVerses?.find((x) => x.number === verse) ?? mVerses?.[0]
-          nextGreekTokens = mv?.tokens ?? []
-          if (nextGreekTokens.length === 0) morphError = "Could not load Greek morphology."
-        }
-
-        setEnglish(nextEnglish)
-        setGreekTokens(nextGreekTokens)
-        const targets = pickQuestTargetIndexes(nextGreekTokens, weakWordSet, wordMemory, reviewMode)
-        setQuestTargetIndexes(targets)
-        if (targets.length > 0) {
-          setQuestChallenge(buildChallengeForTarget(nextGreekTokens, targets[0]))
-        }
-        if (passError && nextGreekTokens.length > 0) {
-          setError("English translation unavailable right now. Greek grammar study is still available.")
-        } else if (!passError && morphError && nextEnglish) {
-          setError("Greek morphology unavailable for this verse.")
-        } else if (passError) {
-          setError(passError)
-        } else if (morphError) {
-          setError(morphError)
-        } else {
-          setError(null)
-        }
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") return
-        setError("Could not load this verse.")
-        setEnglish("")
-        setGreekTokens([])
-        setQuestTargetIndexes([])
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
+    const targets = pickQuestTargetIndexes(greekTokens, weakWordSet, wordMemory, reviewMode)
+    setQuestTargetIndexes(targets)
+    if (targets.length > 0) {
+      setQuestChallenge(buildChallengeForTarget(greekTokens, targets[0]))
+    } else {
+      setQuestChallenge(null)
     }
-
-    void load()
-    return () => controller.abort()
-  }, [hydrated, passageRef, verse, reviewMode, weakWordSet, wordMemory])
-
-  const prevVerse = useCallback(() => {
-    setVerse((v) => Math.max(1, v - 1))
-  }, [])
-
-  const nextVerse = useCallback(() => {
-    setVerse((v) => Math.min(pilot.maxVerse, v + 1))
-  }, [pilot.maxVerse])
+  }, [hydrated, loading, verse, pilot.bookSlug, pilot.chapter, greekTokens, reviewMode, weakWordSet, wordMemory])
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeDetails = useCallback(() => {
@@ -385,18 +251,7 @@ export function GreekOneVerseClient() {
     if (selectedWordIndex == null) setDetailDragOffsetY(0)
   }, [selectedWordIndex])
 
-  const applyRolodexSelection = useCallback(() => {
-    const targetPilotIdx = MORPH_PILOT_CHAPTERS.findIndex(
-      (item) => item.bookSlug === rolodexBookSlug && item.chapter === rolodexChapter,
-    )
-    if (targetPilotIdx < 0) return
-    const targetPilot = MORPH_PILOT_CHAPTERS[targetPilotIdx]
-    const safeVerse = Math.min(Math.max(1, rolodexVerse), targetPilot.maxVerse)
-    setPilotIdx(targetPilotIdx)
-    setVerse(safeVerse)
-  }, [rolodexBookSlug, rolodexChapter, rolodexVerse])
-
-  const jumpToRolodex = useCallback(() => {
+  const applyRolodexSelectionAndClose = useCallback(() => {
     applyRolodexSelection()
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
@@ -421,8 +276,8 @@ export function GreekOneVerseClient() {
         correctWords === 0
           ? "Level complete - answer correctly to earn XP."
           : learnedWords >= Math.ceil(questTargetIndexes.length / 2)
-          ? "Strong verse run - your recall is improving."
-          : "Level complete - keep tapping and these forms will stick."
+            ? "Strong verse run - your recall is improving."
+            : "Level complete - keep tapping and these forms will stick."
       const awarded =
         levelXp > 0
           ? awardProgress({
@@ -680,9 +535,9 @@ export function GreekOneVerseClient() {
             <ArrowLeft className="size-3.5" />
             Back
           </Link>
-          <div className="text-center">
+          <div className="text-center min-w-0 px-1">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">Verse Quest</p>
-            <p className="text-sm text-white/80">{pilot.label}</p>
+            <p className="text-sm text-white/80 truncate">{pilot.label}</p>
           </div>
           <button
             type="button"
@@ -693,6 +548,15 @@ export function GreekOneVerseClient() {
             <Menu className="size-3.5" />
             Menu
           </button>
+        </div>
+        <div className="flex justify-center pb-2 px-3">
+          <Link
+            href="/devotions/greek"
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
+          >
+            <BookOpen className="size-3.5" />
+            Grammar reader
+          </Link>
         </div>
         <div className="px-4 pb-3 sm:px-8 md:px-14">
           <div className="mx-auto max-w-5xl space-y-2">
@@ -867,7 +731,7 @@ export function GreekOneVerseClient() {
                     </p>
                     <button
                       type="button"
-                      onClick={jumpToRolodex}
+                      onClick={applyRolodexSelectionAndClose}
                       className="rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25"
                     >
                       Go to verse
@@ -916,6 +780,14 @@ export function GreekOneVerseClient() {
                   >
                     Full Reader
                     <ExternalLink className="size-3.5 opacity-70" />
+                  </Link>
+                  <Link
+                    href="/devotions/greek"
+                    onClick={closeMenu}
+                    className="inline-flex items-center gap-2 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-amber-200/90 hover:bg-amber-500/20"
+                  >
+                    Grammar reader
+                    <BookOpen className="size-3.5 opacity-80" />
                   </Link>
                 </div>
 
