@@ -202,7 +202,7 @@ function VerseBadgeComponent({
                   href={grammarReaderUrl}
                   className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
                 >
-                  Greek grammar (John 1 pilot)
+                  Greek grammar (pilot: John 1, Luke 6)
                 </a>
               )}
             </div>

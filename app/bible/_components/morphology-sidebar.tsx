@@ -38,8 +38,8 @@ export function MorphologySidebarPanel({
           exit={{ opacity: 0 }}
           className="font-sans text-sm text-white/40 italic"
         >
-          Open the <span className="text-white/50 not-italic">Learn Greek as you read</span> panel above, then tap any word
-          in the Greek line for tenses, moods, participles, and cases.
+          Open the <span className="text-white/50 not-italic">Learn Greek as you read</span> panel above (on pilot
+          chapters), then tap any word in the Greek line for tenses, moods, participles, and cases.
         </motion.p>
       ) : expanded ? (
         <motion.div

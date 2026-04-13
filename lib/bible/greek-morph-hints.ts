@@ -1,5 +1,5 @@
 /**
- * Tiny under-word labels for “training wheels” mode in the Greek line (John 1 pilot).
+ * Tiny under-word labels for “training wheels” mode in the Greek line (MorphGNT pilot chapters).
  */
 
 import type { GreekMorphToken } from "@/lib/bible/morph-types"

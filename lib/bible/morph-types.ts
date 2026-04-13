@@ -1,5 +1,5 @@
 /**
- * Original-language morphology (pilot: Greek John 1 from MorphGNT).
+ * Original-language morphology (MorphGNT pilot: John 1, Luke 6, …).
  * Strong's maps KJV English → lemma; morphology maps Greek surface forms → grammar.
  */
 

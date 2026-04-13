@@ -2,7 +2,7 @@
 
 ## Summary
 
-The app pilots **verse-aligned Greek morphology** using **MorphGNT** (Robinson-style parses) for **John 1**. KJV **Strong’s** alignment is English word order; Greek morphology is keyed to **Greek word order** in the same verse, so the UI shows a separate Greek line (SBL Greek New Testament text via MorphGNT) rather than fusing parses onto KJV tokens.
+The app pilots **verse-aligned Greek morphology** using **MorphGNT** (Robinson-style parses) for bundled chapters (currently **John 1**, **Luke 6**). KJV **Strong’s** alignment is English word order; Greek morphology is keyed to **Greek word order** in the same verse, so the UI shows a separate Greek line (SBL Greek New Testament text via MorphGNT) rather than fusing parses onto KJV tokens.
 
 ## What happened
 
@@ -16,10 +16,12 @@ Strong’s-only word study answers “which lemma underlies this English word?�
 
 ## How we use it
 
-- `scripts/build-john1-morph.mjs` downloads `64-Jn-morphgnt.txt` and emits `lib/bible/morph-data/john-1.json` for bundling.
+- `scripts/build-john1-morph.mjs` → `64-Jn-morphgnt.txt` → `lib/bible/morph-data/john-1.json` (BCV prefix `0401xx`).
+- `scripts/build-luke-6-morph.mjs` → `63-Lk-morphgnt.txt` → `lib/bible/morph-data/luke-6.json` (BCV prefix `0306xx`).
+- `lib/bible/morph-lookup.ts` registers pilot chapters in `MORPH_PILOT_CHAPTERS`.
 - Alignment with **kaiserlik KJV Strong’s** is **by verse only**, not by English word index.
 
 ## How to avoid mistakes next time
 
 - Do not assume **one** morph tag can attach to **KJV** word *i* without a **human or algorithmic alignment** table.
-- When expanding beyond John 1, prefer **regenerating JSON from the same MorphGNT pipeline** rather than hand-editing tokens.
+- When adding a chapter, run the MorphGNT pipeline script and append the file + `morph-lookup` entry rather than hand-editing tokens.

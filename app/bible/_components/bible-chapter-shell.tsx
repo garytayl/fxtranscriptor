@@ -174,7 +174,7 @@ export type BibleChapterShellProps = {
     targetChapter?: number | null
     targetVerse?: number | null
   }[]
-  /** Greek morphology tokens per verse (MorphGNT pilot: John 1). */
+  /** Greek morphology tokens per verse (MorphGNT pilot: e.g. John 1, Luke 6). */
   greekMorphByVerse?: Record<number, GreekMorphToken[]>
 }
 

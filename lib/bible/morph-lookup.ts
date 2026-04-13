@@ -1,8 +1,9 @@
 import type { PassageReference } from "@/lib/bible/reference"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import john1 from "@/lib/bible/morph-data/john-1.json"
+import luke6 from "@/lib/bible/morph-data/luke-6.json"
 
-type John1File = {
+type MorphChapterFile = {
   meta: {
     source: string
     cite: string
@@ -14,20 +15,27 @@ type John1File = {
   verses: Record<string, GreekMorphToken[]>
 }
 
-const JOHN_1 = john1 as John1File
+const MORPH_PILOT_CHAPTERS = [john1, luke6] as MorphChapterFile[]
+
+const MORPH_META = MORPH_PILOT_CHAPTERS[0].meta
+
+function getPilotChapter(bookSlug: string, chapter: number): MorphChapterFile | null {
+  return (
+    MORPH_PILOT_CHAPTERS.find((p) => p.bookSlug === bookSlug && p.chapter === chapter) ?? null
+  )
+}
 
 export function getGreekMorphTokensForChapter(
   bookSlug: string,
   chapter: number
 ): Record<number, GreekMorphToken[]> | null {
-  if (bookSlug === JOHN_1.bookSlug && chapter === JOHN_1.chapter) {
-    const out: Record<number, GreekMorphToken[]> = {}
-    for (const [v, tokens] of Object.entries(JOHN_1.verses)) {
-      out[Number(v)] = tokens
-    }
-    return out
+  const pilot = getPilotChapter(bookSlug, chapter)
+  if (!pilot) return null
+  const out: Record<number, GreekMorphToken[]> = {}
+  for (const [v, tokens] of Object.entries(pilot.verses)) {
+    out[Number(v)] = tokens
   }
-  return null
+  return out
 }
 
 export function getGreekMorphToken(
@@ -51,7 +59,7 @@ export type MorphPassagePayload = {
   readerGrammarUrl: string | null
 }
 
-/** Reader URL with KJV + verse anchor for Greek grammar pilot (John 1). */
+/** Reader URL with KJV + verse anchor for Greek grammar pilot chapters. */
 export function getReaderGrammarUrl(bookSlug: string, chapter: number, verse: number): string {
   const params = new URLSearchParams()
   params.set("t", "kjv")
@@ -59,8 +67,12 @@ export function getReaderGrammarUrl(bookSlug: string, chapter: number, verse: nu
   return `/bible/${bookSlug}/${chapter}?${params.toString()}`
 }
 
+function isMorphPilotChapter(bookSlug: string, chapterNumber: number): boolean {
+  return getPilotChapter(bookSlug, chapterNumber) != null
+}
+
 /**
- * Returns morph tokens for a parsed passage when the pilot dataset covers it (John 1 only).
+ * Returns morph tokens for a parsed passage when the pilot dataset covers that chapter.
  */
 export function getMorphologyForPassage(parsed: PassageReference): MorphPassagePayload {
   const { bookSlug, chapterNumber, verseRange } = parsed
@@ -68,9 +80,9 @@ export function getMorphologyForPassage(parsed: PassageReference): MorphPassageP
   if (!ch || !verseRange) {
     return {
       available: false,
-      cite: JOHN_1.meta.cite,
-      parsingLicense: JOHN_1.meta.parsingLicense,
-      textLicenseNote: JOHN_1.meta.textLicenseNote,
+      cite: MORPH_META.cite,
+      parsingLicense: MORPH_META.parsingLicense,
+      textLicenseNote: MORPH_META.textLicenseNote,
       verses: [],
       readerGrammarUrl: null,
     }
@@ -85,13 +97,13 @@ export function getMorphologyForPassage(parsed: PassageReference): MorphPassageP
   }
 
   const firstVerse = verseRange.start
-  const available = verses.length > 0 && bookSlug === "john" && chapterNumber === 1
+  const available = verses.length > 0 && isMorphPilotChapter(bookSlug, chapterNumber)
 
   return {
     available,
-    cite: JOHN_1.meta.cite,
-    parsingLicense: JOHN_1.meta.parsingLicense,
-    textLicenseNote: JOHN_1.meta.textLicenseNote,
+    cite: MORPH_META.cite,
+    parsingLicense: MORPH_META.parsingLicense,
+    textLicenseNote: MORPH_META.textLicenseNote,
     verses,
     readerGrammarUrl: available ? getReaderGrammarUrl(bookSlug, chapterNumber, firstVerse) : null,
   }
