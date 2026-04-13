@@ -23,8 +23,15 @@ describe("morph pilot chapters", () => {
     expect(byUsfm?.[1]?.length).toBeGreaterThan(5)
   })
 
+  it("loads John 21", () => {
+    const ch = getGreekMorphTokensForChapter("john", 21)
+    expect(ch).not.toBeNull()
+    expect(ch![1]?.length).toBeGreaterThan(5)
+    expect(ch![25]?.length).toBeGreaterThan(0)
+  })
+
   it("returns null for non-pilot chapters", () => {
     expect(getGreekMorphTokensForChapter("luke", 5)).toBeNull()
-    expect(getGreekMorphTokensForChapter("john", 2)).toBeNull()
+    expect(getGreekMorphTokensForChapter("john", 22)).toBeNull()
   })
 })

@@ -2,6 +2,26 @@ import type { PassageReference } from "@/lib/bible/reference"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 import john1 from "@/lib/bible/morph-data/john-1.json"
+import john2 from "@/lib/bible/morph-data/john-2.json"
+import john3 from "@/lib/bible/morph-data/john-3.json"
+import john4 from "@/lib/bible/morph-data/john-4.json"
+import john5 from "@/lib/bible/morph-data/john-5.json"
+import john6 from "@/lib/bible/morph-data/john-6.json"
+import john7 from "@/lib/bible/morph-data/john-7.json"
+import john8 from "@/lib/bible/morph-data/john-8.json"
+import john9 from "@/lib/bible/morph-data/john-9.json"
+import john10 from "@/lib/bible/morph-data/john-10.json"
+import john11 from "@/lib/bible/morph-data/john-11.json"
+import john12 from "@/lib/bible/morph-data/john-12.json"
+import john13 from "@/lib/bible/morph-data/john-13.json"
+import john14 from "@/lib/bible/morph-data/john-14.json"
+import john15 from "@/lib/bible/morph-data/john-15.json"
+import john16 from "@/lib/bible/morph-data/john-16.json"
+import john17 from "@/lib/bible/morph-data/john-17.json"
+import john18 from "@/lib/bible/morph-data/john-18.json"
+import john19 from "@/lib/bible/morph-data/john-19.json"
+import john20 from "@/lib/bible/morph-data/john-20.json"
+import john21 from "@/lib/bible/morph-data/john-21.json"
 import luke6 from "@/lib/bible/morph-data/luke-6.json"
 
 type MorphChapterFile = {
@@ -16,7 +36,30 @@ type MorphChapterFile = {
   verses: Record<string, GreekMorphToken[]>
 }
 
-const MORPH_PILOT_CHAPTERS = [john1, luke6] as MorphChapterFile[]
+const MORPH_PILOT_CHAPTERS = [
+  john1,
+  john2,
+  john3,
+  john4,
+  john5,
+  john6,
+  john7,
+  john8,
+  john9,
+  john10,
+  john11,
+  john12,
+  john13,
+  john14,
+  john15,
+  john16,
+  john17,
+  john18,
+  john19,
+  john20,
+  john21,
+  luke6,
+] as MorphChapterFile[]
 
 const MORPH_META = MORPH_PILOT_CHAPTERS[0].meta
 
