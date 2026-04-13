@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X } from "lucide-react"
 
 import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
 import { GreekMorphWords } from "@/app/bible/_components/greek-morph-words"
@@ -54,6 +54,8 @@ function stripHtmlTags(s: string): string {
 export function GreekOneVerseClient() {
   const [pilotIdx, setPilotIdx] = useState(0)
   const [verse, setVerse] = useState(1)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [verseDraft, setVerseDraft] = useState("1")
   const [hydrated, setHydrated] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +67,7 @@ export function GreekOneVerseClient() {
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
 
   const passageRef = useMemo(() => morphPilotPassageRef(pilot, verse), [pilot, verse])
+  const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
 
   useEffect(() => {
     const s = loadPlace()
@@ -85,6 +88,10 @@ export function GreekOneVerseClient() {
     if (!hydrated) return
     savePlace({ bookSlug: pilot.bookSlug, chapter: pilot.chapter, verse })
   }, [hydrated, pilot.bookSlug, pilot.chapter, verse])
+
+  useEffect(() => {
+    setVerseDraft(String(verse))
+  }, [verse])
 
   useEffect(() => {
     if (!hydrated) return
@@ -175,7 +182,15 @@ export function GreekOneVerseClient() {
   const selectPilot = useCallback((idx: number) => {
     setPilotIdx(idx)
     setVerse(1)
+    setMenuOpen(false)
   }, [])
+
+  const jumpToVerse = useCallback(() => {
+    const num = Number.parseInt(verseDraft.trim(), 10)
+    if (!Number.isFinite(num)) return
+    setVerse(Math.min(pilot.maxVerse, Math.max(1, num)))
+    setMenuOpen(false)
+  }, [pilot.maxVerse, verseDraft])
 
   const handleSelectGreekWord = useCallback((_: number, wordIndex: number) => {
     setSelectedWordIndex(wordIndex)
@@ -203,24 +218,26 @@ export function GreekOneVerseClient() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
+      if (e.key === "Escape") {
+        setMenuOpen(false)
+      } else if (e.key === "ArrowLeft" && !menuOpen) {
         e.preventDefault()
         prevVerse()
-      } else if (e.key === "ArrowRight") {
+      } else if (e.key === "ArrowRight" && !menuOpen) {
         e.preventDefault()
         nextVerse()
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [prevVerse, nextVerse])
+  }, [menuOpen, prevVerse, nextVerse])
 
   const selectedToken =
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-gradient-to-b from-[#06080f] via-[#050505] to-[#030306] text-white">
-      <header className="shrink-0 flex items-center justify-between gap-2 px-3 sm:px-5 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 border-b border-white/[0.06]">
+    <div className="fixed inset-0 z-[60] relative flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,#131822,transparent_40%),linear-gradient(to_bottom,#06080f,#050505,#030306)] text-white">
+      <header className="shrink-0 flex items-center justify-between gap-2 px-3 sm:px-5 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 border-b border-white/[0.06] bg-black/25 backdrop-blur-xl">
         <Link
           href="/devotions"
           className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-white/45 hover:text-white/75 min-h-[44px] min-w-[44px] px-1"
@@ -229,28 +246,123 @@ export function GreekOneVerseClient() {
           <span className="hidden sm:inline">Back</span>
         </Link>
 
-        <div className="flex rounded-full border border-white/10 bg-black/25 p-0.5 shrink-0">
-          {MORPH_PILOT_CHAPTERS.map((c, idx) => {
-            const active = idx === pilotIdx
-            return (
-              <button
-                key={`${c.bookSlug}-${c.chapter}`}
-                type="button"
-                onClick={() => selectPilot(idx)}
-                className={`rounded-full px-3 py-1.5 min-h-[40px] text-[11px] font-mono tracking-wide transition-colors ${
-                  active ? "bg-amber-500/20 text-amber-100" : "text-white/45 hover:text-white/70"
-                }`}
-              >
-                {c.label}
-              </button>
-            )
-          })}
+        <div className="text-center min-w-0">
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-emerald-300/70">Greek Studio</p>
+          <p className="text-xs text-white/75 truncate">{pilot.label}</p>
         </div>
 
-        <span className="font-mono text-[10px] text-white/35 tabular-nums text-right min-w-[3.5rem]">
-          {verse}/{pilot.maxVerse}
-        </span>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/75 hover:bg-white/10"
+          aria-label="Open Greek study menu"
+        >
+          <Menu className="size-3.5" />
+          Menu
+        </button>
       </header>
+
+      {menuOpen ? (
+        <div className="absolute inset-0 z-[70] bg-black/65 backdrop-blur-sm px-3 pt-[max(4.7rem,calc(env(safe-area-inset-top)+4.2rem))] sm:px-6">
+          <div
+            className="mx-auto w-full max-w-3xl rounded-3xl border border-white/15 bg-[#0a0d14]/95 p-4 sm:p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+            role="dialog"
+            aria-label="Greek study menu"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-200/75">
+                <Sparkles className="size-3.5" />
+                Study Menu
+              </p>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
+                aria-label="Close Greek study menu"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Chapter Lab</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {MORPH_PILOT_CHAPTERS.map((c, idx) => {
+                    const active = idx === pilotIdx
+                    return (
+                      <button
+                        key={`${c.bookSlug}-${c.chapter}`}
+                        type="button"
+                        onClick={() => selectPilot(idx)}
+                        className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                          active
+                            ? "border-emerald-300/45 bg-emerald-400/12 text-emerald-100"
+                            : "border-white/15 bg-white/[0.03] text-white/75 hover:bg-white/[0.08]"
+                        }`}
+                      >
+                        <p className="font-sans text-sm font-medium">{c.label}</p>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          {c.maxVerse} verses
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/15 bg-white/[0.03] p-3 sm:p-4">
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Jump to verse</p>
+                <div className="flex gap-2">
+                  <input
+                    value={verseDraft}
+                    onChange={(e) => setVerseDraft(e.target.value)}
+                    inputMode="numeric"
+                    className="flex-1 rounded-xl border border-white/15 bg-black/20 px-3 py-2 font-mono text-sm text-white placeholder:text-white/30 focus:border-emerald-300/50 focus:outline-none"
+                    placeholder={`1-${pilot.maxVerse}`}
+                    aria-label="Verse number"
+                  />
+                  <button
+                    type="button"
+                    onClick={jumpToVerse}
+                    className="rounded-xl border border-emerald-300/35 bg-emerald-400/15 px-4 font-mono text-xs uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25"
+                  >
+                    Go
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWordHintsEnabled((v) => !v)}
+                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-colors ${
+                    wordHintsEnabled
+                      ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
+                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {wordHintsEnabled ? "Hints: On" : "Hints: Off"}
+                </button>
+                <Link
+                  href={readerUrl}
+                  onClick={() => setMenuOpen(false)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
+                >
+                  Full Reader
+                  <ExternalLink className="size-3.5 opacity-70" />
+                </Link>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Close menu backdrop"
+            className="mt-3 h-[calc(100dvh-12rem)] w-full cursor-default"
+            onClick={() => setMenuOpen(false)}
+          />
+        </div>
+      ) : null}
 
       <div
         className="flex-1 min-h-0 flex flex-col items-stretch justify-center px-5 sm:px-10 md:px-16"
@@ -260,9 +372,17 @@ export function GreekOneVerseClient() {
         aria-label="Verse text. Swipe or use arrow keys to change verse."
       >
         <div className="w-full max-w-4xl mx-auto flex flex-col justify-center min-h-0 py-4 gap-8 sm:gap-10">
-          <p className="font-mono text-[11px] sm:text-xs tracking-[0.2em] text-amber-500/70 text-center uppercase shrink-0">
-            {passageRef.replace(":", " · ")}
-          </p>
+          <div className="space-y-2">
+            <p className="font-mono text-[11px] sm:text-xs tracking-[0.2em] text-emerald-300/70 text-center uppercase shrink-0">
+              {passageRef.replace(":", " · ")}
+            </p>
+            <div className="mx-auto h-1 w-full max-w-xs overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-gradient-to-r from-emerald-300/80 to-amber-300/80" style={{ width: verseProgress }} />
+            </div>
+            <p className="text-center font-mono text-[10px] tracking-[0.18em] uppercase text-white/35">
+              Verse {verse} of {pilot.maxVerse}
+            </p>
+          </div>
 
           {error ? (
             <p className="text-center text-red-300/90 text-sm font-sans">{error}</p>
@@ -314,7 +434,7 @@ export function GreekOneVerseClient() {
         </div>
       </div>
 
-      <footer className="shrink-0 border-t border-white/[0.06] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 bg-black/20">
+      <footer className="shrink-0 border-t border-white/[0.06] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 bg-black/25 backdrop-blur-lg">
         <div className="flex items-stretch gap-3 justify-center max-w-lg mx-auto">
           <button
             type="button"
