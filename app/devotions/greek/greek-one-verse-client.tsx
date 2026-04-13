@@ -960,82 +960,83 @@ export function GreekOneVerseClient() {
                 </div>
               ) : null}
 
-              <div className="mt-3 rounded-xl border border-emerald-300/25 bg-emerald-400/[0.07] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200/80">
-                    AI Greek Coach
-                  </p>
+              <div className="mt-3 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-3 sm:p-4 shadow-[0_10px_30px_rgba(16,185,129,0.12)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach</p>
+                    <p className="mt-0.5 text-xs text-white/65">Ask about this exact form in this exact line.</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => void runAiCoach()}
                     disabled={coachLoading}
-                    className="rounded-full border border-emerald-300/40 bg-emerald-400/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
+                    className="rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
                   >
                     {coachLoading ? "Thinking..." : "Coach me"}
                   </button>
                 </div>
 
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    value={coachQuestion}
-                    onChange={(e) => setCoachQuestion(e.target.value)}
-                    placeholder="Ask about this word in context..."
-                    className="flex-1 rounded-xl border border-emerald-300/30 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/55 focus:outline-none"
-                    aria-label="Ask AI Greek coach a question"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void runAiCoach()}
-                    disabled={coachLoading}
-                    className="rounded-xl border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
-                  >
-                    Ask
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCoachQuestion(defaultCoachQuestion)
-                    void runAiCoach(defaultCoachQuestion)
-                  }}
-                  disabled={coachLoading}
-                  className="mt-2 rounded-full border border-emerald-300/30 bg-black/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100/85 hover:bg-black/30 disabled:opacity-60"
-                >
-                  Try: {defaultCoachQuestion}
-                </button>
-
-                {coachError ? <p className="mt-2 text-xs text-red-300/90">{coachError}</p> : null}
-                {coachPayload ? (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-sm leading-relaxed text-white/90">{coachPayload.insight}</p>
-                    <p className="text-xs leading-relaxed text-emerald-100/90">{coachPayload.prayerPrompt}</p>
-                  </div>
-                ) : !coachLoading && !coachError ? (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-xs text-white/60">Ask anything about this exact form in this verse.</p>
-                    <div className="flex gap-2">
-                      <input
-                        value={coachQuestion}
-                        onChange={(e) => setCoachQuestion(e.target.value)}
-                        placeholder="e.g. What is the article doing here?"
-                        className="flex-1 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-xs text-white placeholder:text-white/35 focus:border-emerald-300/50 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => runAiCoach(coachQuestion)}
-                        className="rounded-lg border border-emerald-300/45 bg-emerald-400/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-100 hover:bg-emerald-400/30"
-                      >
-                        Ask
-                      </button>
-                    </div>
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={coachQuestion}
+                      onChange={(e) => setCoachQuestion(e.target.value)}
+                      placeholder="Ask a Greek question in plain English..."
+                      className="flex-1 rounded-xl border border-emerald-300/35 bg-black/35 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/60 focus:outline-none"
+                      aria-label="Ask AI Greek coach a question"
+                    />
                     <button
                       type="button"
-                      onClick={() => runAiCoach("What is the article doing here?")}
-                      className="text-left text-[11px] text-emerald-100/90 underline decoration-dotted underline-offset-2 hover:text-emerald-50"
+                      onClick={() => void runAiCoach()}
+                      disabled={coachLoading}
+                      className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
                     >
-                      Quick: What is the article doing here?
+                      Ask
                     </button>
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoachQuestion(defaultCoachQuestion)
+                        void runAiCoach(defaultCoachQuestion)
+                      }}
+                      disabled={coachLoading}
+                      className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+                    >
+                      {defaultCoachQuestion}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoachQuestion("What role does this word play in the sentence?")
+                        void runAiCoach("What role does this word play in the sentence?")
+                      }}
+                      disabled={coachLoading}
+                      className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+                    >
+                      What role is this word playing?
+                    </button>
+                  </div>
+                </div>
+
+                {coachError ? (
+                  <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
+                ) : null}
+                {coachPayload ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 space-y-2 rounded-xl border border-emerald-200/25 bg-black/25 p-3"
+                  >
+                    <p className="text-sm leading-relaxed text-white/92">{coachPayload.insight}</p>
+                    <p className="text-xs leading-relaxed text-emerald-100/95">{coachPayload.prayerPrompt}</p>
+                  </motion.div>
+                ) : !coachLoading && !coachError ? (
+                  <p className="mt-3 text-xs text-white/62 leading-relaxed">
+                    Tip: ask concrete questions like <span className="text-white/78">“Why dative?”</span> or{" "}
+                    <span className="text-white/78">“What is this article doing?”</span>
+                  </p>
                 ) : null}
               </div>
               </div>
