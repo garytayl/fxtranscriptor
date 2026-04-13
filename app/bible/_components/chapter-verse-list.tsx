@@ -17,7 +17,7 @@ type ChapterVerseListProps = {
   strongsWordsByVerse?: Record<number, StrongsWordAndCode[]>
   /** Called when a word with Strong's is clicked (e.g. to show in sidebar). */
   onSelectStrongs?: (code: string) => void
-  /** Greek morph tokens per verse (MorphGNT pilot chapters). */
+  /** Greek morph tokens per verse (MorphGNT chapters). */
   greekMorphByVerse?: Record<number, GreekMorphToken[]>
   /** Current sidebar selection (highlights Greek word). */
   studySelection?: ChapterStudySelection

@@ -33,6 +33,12 @@ import {
   type GreekProgressSnapshot,
 } from "@/lib/devotions-greek-progress"
 import {
+  buildWeakWordSet,
+  getGreekWordMemory,
+  recordGreekWordMemoryTap,
+  type GreekWordMemoryEntry,
+} from "@/lib/devotions-greek-word-memory"
+import {
   MORPH_PILOT_CHAPTERS,
   morphPilotPassageRef,
   morphPilotReaderUrl,
@@ -51,6 +57,7 @@ const VERSE_XP = 8
 const WORD_XP = 12
 const COACH_XP = 20
 const COACH_HISTORY_LIMIT = 6
+const MICRO_WIN_STREAK_TARGET = 3
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
@@ -100,7 +107,7 @@ function stripHtmlTags(s: string): string {
 }
 
 export function GreekOneVerseClient() {
-  const [page, setPage] = useState<GreekStudioPage>("xp-home")
+  const [page, setPage] = useState<GreekStudioPage>("study")
   const [pilotIdx, setPilotIdx] = useState(0)
   const [verse, setVerse] = useState(1)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -122,6 +129,12 @@ export function GreekOneVerseClient() {
   const [coachQuestion, setCoachQuestion] = useState("")
   const [coachHistory, setCoachHistory] = useState<CoachHistoryItem[]>([])
   const [coachCopied, setCoachCopied] = useState(false)
+  const [wordMemory, setWordMemory] = useState<Record<string, GreekWordMemoryEntry>>(() =>
+    getGreekWordMemory(),
+  )
+  const [reviewMode, setReviewMode] = useState(false)
+  const [microWinCount, setMicroWinCount] = useState(0)
+  const [microWinBurst, setMicroWinBurst] = useState<string | null>(null)
   const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
     getGreekProgressSnapshot(getGreekStudyProgress()),
   )
@@ -155,6 +168,15 @@ export function GreekOneVerseClient() {
     [selectedRolodexChapter.maxVerse],
   )
   const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
+  const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 8), [wordMemory])
+  const weakWordsInVerse = useMemo(
+    () =>
+      greekTokens.reduce((acc, tok) => {
+        const key = `${tok.lemma}|${tok.parse}`
+        return weakWordSet.has(key) ? acc + 1 : acc
+      }, 0),
+    [greekTokens, weakWordSet],
+  )
 
   const verseSwipeStartX = useRef<number | null>(null)
   const verseSwipeStartY = useRef<number | null>(null)
@@ -171,6 +193,10 @@ export function GreekOneVerseClient() {
 
   const refreshProgress = useCallback(() => {
     setProgress(getGreekProgressSnapshot(getGreekStudyProgress()))
+  }, [])
+
+  const refreshWordMemory = useCallback(() => {
+    setWordMemory(getGreekWordMemory())
   }, [])
 
   const awardProgress = useCallback(
@@ -206,16 +232,25 @@ export function GreekOneVerseClient() {
       if (!e.key || e.key === "fx_devotions_greek_v1_progress") {
         refreshProgress()
       }
+      if (!e.key || e.key === "fx_devotions_greek_v1_word_memory") {
+        refreshWordMemory()
+      }
     }
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
-  }, [refreshProgress])
+  }, [refreshProgress, refreshWordMemory])
 
   useEffect(() => {
     if (xpBurst == null) return
     const t = window.setTimeout(() => setXpBurst(null), 1300)
     return () => window.clearTimeout(t)
   }, [xpBurst])
+
+  useEffect(() => {
+    if (!microWinBurst) return
+    const t = window.setTimeout(() => setMicroWinBurst(null), 1500)
+    return () => window.clearTimeout(t)
+  }, [microWinBurst])
 
   useEffect(() => {
     if (!hydrated) return
@@ -233,7 +268,6 @@ export function GreekOneVerseClient() {
     if (initializedDailySession.current) return
     initializedDailySession.current = true
     awardProgress({ kind: "session", key: "daily-open", xp: SESSION_XP })
-    setPage("xp-home")
   }, [hydrated, awardProgress])
 
   useEffect(() => {
@@ -356,14 +390,43 @@ export function GreekOneVerseClient() {
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
 
-  const startStudyFromXp = useCallback(() => {
-    applyRolodexSelection()
-    setPage("study")
-  }, [applyRolodexSelection])
-
   const handleSelectGreekWord = useCallback((wordIndex: number) => {
-    setSelectedWordIndex((prev) => (prev === wordIndex ? null : wordIndex))
-  }, [])
+    const token = greekTokens[wordIndex]
+    if (!token) return
+    const wordFormKey = `${token.lemma}|${token.parse}`
+    const { memory, status } = recordGreekWordMemoryTap(wordFormKey)
+    setWordMemory(memory)
+    if (status === "recognized") {
+      setMicroWinBurst("You recognized this form")
+      setMicroWinCount((prev) => prev + 1)
+    } else if (status === "new") {
+      setMicroWinBurst("New form logged")
+    }
+    setSelectedWordIndex(wordIndex)
+  }, [greekTokens])
+
+  const jumpToWeakWordVerse = useCallback(() => {
+    if (!reviewMode || greekTokens.length === 0) return
+    const weakIndex = greekTokens.findIndex((tok) => weakWordSet.has(`${tok.lemma}|${tok.parse}`))
+    if (weakIndex >= 0) {
+      setSelectedWordIndex(weakIndex)
+      return
+    }
+    if (weakWordSet.size > 0) {
+      nextVerse()
+    }
+  }, [reviewMode, greekTokens, weakWordSet, nextVerse])
+
+  useEffect(() => {
+    if (microWinCount > 0 && microWinCount % MICRO_WIN_STREAK_TARGET === 0) {
+      setMicroWinBurst("You are improving")
+    }
+  }, [microWinCount])
+
+  useEffect(() => {
+    if (!reviewMode) return
+    jumpToWeakWordVerse()
+  }, [reviewMode, pilotIdx, verse, jumpToWeakWordVerse])
 
   const onVerseTouchStart = useCallback((e: TouchEvent) => {
     verseSwipeStartX.current = e.changedTouches[0]?.clientX ?? null
@@ -691,7 +754,7 @@ export function GreekOneVerseClient() {
           </Link>
           <div className="text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">Greek Studio</p>
-            <p className="text-sm text-white/80">{page === "study" ? pilot.label : "XP Home"}</p>
+            <p className="text-sm text-white/80">{page === "study" ? pilot.label : "Progress"}</p>
           </div>
           <button
             type="button"
@@ -719,8 +782,8 @@ export function GreekOneVerseClient() {
           <div className="mx-auto flex max-w-5xl items-center gap-2">
             {(
               [
-                ["xp-home", "XP"],
                 ["study", "Study"],
+                ["xp-home", "XP"],
                 ["progress", "Progress"],
               ] as const
             ).map(([value, label]) => {
@@ -754,6 +817,20 @@ export function GreekOneVerseClient() {
             className="pointer-events-none absolute right-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-emerald-300/50 bg-emerald-400/25 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,0.35)]"
           >
             +{xpBurst} XP
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {microWinBurst ? (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.94 }}
+            transition={{ duration: 0.24 }}
+            className="pointer-events-none absolute left-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-cyan-300/50 bg-cyan-400/20 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-50"
+          >
+            {microWinBurst}
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -882,6 +959,17 @@ export function GreekOneVerseClient() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => setReviewMode((v) => !v)}
+                  className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                    reviewMode
+                      ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
+                      : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {reviewMode ? "Review On" : "Review Weak"}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setWordHintsEnabled((v) => !v)}
                   className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                     wordHintsEnabled
@@ -995,9 +1083,7 @@ export function GreekOneVerseClient() {
                 </div>
               </div>
 
-              <p className="text-[11px] text-white/55">
-                Start on XP, pick your target passage, then enter Study.
-              </p>
+              <p className="text-[11px] text-white/55">Micro wins: repeated taps are tracked and weak forms surface in review mode.</p>
               <div className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
                 <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Choose passage</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -1070,16 +1156,35 @@ export function GreekOneVerseClient() {
               </div>
               <button
                 type="button"
-                onClick={startStudyFromXp}
+                onClick={jumpToRolodex}
                 className="w-full rounded-xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100 hover:bg-emerald-400/25 sm:w-auto"
               >
-                Enter study
+                Jump to verse
               </button>
             </motion.section>
           ) : null}
 
           {page === "study" ? (
             <>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
+                <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1">
+                  Known forms {Object.keys(wordMemory).length}
+                </span>
+                <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1">
+                  Weak in verse {weakWordsInVerse}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setReviewMode((v) => !v)}
+                  className={`rounded-full border px-2.5 py-1 ${
+                    reviewMode
+                      ? "border-cyan-300/50 bg-cyan-300/20 text-cyan-100"
+                      : "border-white/20 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                  }`}
+                >
+                  {reviewMode ? "Reviewing weak words" : "Start review mode"}
+                </button>
+              </div>
               <div className="space-y-2 text-center">
                 <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-300/75">
                   {passageRef.replace(":", " · ")}
@@ -1125,6 +1230,11 @@ export function GreekOneVerseClient() {
                       {greekTokens.map((tok, wi) => {
                         const selected = selectedWordIndex === wi
                         const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
+                        const wordFormKey = `${tok.lemma}|${tok.parse}`
+                        const memoryEntry = wordMemory[wordFormKey]
+                        const knownWord = Boolean(memoryEntry)
+                        const weakWord = weakWordSet.has(wordFormKey)
+                        const repeatedWord = (memoryEntry?.taps ?? 0) >= 2
                         return (
                           <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
                             <button
@@ -1133,11 +1243,18 @@ export function GreekOneVerseClient() {
                               className={
                                 selected
                                   ? "border-b-2 border-amber-300/85 text-amber-200"
+                                  : weakWord
+                                    ? "border-b border-dashed border-cyan-300/70 text-cyan-100 hover:border-cyan-200 hover:text-cyan-50"
+                                    : knownWord
+                                      ? "border-b border-dashed border-emerald-300/60 text-emerald-100 hover:border-emerald-200 hover:text-emerald-50"
                                   : "border-b border-dashed border-amber-300/35 text-amber-100/95 hover:border-amber-300/70 hover:text-amber-50"
                               }
                             >
                               {tok.word}
                             </button>
+                            {repeatedWord ? (
+                              <span className="mt-0.5 font-mono text-[8px] sm:text-[9px] text-emerald-300/70">seen</span>
+                            ) : null}
                             {hint ? (
                               <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
                             ) : null}
