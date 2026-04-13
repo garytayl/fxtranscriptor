@@ -11,6 +11,7 @@ import { ScrollToVerse } from "@/app/bible/_components/scroll-to-verse"
 import { TranslationSettings } from "@/app/bible/_components/translation-settings"
 import { ChapterWordStudy } from "@/app/bible/_components/chapter-word-study"
 import { ChapterVerseList } from "@/app/bible/_components/chapter-verse-list"
+import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
 import { LexiconCacheProvider } from "@/app/bible/_components/lexicon-cache-context"
 import {
   ChapterStudySidebar,
@@ -197,10 +198,14 @@ function ChapterBody({
   onSelectStrongs,
   studySelection,
   onSelectGreekMorph,
+  greekWordHints,
+  onToggleGreekWordHints,
 }: BibleChapterShellProps & {
   onSelectStrongs?: (code: string) => void
   studySelection?: ChapterStudySelection
   onSelectGreekMorph?: (verseNumber: number, wordIndex: number) => void
+  greekWordHints?: boolean
+  onToggleGreekWordHints?: () => void
 }) {
   const hasStrongsForChapter =
     kjvWordStudyEnabled && Object.values(strongsWordsByVerse).some((pairs) => pairs.length > 0)
@@ -254,12 +259,11 @@ function ChapterBody({
         </p>
       )}
 
-      {hasGreekMorph && verses.length > 0 && (
-        <p className="text-[11px] sm:text-xs leading-relaxed text-muted-foreground border border-amber-500/25 bg-amber-500/5 rounded-md px-3 py-2">
-          <span className="text-foreground/90 font-medium">Greek grammar (pilot):</span> the line under each verse is
-          the Greek text (SBL) in sentence order. Tap a word for parsing and short grammar notes. This is separate from
-          KJV Strong&apos;s alignment (English word order).
-        </p>
+      {hasGreekMorph && verses.length > 0 && onToggleGreekWordHints && (
+        <GreekGrammarPrimer
+          wordHintsEnabled={greekWordHints ?? false}
+          onToggleWordHints={onToggleGreekWordHints}
+        />
       )}
 
       {kjvWordStudyEnabled && hasStrongsForChapter && verses.length > 0 && (
@@ -287,6 +291,7 @@ function ChapterBody({
           greekMorphByVerse={greekMorphByVerse}
           studySelection={studySelection}
           onSelectGreekMorph={onSelectGreekMorph}
+          greekWordHints={greekWordHints}
           footnotes={footnotes}
         />
       )}
@@ -325,6 +330,7 @@ export function BibleChapterShell(props: BibleChapterShellProps) {
 
   const [selection, setSelection] = useState<ChapterStudySelection>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [greekWordHints, setGreekWordHints] = useState(false)
 
   const hasStrongsForChapter =
     kjvWordStudyEnabled && Object.values(strongsWordsByVerse).some((pairs) => pairs.length > 0)
@@ -355,6 +361,10 @@ export function BibleChapterShell(props: BibleChapterShellProps) {
             onSelectStrongs={kjvWordStudyEnabled ? onSelectStrongs : undefined}
             studySelection={selection}
             onSelectGreekMorph={hasGreekMorph ? onSelectGreekMorph : undefined}
+            greekWordHints={greekWordHints}
+            onToggleGreekWordHints={
+              hasGreekMorph ? () => setGreekWordHints((v) => !v) : undefined
+            }
           />
         </div>
 

@@ -14,6 +14,8 @@ describe("expandGreekMorphToken", () => {
     expect(out.parseSummary).toContain("imperfect")
     expect(out.parseSummary).toContain("indicative")
     expect(out.parseSummary).toContain("singular")
+    expect(out.plainEnglishLead.length).toBeGreaterThan(10)
+    expect(out.learningSections.length).toBeGreaterThan(0)
   })
 
   it("expands nominative noun", () => {
@@ -49,5 +51,6 @@ describe("expandGreekMorphToken", () => {
     })
     expect(out.parseSummary).toContain("participle")
     expect(out.parseSummary).toContain("nominative")
+    expect(out.learningSections.some((s) => /participle/i.test(s.title))).toBe(true)
   })
 })

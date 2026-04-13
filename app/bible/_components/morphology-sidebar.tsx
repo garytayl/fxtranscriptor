@@ -38,8 +38,8 @@ export function MorphologySidebarPanel({
           exit={{ opacity: 0 }}
           className="font-sans text-sm text-white/40 italic"
         >
-          Tap a Greek word in the line below the verse (John 1 pilot) to see its form, parsing, and short grammar
-          notes.
+          Open the <span className="text-white/50 not-italic">Learn Greek as you read</span> panel above, then tap any word
+          in the Greek line for tenses, moods, participles, and cases.
         </motion.p>
       ) : expanded ? (
         <motion.div
@@ -65,13 +65,32 @@ export function MorphologySidebarPanel({
             <p className="text-[10px] uppercase tracking-wider text-white/45">Category</p>
             <p className="text-sm text-white/90">{expanded.posLabel}</p>
           </div>
+          <div className="rounded-md bg-white/5 border border-white/10 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wider text-amber-200/70 mb-1">Read this first</p>
+            <p className="text-sm text-white/92 leading-snug">{expanded.plainEnglishLead}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-white/45">Morphology tag (MorphGNT)</p>
+            <p className="font-mono text-[11px] text-white/55 break-all">{token.parse}</p>
+          </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-white/45">Parsing</p>
             <p className="text-sm text-white/90">{expanded.parseSummary}</p>
           </div>
+          {expanded.learningSections.length > 0 && (
+            <div className="space-y-3 border-t border-white/10 pt-3">
+              <p className="text-[10px] uppercase tracking-wider text-amber-200/60">Mini-lesson</p>
+              {expanded.learningSections.map((sec, i) => (
+                <div key={i} className="space-y-1">
+                  <p className="text-xs font-semibold text-white/95">{sec.title}</p>
+                  <p className="text-xs text-white/75 leading-relaxed">{sec.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
           {expanded.grammarCards.length > 0 && (
             <div className="space-y-2 border-t border-white/10 pt-3">
-              <p className="text-[10px] uppercase tracking-wider text-white/45">Grammar notes</p>
+              <p className="text-[10px] uppercase tracking-wider text-white/45">Extra notes</p>
               <ul className="list-disc pl-4 space-y-2 text-xs text-white/75 leading-relaxed">
                 {expanded.grammarCards.map((line, i) => (
                   <li key={i}>{line}</li>

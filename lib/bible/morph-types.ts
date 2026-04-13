@@ -20,4 +20,8 @@ export type GreekMorphExpanded = {
   parseSummary: string
   /** Short teaching notes keyed off labels (not raw codes) */
   grammarCards: string[]
+  /** One-sentence orientation for learners */
+  plainEnglishLead: string
+  /** Short titled sections (tense, participle, mood, case…) */
+  learningSections: { title: string; body: string }[]
 }

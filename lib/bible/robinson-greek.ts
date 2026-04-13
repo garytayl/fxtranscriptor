@@ -5,6 +5,7 @@
 
 import type { GreekMorphExpanded, GreekMorphToken } from "@/lib/bible/morph-types"
 import { grammarCardsForGreekExpanded } from "@/lib/bible/grammar-cards-greek"
+import { buildGreekLearningSections, buildGreekPlainEnglishLead } from "@/lib/bible/greek-grammar-learning"
 
 const POS_NAMES: Record<string, string> = {
   "A-": "Adjective",
@@ -159,17 +160,26 @@ function expandNominal(pos: string, p: string): { summary: string; cards: Return
   }
 }
 
+function finishExpanded(token: GreekMorphToken, partial: Omit<GreekMorphExpanded, "plainEnglishLead" | "learningSections">): GreekMorphExpanded {
+  const parseSummary = partial.parseSummary
+  return {
+    ...partial,
+    plainEnglishLead: buildGreekPlainEnglishLead(token, parseSummary),
+    learningSections: buildGreekLearningSections(token),
+  }
+}
+
 export function expandGreekMorphToken(token: GreekMorphToken): GreekMorphExpanded {
   const pos = token.pos.trim()
   const parseRaw = token.parse.trim()
   const posLabel = POS_NAMES[pos] ?? (pos.replace(/-/g, "").trim() || "Word")
 
   if (!parseRaw || isUnderspecified(parseRaw)) {
-    return {
+    return finishExpanded(token, {
       posLabel,
       parseSummary: "Form is indeclinable here (no case/tense parse).",
       grammarCards: [],
-    }
+    })
   }
 
   const p = normParse(parseRaw)
@@ -178,28 +188,28 @@ export function expandGreekMorphToken(token: GreekMorphToken): GreekMorphExpande
     const moodChar = p[3]
     if (moodChar === "P") {
       const { summary, cards } = expandVerbParticiple(p)
-      return { posLabel, parseSummary: summary, grammarCards: [...new Set(cards)] }
+      return finishExpanded(token, { posLabel, parseSummary: summary, grammarCards: [...new Set(cards)] })
     }
     if (moodChar === "N") {
       const { summary, cards } = expandVerbInfinitive(p)
-      return { posLabel, parseSummary: summary, grammarCards: [...new Set(cards)] }
+      return finishExpanded(token, { posLabel, parseSummary: summary, grammarCards: [...new Set(cards)] })
     }
     const { summary, cards } = expandVerbFinite(p)
-    return { posLabel, parseSummary: summary, grammarCards: [...new Set(cards)] }
+    return finishExpanded(token, { posLabel, parseSummary: summary, grammarCards: [...new Set(cards)] })
   }
 
   if (pos === "A-" || pos === "N-" || pos.startsWith("R") || pos === "RA") {
     const { summary, cards } = expandNominal(pos, p)
-    return {
+    return finishExpanded(token, {
       posLabel,
       parseSummary: summary || "See lemma and context.",
       grammarCards: [...new Set(cards)],
-    }
+    })
   }
 
-  return {
+  return finishExpanded(token, {
     posLabel,
     parseSummary: parseRaw,
     grammarCards: [],
-  }
+  })
 }

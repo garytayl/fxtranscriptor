@@ -22,6 +22,8 @@ type ChapterVerseListProps = {
   /** Current sidebar selection (highlights Greek word). */
   studySelection?: ChapterStudySelection
   onSelectGreekMorph?: (verseNumber: number, wordIndex: number) => void
+  /** Show terse morph codes under Greek words */
+  greekWordHints?: boolean
   /** Footnote by verse and marker; may include kind/target for cross-ref links. */
   footnotes?: {
     verseNumber: number
@@ -60,6 +62,7 @@ export function ChapterVerseList({
   greekMorphByVerse = {},
   studySelection,
   onSelectGreekMorph,
+  greekWordHints = false,
   footnotes,
 }: ChapterVerseListProps) {
   const footnotesByVerse = footnotes ? buildFootnotesByVerse(footnotes) : {}
@@ -107,6 +110,7 @@ export function ChapterVerseList({
                 tokens={greekTokens}
                 selectedIndex={greekSel}
                 onSelect={onSelectGreekMorph}
+                wordHintsEnabled={greekWordHints}
               />
             ) : null}
           </li>
