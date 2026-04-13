@@ -1,23 +1,151 @@
 "use client"
 
-import { BookOpen, GraduationCap } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { BookOpen, ChevronDown, ChevronUp, GraduationCap } from "lucide-react"
+
+const STORAGE_VISITS = "fx_greek_primer_visit_count_v1"
+const STORAGE_USER_COLLAPSED = "fx_greek_primer_user_collapsed_v1"
+const AUTO_COLLAPSE_AFTER_VISITS = 3
+
+/** Avoid double-counting when React Strict Mode runs effects twice in development. */
+let primerVisitBumpAt = 0
 
 /**
  * Visible "start here" grammar intro for NT MorphGNT chapters.
+ * With `persistBehavior="devotions"`, visit count and manual minimize are remembered;
+ * after three visits the primer defaults to minimized until expanded.
  */
 export function GreekGrammarPrimer({
   wordHintsEnabled,
   onToggleWordHints,
+  persistBehavior = "none",
+  className,
 }: {
   wordHintsEnabled: boolean
   onToggleWordHints: () => void
+  persistBehavior?: "none" | "devotions"
+  /** Merged onto the root (e.g. dark devotions theme overrides). */
+  className?: string
 }) {
+  const [hydrated, setHydrated] = useState(false)
+  const [expanded, setExpanded] = useState(true)
+
+  useEffect(() => {
+    if (persistBehavior !== "devotions" || typeof window === "undefined") {
+      setHydrated(true)
+      return
+    }
+    try {
+      const visits = Math.min(
+        999,
+        Math.max(0, Number.parseInt(window.localStorage.getItem(STORAGE_VISITS) ?? "0", 10) || 0),
+      )
+      const userCollapsed = window.localStorage.getItem(STORAGE_USER_COLLAPSED)
+      let startExpanded = true
+      if (userCollapsed === "1") startExpanded = false
+      else if (userCollapsed === "0") startExpanded = true
+      else startExpanded = visits < AUTO_COLLAPSE_AFTER_VISITS
+
+      setExpanded(startExpanded)
+
+      const now = Date.now()
+      const duplicateEffect = now - primerVisitBumpAt < 750
+      if (!duplicateEffect) {
+        primerVisitBumpAt = now
+        window.localStorage.setItem(STORAGE_VISITS, String(visits + 1))
+      }
+    } catch {
+      setExpanded(true)
+    }
+    setHydrated(true)
+  }, [persistBehavior])
+
+  const setUserCollapsedPref = useCallback((collapsed: boolean) => {
+    try {
+      window.localStorage.setItem(STORAGE_USER_COLLAPSED, collapsed ? "1" : "0")
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const openPrimer = useCallback(() => {
+    setExpanded(true)
+    setUserCollapsedPref(false)
+  }, [setUserCollapsedPref])
+
+  const minimizePrimer = useCallback(() => {
+    setExpanded(false)
+    setUserCollapsedPref(true)
+  }, [setUserCollapsedPref])
+
+  const rootClass = [
+    "rounded-lg border border-amber-500/35 bg-gradient-to-b from-amber-500/10 to-background overflow-hidden",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+
+  const hintsButton = (
+    <button
+      type="button"
+      onClick={onToggleWordHints}
+      className={`text-[11px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-md border transition-colors shrink-0 ${
+        wordHintsEnabled
+          ? "border-amber-500/60 bg-amber-500/15 text-foreground"
+          : "border-border bg-card/80 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {wordHintsEnabled ? "Hide word hints" : "Show word hints"}
+    </button>
+  )
+
+  if (persistBehavior === "devotions" && hydrated && !expanded) {
+    return (
+      <div className={rootClass}>
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4 border-b border-amber-500/20 bg-muted/15">
+          <GraduationCap className="size-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden />
+          <p className="text-xs font-medium text-foreground flex-1 min-w-[12rem]">Learn Greek as you read</p>
+          {hintsButton}
+          <button
+            type="button"
+            onClick={openPrimer}
+            className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-amber-500/45 text-amber-800 dark:text-amber-200 hover:bg-amber-500/15 shrink-0"
+          >
+            Expand
+            <ChevronDown className="size-3.5" aria-hidden />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (persistBehavior === "devotions" && !hydrated) {
+    return (
+      <div className={rootClass} aria-hidden>
+        <div className="h-12 animate-pulse bg-muted/30 border-b border-amber-500/20" />
+      </div>
+    )
+  }
+
   return (
-    <div className="rounded-lg border border-amber-500/35 bg-gradient-to-b from-amber-500/10 to-background overflow-hidden">
-      <div className="flex items-start gap-3 px-3 py-3 sm:px-4 sm:py-3.5 border-b border-amber-500/20">
+    <div className={rootClass}>
+      <div className="flex items-start gap-2 px-3 py-3 sm:px-4 sm:py-3.5 border-b border-amber-500/20">
         <GraduationCap className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden />
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold text-foreground tracking-tight">Learn Greek as you read</p>
+        <div className="min-w-0 space-y-1 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground tracking-tight">Learn Greek as you read</p>
+            {persistBehavior === "devotions" ? (
+              <button
+                type="button"
+                onClick={minimizePrimer}
+                className="inline-flex items-center gap-1 shrink-0 text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border border-amber-500/35 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                aria-label="Minimize grammar note"
+              >
+                <ChevronUp className="size-3.5" aria-hidden />
+                Minimize
+              </button>
+            ) : null}
+          </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             Tap any word in the gold Greek line for a full breakdown. Use the primer below for tenses, moods,
             participles, and cases, then jump back into your chapter and tap words in context.
@@ -26,17 +154,7 @@ export function GreekGrammarPrimer({
       </div>
 
       <div className="px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/20">
-        <button
-          type="button"
-          onClick={onToggleWordHints}
-          className={`text-[11px] font-mono uppercase tracking-wider px-2.5 py-1.5 rounded-md border transition-colors ${
-            wordHintsEnabled
-              ? "border-amber-500/60 bg-amber-500/15 text-foreground"
-              : "border-border bg-card/80 text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {wordHintsEnabled ? "Hide word hints" : "Show word hints"}
-        </button>
+        {hintsButton}
         <span className="text-[10px] text-muted-foreground">
           Tiny codes under each Greek word (e.g. aor.act.ind, pres.mid.ptc·nom).
         </span>

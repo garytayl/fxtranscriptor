@@ -431,9 +431,12 @@ export function GreekGrammarReaderClient() {
         onTouchEnd={onVerseTouchEnd}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-          <div className="rounded-xl border border-amber-500/25 bg-black/20 p-3 sm:p-4 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white">
-            <GreekGrammarPrimer wordHintsEnabled={wordHintsEnabled} onToggleWordHints={() => setWordHintsEnabled((v) => !v)} />
-          </div>
+          <GreekGrammarPrimer
+            persistBehavior="devotions"
+            className="rounded-xl border border-amber-500/25 bg-black/20 p-3 sm:p-4 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white"
+            wordHintsEnabled={wordHintsEnabled}
+            onToggleWordHints={() => setWordHintsEnabled((v) => !v)}
+          />
 
           <div className="space-y-2 text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-amber-300/75">{passageRef.replace(":", " · ")}</p>
