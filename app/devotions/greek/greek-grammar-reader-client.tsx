@@ -5,10 +5,12 @@ import Link from "next/link"
 import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, Menu, Sparkles, X } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
-import { GreekAiCoachBlock } from "@/app/devotions/greek/greek-ai-coach-block"
+import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
 import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
+import { buildGreekWordLearningClues } from "@/lib/bible/greek-word-learning-clues"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
+import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
 
 import {
@@ -67,6 +69,10 @@ export function GreekGrammarReaderClient() {
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
   const closeDetails = useCallback(() => setSelectedWordIndex(null), [])
+
+  const awardCoachProgress = useCallback((event: Parameters<typeof recordGreekStudyEvent>[0]) => {
+    return recordGreekStudyEvent(event).awardedXp
+  }, [])
 
   useEffect(() => {
     if (selectedWordIndex == null) setDetailDragOffsetY(0)
@@ -221,7 +227,7 @@ export function GreekGrammarReaderClient() {
 
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
-      <header className="shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
+      <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
           <Link
             href="/devotions"
@@ -262,7 +268,7 @@ export function GreekGrammarReaderClient() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-[70] bg-black/65 px-3 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.35rem))] backdrop-blur-sm sm:px-6"
+            className="absolute inset-0 z-[78] bg-black/65 px-3 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.35rem))] backdrop-blur-sm sm:px-6"
             onClick={closeMenu}
           >
             <motion.div
@@ -586,18 +592,17 @@ export function GreekGrammarReaderClient() {
                   </button>
                 </div>
 
-                {selectedWordIndex != null ? (
-                  <GreekAiCoachBlock
-                    key={`${levelKey}-coach-${selectedWordIndex}`}
-                    passageRef={passageRef}
-                    levelKey={levelKey}
-                    wordIndex={selectedWordIndex}
-                    english={english}
-                    verseGreekLine={verseGreekLine}
-                    token={selectedToken}
-                    variant="amber"
-                  />
-                ) : null}
+                <GreekCoachLab
+                  key={`${levelKey}-lab-${selectedWordIndex}`}
+                  levelKey={levelKey}
+                  passageRef={passageRef}
+                  english={english}
+                  verseGreekLine={verseGreekLine}
+                  selectedToken={selectedToken}
+                  wordIndex={selectedWordIndex ?? 0}
+                  learningClues={buildGreekWordLearningClues(selectedToken)}
+                  awardProgress={awardCoachProgress}
+                />
 
                 <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
               </div>
@@ -606,7 +611,7 @@ export function GreekGrammarReaderClient() {
         ) : null}
       </AnimatePresence>
 
-      <footer className="shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+      <footer className="relative z-[72] shrink-0 border-t border-white/10 bg-black/30 backdrop-blur-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
         <div className="mx-auto flex max-w-lg gap-3">
           <button
             type="button"
