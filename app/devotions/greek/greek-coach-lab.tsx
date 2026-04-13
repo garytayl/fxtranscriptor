@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import clsx from "clsx"
 import { Copy, Lightbulb, RefreshCw, Sparkles, Trash2 } from "lucide-react"
 import { motion } from "framer-motion"
 
@@ -52,6 +53,7 @@ export function GreekCoachLab({
   wordIndex,
   learningClues,
   awardProgress,
+  className,
 }: {
   levelKey: string
   passageRef: string
@@ -62,6 +64,8 @@ export function GreekCoachLab({
   learningClues: GreekWordLearningClues | null
   /** Returns awarded XP for this event (0 if duplicate key today). */
   awardProgress: (event: GreekProgressEvent) => number
+  /** Extra classes on the outer card (e.g. top margin when below morphology). */
+  className?: string
 }) {
   const [coachLoading, setCoachLoading] = useState(false)
   const [coachError, setCoachError] = useState<string | null>(null)
@@ -220,31 +224,36 @@ export function GreekCoachLab({
   }, [])
 
   return (
-    <div className="mt-2 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-3 shadow-[0_10px_30px_rgba(16,185,129,0.12)]">
+    <div
+      className={clsx(
+        "flex flex-col gap-5 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-4 shadow-[0_10px_30px_rgba(16,185,129,0.12)]",
+        className,
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach Lab</p>
-          <p className="mt-0.5 text-xs text-white/65">Quick actions, follow-up prompts, and re-ask history.</p>
+          <p className="mt-1 text-xs leading-relaxed text-white/65">Quick actions, follow-up prompts, and re-ask history.</p>
         </div>
         <button
           type="button"
           onClick={() => handleAskCoach()}
           disabled={!coachCanAsk}
-          className="inline-flex items-center gap-1 rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
         >
           <Lightbulb className="size-3.5" />
           {coachLoading ? "Thinking..." : "Coach me"}
         </button>
       </div>
 
-      <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-2.5">
+      <div className="rounded-xl border border-white/15 bg-black/25 p-3">
         <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Current focus</p>
-        <p className="mt-1 text-xs text-white/82">
+        <p className="mt-1.5 text-xs leading-relaxed text-white/82">
           {selectedToken.word} ({selectedToken.lemma}) — {coachMicroFocus}
         </p>
       </div>
 
-      <div className="mt-3 space-y-2">
+      <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             value={coachQuestion}
@@ -286,7 +295,7 @@ export function GreekCoachLab({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => handleAskCoach(coachHistory[0]?.question)}
@@ -317,7 +326,7 @@ export function GreekCoachLab({
       </div>
 
       {coachHistory.length > 0 ? (
-        <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-3">
+        <div className="rounded-xl border border-white/15 bg-black/25 p-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Recent coach prompts</p>
             <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
@@ -342,13 +351,13 @@ export function GreekCoachLab({
       ) : null}
 
       {coachError ? (
-        <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
+        <p className="rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
       ) : null}
       {coachLoading ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-3 rounded-xl border border-emerald-200/25 bg-black/30 p-3"
+          className="rounded-xl border border-emerald-200/25 bg-black/30 p-3"
         >
           <div className="flex items-center gap-2 text-emerald-100">
             <Sparkles className="size-4 animate-pulse" />
@@ -372,7 +381,7 @@ export function GreekCoachLab({
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-3 space-y-2 rounded-xl border border-emerald-200/25 bg-black/25 p-3"
+          className="space-y-2.5 rounded-xl border border-emerald-200/25 bg-black/25 p-3"
         >
           <p className="text-sm leading-relaxed text-white/92">{coachPayload.insight}</p>
           {coachPayload.grammarHook ? (
@@ -389,7 +398,7 @@ export function GreekCoachLab({
           ) : null}
         </motion.div>
       ) : !coachLoading && !coachError ? (
-        <p className="mt-3 text-xs leading-relaxed text-white/62">
+        <p className="text-xs leading-relaxed text-white/62">
           Tap quick actions to drill grammar, syntax, and prayer applications for this exact word.
         </p>
       ) : null}

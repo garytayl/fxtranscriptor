@@ -1492,34 +1492,38 @@ export function GreekVerseQuestClient() {
                     <p className="mt-1 text-sm text-white/92">
                       Familiarity: <span className="text-emerald-100">{selectedFamiliarityLabel}</span>
                     </p>
-                    <p className="mt-1 text-xs text-white/75">
+                    <p className="mt-1 text-xs leading-relaxed text-white/75">
                       {selectedTokenLearningClues?.quickReason ??
                         `Lemma ${selectedToken.lemma} · parse ${selectedToken.parse}`}
                     </p>
-                    <div className="mt-3">
-                      <GreekCoachLab
-                        key={`${levelKey}-lab-${selectedWordIndex}`}
-                        levelKey={levelKey}
-                        passageRef={passageRef}
-                        english={english}
-                        verseGreekLine={verseGreekLine}
-                        selectedToken={selectedToken}
-                        wordIndex={selectedWordIndex ?? 0}
-                        learningClues={selectedTokenLearningClues}
-                        awardProgress={awardProgress}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={continueQuest}
-                      className="mt-3 w-full rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-1.5 text-xs text-emerald-50 hover:bg-emerald-400/30"
-                    >
-                      Continue quest
-                    </button>
                   </div>
                 ) : null}
 
                 <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
+
+                {questStage === "revealed" ? (
+                  <>
+                    <GreekCoachLab
+                      key={`${levelKey}-lab-${selectedWordIndex}`}
+                      levelKey={levelKey}
+                      passageRef={passageRef}
+                      english={english}
+                      verseGreekLine={verseGreekLine}
+                      selectedToken={selectedToken}
+                      wordIndex={selectedWordIndex ?? 0}
+                      learningClues={selectedTokenLearningClues}
+                      awardProgress={awardProgress}
+                      className="mt-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={continueQuest}
+                      className="mt-5 w-full rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-400/30"
+                    >
+                      Continue quest
+                    </button>
+                  </>
+                ) : null}
               </div>
             </motion.section>
           </motion.div>

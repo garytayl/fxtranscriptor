@@ -592,6 +592,8 @@ export function GreekGrammarReaderClient() {
                   </button>
                 </div>
 
+                <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
+
                 <GreekCoachLab
                   key={`${levelKey}-lab-${selectedWordIndex}`}
                   levelKey={levelKey}
@@ -602,9 +604,8 @@ export function GreekGrammarReaderClient() {
                   wordIndex={selectedWordIndex ?? 0}
                   learningClues={buildGreekWordLearningClues(selectedToken)}
                   awardProgress={awardCoachProgress}
+                  className="mt-8"
                 />
-
-                <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
               </div>
             </motion.section>
           </motion.div>
