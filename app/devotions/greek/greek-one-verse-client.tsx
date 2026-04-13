@@ -67,6 +67,7 @@ export function GreekOneVerseClient() {
   const [coachError, setCoachError] = useState<string | null>(null)
   const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
   const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
+  const [coachQuestion, setCoachQuestion] = useState("")
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
   const passageRef = useMemo(() => morphPilotPassageRef(pilot, verse), [pilot, verse])
@@ -233,27 +234,35 @@ export function GreekOneVerseClient() {
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
   const selectedTokenExpanded = selectedToken ? expandGreekMorphToken(selectedToken) : null
   const selectedTokenLearningClues = selectedToken ? buildGreekWordLearningClues(selectedToken) : null
+  const defaultCoachQuestion = selectedTokenLearningClues?.articleFunctionHint
+    ? "What is the article doing here?"
+    : "Why is this form parsed this way?"
 
   const activeTokenKey =
     selectedToken && selectedWordIndex != null
       ? `${pilot.bookSlug}-${pilot.chapter}-${verse}-${selectedWordIndex}-${selectedToken.word}`
       : null
+  const verseGreekContext = greekTokens.map((tok) => tok.word).join(" ")
 
   useEffect(() => {
     if (!activeTokenKey) {
       setCoachPayload(null)
       setCoachError(null)
+      setCoachQuestion("")
       return
     }
-    if (coachTokenKey === activeTokenKey) return
+    if (coachTokenKey?.startsWith(`${activeTokenKey}|`)) return
     setCoachPayload(null)
     setCoachError(null)
+    setCoachQuestion("")
   }, [activeTokenKey, coachTokenKey])
 
-  const runAiCoach = useCallback(async () => {
+  const runAiCoach = useCallback(async (explicitQuestion?: string) => {
     if (!selectedToken || !activeTokenKey) return
     if (coachLoading) return
-    if (coachTokenKey === activeTokenKey && coachPayload) return
+    const resolvedQuestion = (explicitQuestion ?? coachQuestion).trim()
+    const requestKey = `${activeTokenKey}|${resolvedQuestion.toLowerCase()}`
+    if (coachTokenKey === requestKey && coachPayload) return
 
     setCoachLoading(true)
     setCoachError(null)
@@ -263,12 +272,14 @@ export function GreekOneVerseClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           reference: passageRef,
-          english,
           greekWord: selectedToken.word,
           lemma: selectedToken.lemma,
           parse: selectedToken.parse,
           category: selectedTokenExpanded?.posLabel ?? selectedToken.pos,
           parseSummary: selectedTokenExpanded?.parseSummary ?? selectedToken.parse,
+          english,
+          verseGreek: verseGreekContext,
+          userQuestion: resolvedQuestion || undefined,
         }),
       })
       const data = (await response.json()) as
@@ -294,7 +305,7 @@ export function GreekOneVerseClient() {
         insight: insight.trim(),
         prayerPrompt: prayerPrompt.trim(),
       })
-      setCoachTokenKey(activeTokenKey)
+      setCoachTokenKey(requestKey)
     } catch (err) {
       setCoachError(err instanceof Error ? err.message : "Could not generate AI coach insight.")
     } finally {
@@ -309,6 +320,8 @@ export function GreekOneVerseClient() {
     coachPayload,
     passageRef,
     english,
+    verseGreekContext,
+    coachQuestion,
   ])
 
   const onMenuTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
@@ -698,13 +711,42 @@ export function GreekOneVerseClient() {
                   </p>
                   <button
                     type="button"
-                    onClick={runAiCoach}
+                    onClick={() => void runAiCoach()}
                     disabled={coachLoading}
                     className="rounded-full border border-emerald-300/40 bg-emerald-400/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
                   >
                     {coachLoading ? "Thinking..." : "Coach me"}
                   </button>
                 </div>
+
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={coachQuestion}
+                    onChange={(e) => setCoachQuestion(e.target.value)}
+                    placeholder="Ask about this word in context..."
+                    className="flex-1 rounded-xl border border-emerald-300/30 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/55 focus:outline-none"
+                    aria-label="Ask AI Greek coach a question"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void runAiCoach()}
+                    disabled={coachLoading}
+                    className="rounded-xl border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
+                  >
+                    Ask
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCoachQuestion(defaultCoachQuestion)
+                    void runAiCoach(defaultCoachQuestion)
+                  }}
+                  disabled={coachLoading}
+                  className="mt-2 rounded-full border border-emerald-300/30 bg-black/20 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-100/85 hover:bg-black/30 disabled:opacity-60"
+                >
+                  Try: {defaultCoachQuestion}
+                </button>
 
                 {coachError ? <p className="mt-2 text-xs text-red-300/90">{coachError}</p> : null}
                 {coachPayload ? (

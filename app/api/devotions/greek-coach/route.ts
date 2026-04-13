@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
 type GreekCoachResponse = {
+  insight: string
+  prayerPrompt: string
   microGloss: string
   grammarHook: string
   reflectionPrompt: string
@@ -28,6 +30,9 @@ export async function POST(request: NextRequest) {
         parse?: unknown
         category?: unknown
         parseSummary?: unknown
+        english?: unknown
+        verseGreek?: unknown
+        userQuestion?: unknown
       }
     | null
 
@@ -41,6 +46,9 @@ export async function POST(request: NextRequest) {
   const parse = normalizeText(payload.parse, "")
   const category = normalizeText(payload.category, "Word")
   const parseSummary = normalizeText(payload.parseSummary, "Contextual meaning depends on sentence flow.")
+  const english = normalizeText(payload.english, "")
+  const verseGreek = normalizeText(payload.verseGreek, "")
+  const userQuestion = normalizeText(payload.userQuestion, "")
 
   if (!greekWord || !lemma || !parse) {
     return NextResponse.json({ error: "Missing required Greek word payload fields." }, { status: 400 })
@@ -55,16 +63,21 @@ Give a very concise coaching response for this selected Greek word:
 - Category: ${category}
 - Parse code: ${parse}
 - Parse summary: ${parseSummary}
+- Greek phrase context: ${verseGreek || "(not provided)"}
+- English context: ${english || "(not provided)"}
+${userQuestion ? `- Learner's exact question: ${userQuestion}` : ""}
 
 Respond with strict JSON only:
 {
+  "insight": "1-2 short sentences. If a learner question is provided, answer it directly first, then connect to grammar",
+  "prayerPrompt": "1 short reflective question that turns grammar into prayerful meditation",
   "microGloss": "1 short sentence, plain English gloss and sense in context",
   "grammarHook": "1 short sentence that teaches why this form matters",
   "reflectionPrompt": "1 reflective question that turns grammar into prayerful meditation"
 }
 
 Constraints:
-- Each field max 130 characters.
+- Each field max 240 characters.
 - Never mention AI, model, or uncertainty.
 - Avoid markdown and avoid extra keys.`
 
@@ -115,6 +128,11 @@ Constraints:
   }
 
   return NextResponse.json({
+    insight: normalizeText(parsed.insight, normalizeText(parsed.microGloss, "This word shapes the verse's meaning in context.")),
+    prayerPrompt: normalizeText(
+      parsed.prayerPrompt,
+      normalizeText(parsed.reflectionPrompt, "How does this word deepen your attention to Christ here?"),
+    ),
     microGloss: normalizeText(parsed.microGloss, "This word helps shape the line's meaning in context."),
     grammarHook: normalizeText(parsed.grammarHook, "Its form carries a key grammatical cue for interpretation."),
     reflectionPrompt: normalizeText(parsed.reflectionPrompt, "How does this word deepen your attention to Christ here?"),
