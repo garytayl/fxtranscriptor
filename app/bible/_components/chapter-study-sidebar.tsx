@@ -11,6 +11,8 @@ export type ChapterStudySelection =
 
 type ChapterStudySidebarProps = {
   bookSlug: string
+  /** API/HCSB book id (e.g. LUK) so morph lookup matches bundled data when URL slug differs. */
+  bookId?: string
   chapterNumber: number
   selection: ChapterStudySelection
   hasStrongsForChapter: boolean
@@ -19,6 +21,7 @@ type ChapterStudySidebarProps = {
 
 export function ChapterStudySidebar({
   bookSlug,
+  bookId,
   chapterNumber,
   selection,
   hasStrongsForChapter,
@@ -29,7 +32,13 @@ export function ChapterStudySidebar({
   }
 
   if (selection?.kind === "greekMorph") {
-    const token = getGreekMorphToken(bookSlug, chapterNumber, selection.verse, selection.wordIndex)
+    const token = getGreekMorphToken(
+      bookSlug,
+      chapterNumber,
+      selection.verse,
+      selection.wordIndex,
+      bookId,
+    )
     return (
       <MorphologySidebarPanel
         token={token}

@@ -80,11 +80,11 @@ export default async function BibleChapterPage({ params, searchParams }: PagePro
       ? await getStrongsWordsForChapter({ slug: book.slug, id: book.id }, chapterNumber)
       : {}
 
-  const greekMorphByVerse = getGreekMorphTokensForChapter(book.slug, chapterNumber) ?? {}
+  const greekMorphByVerse = getGreekMorphTokensForChapter(book.slug, chapterNumber, book.id) ?? {}
 
   return (
     <BibleChapterShell
-      book={{ slug: book.slug, name: book.name }}
+      book={{ slug: book.slug, name: book.name, id: book.id }}
       chapterNumber={chapterNumber}
       chapters={chapters}
       verses={verses}

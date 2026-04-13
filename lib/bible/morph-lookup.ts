@@ -20,17 +20,54 @@ const MORPH_PILOT_CHAPTERS = [john1, luke6] as MorphChapterFile[]
 
 const MORPH_META = MORPH_PILOT_CHAPTERS[0].meta
 
-function getPilotChapter(bookSlug: string, chapter: number): MorphChapterFile | null {
+/**
+ * API.Bible book `id` is often USFM (e.g. LUK, JHN). Local HCSB uses the same ids as `lib/bible/constants`.
+ */
+const USFM_ID_TO_MORPH_SLUG: Record<string, string> = {
+  LUK: "luke",
+  JHN: "john",
+}
+
+/**
+ * Some translations expose longer book names; slugify yields paths like `the-gospel-of-luke` while
+ * morph JSON uses `luke`.
+ */
+const MORPH_BOOK_SLUG_ALIASES: Record<string, string> = {
+  "the-gospel-of-luke": "luke",
+  "the-gospel-according-to-luke": "luke",
+  "gospel-of-luke": "luke",
+  "the-gospel-of-john": "john",
+  "the-gospel-according-to-john": "john",
+  "gospel-of-john": "john",
+}
+
+/** Map URL/API slug + optional USFM id to the `bookSlug` stored in morph JSON. */
+export function resolveMorphDatasetBookSlug(bookSlug: string, bookId?: string | null): string {
+  if (bookId) {
+    const fromUsfm = USFM_ID_TO_MORPH_SLUG[bookId.trim().toUpperCase()]
+    if (fromUsfm) return fromUsfm
+  }
+  const key = bookSlug.trim().toLowerCase()
+  return MORPH_BOOK_SLUG_ALIASES[key] ?? bookSlug
+}
+
+function getPilotChapter(
+  bookSlug: string,
+  chapter: number,
+  bookId?: string | null
+): MorphChapterFile | null {
+  const resolved = resolveMorphDatasetBookSlug(bookSlug, bookId)
   return (
-    MORPH_PILOT_CHAPTERS.find((p) => p.bookSlug === bookSlug && p.chapter === chapter) ?? null
+    MORPH_PILOT_CHAPTERS.find((p) => p.bookSlug === resolved && p.chapter === chapter) ?? null
   )
 }
 
 export function getGreekMorphTokensForChapter(
   bookSlug: string,
-  chapter: number
+  chapter: number,
+  bookId?: string | null
 ): Record<number, GreekMorphToken[]> | null {
-  const pilot = getPilotChapter(bookSlug, chapter)
+  const pilot = getPilotChapter(bookSlug, chapter, bookId)
   if (!pilot) return null
   const out: Record<number, GreekMorphToken[]> = {}
   for (const [v, tokens] of Object.entries(pilot.verses)) {
@@ -43,9 +80,10 @@ export function getGreekMorphToken(
   bookSlug: string,
   chapter: number,
   verse: number,
-  wordIndex: number
+  wordIndex: number,
+  bookId?: string | null
 ): GreekMorphToken | null {
-  const ch = getGreekMorphTokensForChapter(bookSlug, chapter)
+  const ch = getGreekMorphTokensForChapter(bookSlug, chapter, bookId)
   const tokens = ch?.[verse]
   if (!tokens || wordIndex < 0 || wordIndex >= tokens.length) return null
   return tokens[wordIndex] ?? null
@@ -68,8 +106,8 @@ export function getReaderGrammarUrl(bookSlug: string, chapter: number, verse: nu
   return `/bible/${bookSlug}/${chapter}?${params.toString()}`
 }
 
-function isMorphPilotChapter(bookSlug: string, chapterNumber: number): boolean {
-  return getPilotChapter(bookSlug, chapterNumber) != null
+function isMorphPilotChapter(bookSlug: string, chapterNumber: number, bookId?: string | null): boolean {
+  return getPilotChapter(bookSlug, chapterNumber, bookId) != null
 }
 
 /**
@@ -77,7 +115,7 @@ function isMorphPilotChapter(bookSlug: string, chapterNumber: number): boolean {
  */
 export function getMorphologyForPassage(parsed: PassageReference): MorphPassagePayload {
   const { bookSlug, chapterNumber, verseRange } = parsed
-  const ch = getGreekMorphTokensForChapter(bookSlug, chapterNumber)
+  const ch = getGreekMorphTokensForChapter(bookSlug, chapterNumber, null)
   if (!ch || !verseRange) {
     return {
       available: false,
@@ -98,7 +136,7 @@ export function getMorphologyForPassage(parsed: PassageReference): MorphPassageP
   }
 
   const firstVerse = verseRange.start
-  const available = verses.length > 0 && isMorphPilotChapter(bookSlug, chapterNumber)
+  const available = verses.length > 0 && isMorphPilotChapter(bookSlug, chapterNumber, null)
 
   return {
     available,

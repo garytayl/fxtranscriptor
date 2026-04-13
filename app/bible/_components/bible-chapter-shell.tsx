@@ -24,11 +24,12 @@ import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 const DISMISS_THRESHOLD = 60
 
-type BookInfo = { slug: string; name: string }
+type BookInfo = { slug: string; name: string; id?: string }
 type ChapterOption = { id: string; number: number }
 
 function MobileChapterStudySheet({
   bookSlug,
+  bookId,
   chapterNumber,
   selection,
   hasStrongsForChapter,
@@ -36,6 +37,7 @@ function MobileChapterStudySheet({
   onDismiss,
 }: {
   bookSlug: string
+  bookId?: string
   chapterNumber: number
   selection: ChapterStudySelection
   hasStrongsForChapter: boolean
@@ -106,6 +108,7 @@ function MobileChapterStudySheet({
         >
           <ChapterStudySidebar
             bookSlug={bookSlug}
+            bookId={bookId}
             chapterNumber={chapterNumber}
             selection={selection}
             hasStrongsForChapter={hasStrongsForChapter}
@@ -388,6 +391,7 @@ export function BibleChapterShell(props: BibleChapterShellProps) {
           >
             <ChapterStudySidebar
               bookSlug={book.slug}
+              bookId={book.id}
               chapterNumber={chapterNumber}
               selection={selection}
               hasStrongsForChapter={hasStrongsForChapter}
@@ -406,6 +410,7 @@ export function BibleChapterShell(props: BibleChapterShellProps) {
                 : `g-${selection.verse}-${selection.wordIndex}`
             }
             bookSlug={book.slug}
+            bookId={book.id}
             chapterNumber={chapterNumber}
             selection={selection}
             hasStrongsForChapter={hasStrongsForChapter}
