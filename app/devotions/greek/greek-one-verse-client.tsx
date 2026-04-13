@@ -205,7 +205,7 @@ export function GreekOneVerseClient() {
   }, [pilot.maxVerse, verseDraft])
 
   const handleSelectGreekWord = useCallback((_: number, wordIndex: number) => {
-    setSelectedWordIndex(wordIndex)
+    setSelectedWordIndex((prev) => (prev === wordIndex ? null : wordIndex))
   }, [])
 
   const selectedToken =
@@ -625,6 +625,19 @@ export function GreekOneVerseClient() {
             ) : null}
             {selectedToken ? (
               <div className="rounded-xl border border-white/10 bg-black/25 p-3 sm:p-4">
+                <div className="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/55">
+                    Word details
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedWordIndex(null)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/70 hover:bg-white/10"
+                    aria-label="Close word details"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
                 <MorphologySidebarPanel
                   token={selectedToken}
                   verseNumber={verse}
