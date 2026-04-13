@@ -242,6 +242,93 @@ function stableHash(input: string): number {
   return h
 }
 
+type QuestPhrasePick = {
+  targetIndexes: number[]
+  /** Inclusive index range: one readable phrase / clause chunk in verse order */
+  clusterStart: number
+  clusterEnd: number
+}
+
+function scoreTokenForQuest(
+  token: GreekMorphToken,
+  memory: GreekWordMemory,
+  weakSet: Set<string>,
+  reviewMode: boolean,
+): number {
+  const key = wordFormKey(token)
+  const mem = memory[key]
+  const isWeak = weakSet.has(key)
+  const familiarity = mem?.familiarity ?? "new"
+  const familiarityScore = familiarity === "new" ? 3 : familiarity === "seen" ? 2 : -2
+  const contentScore = /^(V|N|A|R|D)/.test(token.pos) ? 3 : 1
+  const reviewBoost = reviewMode ? (isWeak ? 8 : familiarity === "seen" ? 4 : -3) : 0
+  return (isWeak ? 6 : 0) + familiarityScore + contentScore + reviewBoost
+}
+
+/** Pick targets inside one contiguous phrase so drills stay in a coherent unit, not scattered. */
+function pickQuestTargetsInPhrase(
+  tokens: GreekMorphToken[],
+  weakSet: Set<string>,
+  memory: GreekWordMemory,
+  reviewMode: boolean,
+): QuestPhrasePick {
+  const n = tokens.length
+  if (n === 0) return { targetIndexes: [], clusterStart: 0, clusterEnd: 0 }
+
+  const targetCount = Math.min(
+    n,
+    Math.max(QUEST_MIN_TARGETS, Math.min(QUEST_MAX_TARGETS, Math.ceil(n * 0.34))),
+  )
+
+  const perIndex = tokens.map((token, idx) => ({
+    idx,
+    score: scoreTokenForQuest(token, memory, weakSet, reviewMode),
+  }))
+
+  if (n === 1) {
+    return { targetIndexes: [0], clusterStart: 0, clusterEnd: 0 }
+  }
+
+  const minPhraseLen = Math.min(n, Math.max(targetCount + 1, 3))
+  const maxPhraseLen = Math.min(n, 12)
+
+  let bestStart = 0
+  let bestEnd = n - 1
+  let bestScore = -Infinity
+
+  for (let len = maxPhraseLen; len >= minPhraseLen; len--) {
+    for (let start = 0; start + len <= n; start++) {
+      const end = start + len - 1
+      let sum = 0
+      let verbHits = 0
+      for (let i = start; i <= end; i++) {
+        sum += perIndex[i].score
+        if (tokens[i].pos.startsWith("V")) verbHits += 1
+      }
+      const combined = sum + Math.min(4, verbHits) * 0.5
+      if (combined > bestScore) {
+        bestScore = combined
+        bestStart = start
+        bestEnd = end
+      }
+    }
+  }
+
+  const windowCandidates = perIndex.filter((p) => p.idx >= bestStart && p.idx <= bestEnd)
+  windowCandidates.sort((a, b) => b.score - a.score)
+  const take = Math.min(targetCount, windowCandidates.length)
+  const picked = windowCandidates
+    .slice(0, take)
+    .map((p) => p.idx)
+    .sort((a, b) => a - b)
+
+  return {
+    targetIndexes: picked,
+    clusterStart: bestStart,
+    clusterEnd: bestEnd,
+  }
+}
+
 function buildChallengeOptions(correct: string, pool: string[], seed: number): string[] {
   const uniquePool = Array.from(new Set(pool.filter((item) => item && item !== correct))).sort((a, b) =>
     a.localeCompare(b),
@@ -256,32 +343,6 @@ function buildChallengeOptions(correct: string, pool: string[], seed: number): s
   const rotateBy = options.length > 0 ? seed % options.length : 0
   const rotated = options.slice(rotateBy).concat(options.slice(0, rotateBy))
   return rotated
-}
-
-function pickQuestTargetIndexes(
-  tokens: GreekMorphToken[],
-  weakSet: Set<string>,
-  memory: GreekWordMemory,
-  reviewMode: boolean,
-): number[] {
-  if (tokens.length === 0) return []
-  const scored = tokens.map((token, idx) => {
-    const key = wordFormKey(token)
-    const mem = memory[key]
-    const isWeak = weakSet.has(key)
-    const familiarity = mem?.familiarity ?? "new"
-    const familiarityScore = familiarity === "new" ? 3 : familiarity === "seen" ? 2 : -2
-    const contentScore = /^(V|N|A|R|D)/.test(token.pos) ? 3 : 1
-    const reviewBoost = reviewMode ? (isWeak ? 8 : familiarity === "seen" ? 4 : -3) : 0
-    const score = (isWeak ? 6 : 0) + familiarityScore + contentScore + reviewBoost
-    return { idx, score }
-  })
-  scored.sort((a, b) => b.score - a.score)
-  const targetCount = Math.min(
-    tokens.length,
-    Math.max(QUEST_MIN_TARGETS, Math.min(QUEST_MAX_TARGETS, Math.ceil(tokens.length * 0.34))),
-  )
-  return scored.slice(0, targetCount).map((item) => item.idx)
 }
 
 function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number): QuestWordChallenge | null {
@@ -418,6 +479,7 @@ export function GreekVerseQuestClient() {
   const [questStage, setQuestStage] = useState<QuestWordStage>("challenge")
   const [questChallenge, setQuestChallenge] = useState<QuestWordChallenge | null>(null)
   const [questTargetIndexes, setQuestTargetIndexes] = useState<number[]>([])
+  const [questCluster, setQuestCluster] = useState<{ start: number; end: number } | null>(null)
   const [completedTargetIndexes, setCompletedTargetIndexes] = useState<number[]>([])
   const [correctTargetIndexes, setCorrectTargetIndexes] = useState<number[]>([])
   const [dailyVerseRunDone, setDailyVerseRunDone] = useState(false)
@@ -437,6 +499,15 @@ export function GreekVerseQuestClient() {
     ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
     : 0
   const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
+
+  const clusterGreekPreview = useMemo(() => {
+    if (!questCluster || greekTokens.length === 0) return null
+    const { start, end } = questCluster
+    return greekTokens
+      .slice(start, end + 1)
+      .map((t) => t.word)
+      .join(" ")
+  }, [questCluster, greekTokens])
 
   const verseSwipeStartX = useRef<number | null>(null)
   const verseSwipeStartY = useRef<number | null>(null)
@@ -535,8 +606,14 @@ export function GreekVerseQuestClient() {
     setCompletedTargetIndexes([])
     setCorrectTargetIndexes([])
     setLevelComplete(null)
-    const targets = pickQuestTargetIndexes(greekTokens, weakWordSet, wordMemory, reviewMode)
+    const { targetIndexes: targets, clusterStart, clusterEnd } = pickQuestTargetsInPhrase(
+      greekTokens,
+      weakWordSet,
+      wordMemory,
+      reviewMode,
+    )
     setQuestTargetIndexes(targets)
+    setQuestCluster(targets.length > 0 ? { start: clusterStart, end: clusterEnd } : null)
     if (targets.length > 0) {
       setQuestChallenge(buildChallengeForTarget(greekTokens, targets[0]))
     } else {
@@ -638,11 +715,21 @@ export function GreekVerseQuestClient() {
     (wordIndex: number) => {
       if (!questTargetIndexes.includes(wordIndex)) return
       setSelectedWordIndex(wordIndex)
-      setQuestStage("challenge")
+      if (completedTargetIndexes.includes(wordIndex)) {
+        setQuestStage("revealed")
+        setQuestChallenge(null)
+        return
+      }
       const challenge = buildChallengeForTarget(greekTokens, wordIndex)
-      setQuestChallenge(challenge)
+      if (challenge) {
+        setQuestStage("challenge")
+        setQuestChallenge(challenge)
+      } else {
+        setQuestStage("revealed")
+        setQuestChallenge(null)
+      }
     },
-    [questTargetIndexes, greekTokens],
+    [questTargetIndexes, completedTargetIndexes, greekTokens],
   )
 
   const revealQuestWord = useCallback(
@@ -1207,6 +1294,19 @@ export function GreekVerseQuestClient() {
                   : "Daily verse run active. Clear all targets to complete today."}
               </p>
             ) : null}
+            {clusterGreekPreview ? (
+              <p className="mx-auto mt-2 max-w-3xl px-2 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                Phrase focus
+              </p>
+            ) : null}
+            {clusterGreekPreview ? (
+              <p
+                lang="el"
+                className="mx-auto mt-1 max-w-3xl px-3 text-center text-sm leading-snug text-amber-200/80"
+              >
+                {clusterGreekPreview}
+              </p>
+            ) : null}
           </div>
 
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
@@ -1242,6 +1342,8 @@ export function GreekVerseQuestClient() {
                     const familiarity = memory?.familiarity ?? "new"
                     const weakWord = weakWordSet.has(key)
                     const targetWord = questTargetIndexes.includes(wi)
+                    const inPhraseCluster =
+                      questCluster != null && wi >= questCluster.start && wi <= questCluster.end
                     const completedWord = completedTargetIndexes.includes(wi)
                     const selected = selectedWordIndex === wi
                     const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
@@ -1255,7 +1357,9 @@ export function GreekVerseQuestClient() {
                             selected
                               ? "border-b-2 border-amber-300/85 text-amber-200"
                               : !targetWord
-                                ? "border-b border-transparent text-amber-100/35"
+                                ? inPhraseCluster
+                                  ? "border-b border-dotted border-white/25 text-amber-100/55"
+                                  : "border-b border-transparent text-amber-100/35"
                                 : weakWord
                                   ? "border-b border-dashed border-cyan-300/80 text-cyan-100 hover:border-cyan-200 hover:text-cyan-50"
                                   : familiarity === "learned"
