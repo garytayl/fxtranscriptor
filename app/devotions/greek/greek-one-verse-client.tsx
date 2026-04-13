@@ -1027,7 +1027,7 @@ export function GreekOneVerseClient() {
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Unique forms</p>
-                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.uniqueWordFormsToday}</p>
+                  <p className="mt-1 text-sm font-semibold text-white/92">{progress.uniqueWordForms}</p>
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
