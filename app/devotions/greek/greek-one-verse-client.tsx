@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Menu, Sparkles, X } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, Target, Trophy, X, Zap } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
@@ -10,6 +10,12 @@ import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import { expandGreekMorphToken } from "@/lib/bible/robinson-greek"
 import { buildGreekWordLearningClues } from "@/lib/bible/greek-word-learning-clues"
+import {
+  getGreekProgressSnapshot,
+  getGreekStudyProgress,
+  recordGreekStudyEvent,
+  type GreekProgressSnapshot,
+} from "@/lib/devotions-greek-progress"
 import {
   MORPH_PILOT_CHAPTERS,
   morphPilotPassageRef,
@@ -22,6 +28,10 @@ const STORAGE_KEY = "fx_devotions_greek_place_v1"
 const MENU_SWIPE_CLOSE_THRESHOLD = 72
 const DETAIL_SWIPE_CLOSE_THRESHOLD = 102
 const DETAIL_SWIPE_CLOSE_VELOCITY = 0.72
+const SESSION_XP = 14
+const VERSE_XP = 8
+const WORD_XP = 12
+const COACH_XP = 20
 
 type StoredPlace = { bookSlug: string; chapter: number; verse: number }
 type PassageVerse = { number: number; text: string }
@@ -70,6 +80,10 @@ export function GreekOneVerseClient() {
   const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
   const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
   const [coachQuestion, setCoachQuestion] = useState("")
+  const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
+    getGreekProgressSnapshot(getGreekStudyProgress()),
+  )
+  const [xpBurst, setXpBurst] = useState<number | null>(null)
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
   const passageRef = useMemo(() => morphPilotPassageRef(pilot, verse), [pilot, verse])
@@ -89,6 +103,23 @@ export function GreekOneVerseClient() {
   const detailSwipeStartedAt = useRef<number | null>(null)
   const detailContentRef = useRef<HTMLDivElement | null>(null)
   const [detailDragOffsetY, setDetailDragOffsetY] = useState(0)
+  const initializedDailySession = useRef(false)
+
+  const refreshProgress = useCallback(() => {
+    setProgress(getGreekProgressSnapshot(getGreekStudyProgress()))
+  }, [])
+
+  const awardProgress = useCallback(
+    (event: Parameters<typeof recordGreekStudyEvent>[0]) => {
+      const { progress: updated, awardedXp } = recordGreekStudyEvent(event)
+      setProgress(getGreekProgressSnapshot(updated))
+      if (awardedXp > 0) {
+        setXpBurst(awardedXp)
+      }
+      return awardedXp
+    },
+    [],
+  )
 
   useEffect(() => {
     const s = loadPlace()
@@ -106,6 +137,23 @@ export function GreekOneVerseClient() {
   }, [])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === "fx_devotions_greek_v1_progress") {
+        refreshProgress()
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [refreshProgress])
+
+  useEffect(() => {
+    if (xpBurst == null) return
+    const t = window.setTimeout(() => setXpBurst(null), 1300)
+    return () => window.clearTimeout(t)
+  }, [xpBurst])
+
+  useEffect(() => {
     if (!hydrated) return
     savePlace({ bookSlug: pilot.bookSlug, chapter: pilot.chapter, verse })
   }, [hydrated, pilot.bookSlug, pilot.chapter, verse])
@@ -113,6 +161,22 @@ export function GreekOneVerseClient() {
   useEffect(() => {
     setVerseDraft(String(verse))
   }, [verse])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (initializedDailySession.current) return
+    initializedDailySession.current = true
+    awardProgress({ kind: "session", key: "daily-open", xp: SESSION_XP })
+  }, [hydrated, awardProgress])
+
+  useEffect(() => {
+    if (!hydrated) return
+    awardProgress({
+      kind: "verse",
+      key: `${pilot.bookSlug}-${pilot.chapter}-${verse}`,
+      xp: VERSE_XP,
+    })
+  }, [hydrated, pilot.bookSlug, pilot.chapter, verse, awardProgress])
 
   useEffect(() => {
     if (!hydrated) return
@@ -260,11 +324,19 @@ export function GreekOneVerseClient() {
       setCoachQuestion("")
       return
     }
+    if (selectedToken) {
+      awardProgress({
+        kind: "word",
+        key: activeTokenKey,
+        xp: WORD_XP,
+        wordFormKey: `${selectedToken.lemma}|${selectedToken.parse}`,
+      })
+    }
     if (coachTokenKey?.startsWith(`${activeTokenKey}|`)) return
     setCoachPayload(null)
     setCoachError(null)
     setCoachQuestion("")
-  }, [activeTokenKey, coachTokenKey])
+  }, [activeTokenKey, coachTokenKey, selectedToken, awardProgress])
 
   const runAiCoach = useCallback(async (explicitQuestion?: string) => {
     if (!selectedToken || !activeTokenKey) return
@@ -315,6 +387,11 @@ export function GreekOneVerseClient() {
         prayerPrompt: prayerPrompt.trim(),
       })
       setCoachTokenKey(requestKey)
+      awardProgress({
+        kind: "coach",
+        key: requestKey,
+        xp: COACH_XP,
+      })
     } catch (err) {
       setCoachError(err instanceof Error ? err.message : "Could not generate AI coach insight.")
     } finally {
@@ -331,6 +408,7 @@ export function GreekOneVerseClient() {
     english,
     verseGreekContext,
     coachQuestion,
+    awardProgress,
   ])
 
   const onMenuTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
@@ -435,6 +513,12 @@ export function GreekOneVerseClient() {
     return () => window.removeEventListener("keydown", onKey)
   }, [menuOpen, selectedWordIndex, closeMenu, closeDetails, prevVerse, nextVerse])
 
+  const verseGoal = 6
+  const wordGoal = 8
+  const coachGoal = 1
+  const dailyVersePct = Math.max(0, Math.min(100, (progress.versesToday / verseGoal) * 100))
+  const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
+
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -473,6 +557,20 @@ export function GreekOneVerseClient() {
           </button>
         </div>
       </header>
+
+      <AnimatePresence>
+        {xpBurst != null ? (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.92 }}
+            transition={{ duration: 0.24 }}
+            className="pointer-events-none absolute right-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-emerald-300/50 bg-emerald-400/25 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,0.35)]"
+          >
+            +{xpBurst} XP
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {menuOpen ? (
@@ -623,6 +721,81 @@ export function GreekOneVerseClient() {
               Verse {verse} of {pilot.maxVerse}
             </p>
           </div>
+
+          <motion.section
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.26 }}
+            className="rounded-2xl border border-white/15 bg-black/30 p-3 sm:p-4 space-y-3 backdrop-blur-md"
+            aria-label="Greek study progress"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1">
+                <Trophy className="size-3.5 text-emerald-100" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100">
+                  Level {progress.level}
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">Total XP</p>
+                <p className="text-sm font-semibold text-white/90">{progress.totalXp}</p>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between text-[11px]">
+                <span className="font-mono uppercase tracking-[0.14em] text-white/50">
+                  <Zap className="mr-1 inline size-3.5 text-amber-200/80" />
+                  Today {progress.todayXp}/{progress.dailyGoalXp} XP
+                </span>
+                <span className={`font-mono uppercase tracking-[0.14em] ${progress.dailyGoalReached ? "text-emerald-200/90" : "text-white/45"}`}>
+                  {progress.dailyGoalReached ? "Goal reached" : "Daily goal"}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-300"
+                  style={{ width: `${dailyXpPct}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Streak</p>
+                <p className="mt-0.5 text-sm font-semibold text-white/90">
+                  <Flame className="mr-1 inline size-3.5 text-orange-300/90" />
+                  {progress.streak}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Verses</p>
+                <p className="mt-0.5 text-sm font-semibold text-white/90">
+                  {progress.versesToday}/{verseGoal}
+                </p>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-emerald-300/80" style={{ width: `${dailyVersePct}%` }} />
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Words</p>
+                <p className="mt-0.5 text-sm font-semibold text-white/90">
+                  {progress.wordsToday}/{wordGoal}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Coach</p>
+                <p className="mt-0.5 text-sm font-semibold text-white/90">
+                  <Target className="mr-1 inline size-3.5 text-cyan-200/85" />
+                  {Math.min(progress.coachToday, coachGoal)}/{coachGoal}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-white/55">
+              Dig in daily: read {verseGoal} verses, inspect {wordGoal} words, ask coach once, and build your Greek streak.
+            </p>
+          </motion.section>
 
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
 
