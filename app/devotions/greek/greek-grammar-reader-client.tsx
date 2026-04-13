@@ -50,7 +50,7 @@ export function GreekGrammarReaderClient() {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
-  const [showEnglish, setShowEnglish] = useState(false)
+  const [showEnglish, setShowEnglish] = useState(true)
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
 
   const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
@@ -432,11 +432,12 @@ export function GreekGrammarReaderClient() {
       </AnimatePresence>
 
       <main
-        className="flex-1 min-h-0 overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-6">
+          <div className="flex shrink-0 flex-col gap-6">
           <GreekGrammarPrimer
             persistBehavior="devotions"
             className="rounded-xl border border-amber-500/25 bg-black/20 p-3 sm:p-4 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white"
@@ -458,8 +459,9 @@ export function GreekGrammarReaderClient() {
           </div>
 
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
+          </div>
 
-          <section className="min-h-[40vh] sm:min-h-[44vh] flex items-center justify-center">
+          <section className="flex min-h-[min(40vh,440px)] flex-1 flex-col items-center justify-center">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
@@ -523,7 +525,7 @@ export function GreekGrammarReaderClient() {
 
           {showEnglish && english ? (
             <p
-              className="mx-auto max-w-3xl text-center text-white/70 leading-relaxed"
+              className="mx-auto max-w-3xl shrink-0 border-t border-white/10 pt-5 text-center text-white/70 leading-relaxed"
               style={{ fontSize: "clamp(1.05rem, 3.3vw, 1.6rem)" }}
             >
               {english}

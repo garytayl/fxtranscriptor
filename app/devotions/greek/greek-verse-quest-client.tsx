@@ -478,7 +478,7 @@ export function GreekVerseQuestClient() {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
-  const [showEnglish, setShowEnglish] = useState(false)
+  const [showEnglish, setShowEnglish] = useState(true)
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
   const [wordMemory, setWordMemory] = useState<GreekWordMemory>(() => getGreekWordMemory())
   const [reviewMode, setReviewMode] = useState(false)
@@ -1250,11 +1250,12 @@ export function GreekVerseQuestClient() {
       </AnimatePresence>
 
       <main
-        className="flex-1 min-h-0 overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-6">
+          <div className="flex shrink-0 flex-col gap-6">
           <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
             <span
               className={`rounded-full border px-2.5 py-1 ${
@@ -1318,8 +1319,9 @@ export function GreekVerseQuestClient() {
           </div>
 
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
+          </div>
 
-          <section className="min-h-[56vh] sm:min-h-[60vh] flex items-center justify-center">
+          <section className="flex min-h-[min(52vh,520px)] flex-1 flex-col items-center justify-center">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
@@ -1404,7 +1406,10 @@ export function GreekVerseQuestClient() {
           </section>
 
           {showEnglish && english ? (
-            <p className="mx-auto max-w-3xl text-center text-white/70 leading-relaxed" style={{ fontSize: "clamp(1.05rem, 3.3vw, 1.6rem)" }}>
+            <p
+              className="mx-auto max-w-3xl shrink-0 border-t border-white/10 pt-5 text-center text-white/70 leading-relaxed"
+              style={{ fontSize: "clamp(1.05rem, 3.3vw, 1.6rem)" }}
+            >
               {english}
             </p>
           ) : null}
