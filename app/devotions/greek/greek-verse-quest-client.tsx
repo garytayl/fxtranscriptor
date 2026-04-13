@@ -36,6 +36,7 @@ import {
 } from "@/lib/devotions-greek-word-memory"
 import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
 import { buildLemmaQuizLabelMap, normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
+import { useGreekUiPreferences } from "@/lib/devotions-greek-ui-preferences"
 
 import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
 import {
@@ -477,11 +478,10 @@ export function GreekVerseQuestClient() {
   } = useGreekPilotVerse()
 
   const [menuOpen, setMenuOpen] = useState(false)
-  const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
-  const [showEnglish, setShowEnglish] = useState(true)
+  const { prefs: uiPrefs, updatePrefs: updateUiPrefs } = useGreekUiPreferences()
+  const { wordHintsEnabled, showEnglish, reviewMode } = uiPrefs
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
   const [wordMemory, setWordMemory] = useState<GreekWordMemory>(() => getGreekWordMemory())
-  const [reviewMode, setReviewMode] = useState(false)
   const [questStage, setQuestStage] = useState<QuestWordStage>("challenge")
   const [questChallenge, setQuestChallenge] = useState<QuestWordChallenge | null>(null)
   const [questTargetIndexes, setQuestTargetIndexes] = useState<number[]>([])
@@ -1187,7 +1187,7 @@ export function GreekVerseQuestClient() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setReviewMode((v) => !v)}
+                    onClick={() => updateUiPrefs({ reviewMode: !reviewMode })}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       reviewMode
                         ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
@@ -1198,7 +1198,7 @@ export function GreekVerseQuestClient() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWordHintsEnabled((v) => !v)}
+                    onClick={() => updateUiPrefs({ wordHintsEnabled: !wordHintsEnabled })}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       wordHintsEnabled
                         ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
@@ -1209,7 +1209,7 @@ export function GreekVerseQuestClient() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowEnglish((v) => !v)}
+                    onClick={() => updateUiPrefs({ showEnglish: !showEnglish })}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       showEnglish
                         ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"

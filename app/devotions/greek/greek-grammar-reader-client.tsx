@@ -12,6 +12,7 @@ import { buildGreekWordLearningClues } from "@/lib/bible/greek-word-learning-clu
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
+import { useGreekUiPreferences } from "@/lib/devotions-greek-ui-preferences"
 
 import {
   DETAIL_SWIPE_CLOSE_THRESHOLD,
@@ -49,8 +50,8 @@ export function GreekGrammarReaderClient() {
   } = useGreekPilotVerse()
 
   const [menuOpen, setMenuOpen] = useState(false)
-  const [wordHintsEnabled, setWordHintsEnabled] = useState(false)
-  const [showEnglish, setShowEnglish] = useState(true)
+  const { prefs: uiPrefs, updatePrefs: updateUiPrefs } = useGreekUiPreferences()
+  const { wordHintsEnabled, showEnglish } = uiPrefs
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
 
   const verseProgress = `${Math.max(3, (verse / pilot.maxVerse) * 100)}%`
@@ -380,7 +381,7 @@ export function GreekGrammarReaderClient() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setWordHintsEnabled((v) => !v)}
+                    onClick={() => updateUiPrefs({ wordHintsEnabled: !wordHintsEnabled })}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       wordHintsEnabled
                         ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
@@ -391,7 +392,7 @@ export function GreekGrammarReaderClient() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowEnglish((v) => !v)}
+                    onClick={() => updateUiPrefs({ showEnglish: !showEnglish })}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       showEnglish
                         ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
@@ -442,7 +443,7 @@ export function GreekGrammarReaderClient() {
             persistBehavior="devotions"
             className="rounded-xl border border-amber-500/25 bg-black/20 p-3 sm:p-4 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white"
             wordHintsEnabled={wordHintsEnabled}
-            onToggleWordHints={() => setWordHintsEnabled((v) => !v)}
+            onToggleWordHints={() => updateUiPrefs({ wordHintsEnabled: !wordHintsEnabled })}
           />
 
           <div className="space-y-2 text-center">
