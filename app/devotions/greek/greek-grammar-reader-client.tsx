@@ -538,7 +538,7 @@ export function GreekGrammarReaderClient() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[66] flex items-end"
+            className="absolute inset-0 z-[66] flex min-h-0 items-end"
           >
             <button
               type="button"
@@ -551,22 +551,21 @@ export function GreekGrammarReaderClient() {
               animate={{ y: detailDragOffsetY }}
               exit={{ y: "100%" }}
               transition={detailDragOffsetY > 0 ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
-              className="relative z-[67] w-full rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
-              onTouchStart={onDetailTouchStart}
-              onTouchMove={onDetailTouchMove}
-              onTouchEnd={onDetailTouchEnd}
-              onTouchCancel={() => {
-                detailSwipeStartY.current = null
-                detailSwipeCurrentY.current = null
-                detailSwipeStartX.current = null
-                detailSwipeCurrentX.current = null
-                detailSwipeStartedAt.current = null
-                setDetailDragOffsetY(0)
-              }}
+              className="relative z-[67] flex max-h-[min(90dvh,880px)] min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
             >
               <div
-                ref={detailContentRef}
-                className="mx-auto max-h-[68vh] w-full max-w-4xl overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6"
+                className="shrink-0 border-b border-white/10 px-4 pb-3 pt-3 sm:px-6"
+                onTouchStart={onDetailTouchStart}
+                onTouchMove={onDetailTouchMove}
+                onTouchEnd={onDetailTouchEnd}
+                onTouchCancel={() => {
+                  detailSwipeStartY.current = null
+                  detailSwipeCurrentY.current = null
+                  detailSwipeStartX.current = null
+                  detailSwipeCurrentX.current = null
+                  detailSwipeStartedAt.current = null
+                  setDetailDragOffsetY(0)
+                }}
               >
                 <div
                   data-detail-swipe-handle
@@ -575,7 +574,7 @@ export function GreekGrammarReaderClient() {
                   <div className="h-1.5 w-14 rounded-full bg-white/25" />
                   <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Swipe down from here to close</p>
                 </div>
-                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="mx-auto flex max-w-4xl items-center justify-between">
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Greek · Word</p>
                     <p className="mt-0.5 text-sm text-white/80" lang="el">
@@ -591,7 +590,11 @@ export function GreekGrammarReaderClient() {
                     <X className="size-4" />
                   </button>
                 </div>
-
+              </div>
+              <div
+                ref={detailContentRef}
+                className="touch-pan-y mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1 [-webkit-overflow-scrolling:touch] sm:px-6"
+              >
                 <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
 
                 <GreekCoachLab
