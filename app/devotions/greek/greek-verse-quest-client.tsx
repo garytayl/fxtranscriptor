@@ -2,10 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, ExternalLink, Flame, Menu, Sparkles, X } from "lucide-react"
+import {
+  ArrowLeft,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Flame,
+  Lightbulb,
+  Menu,
+  RefreshCw,
+  Sparkles,
+  Target,
+  Trash2,
+  X,
+  Zap,
+} from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
-import { GreekAiCoachBlock } from "@/app/devotions/greek/greek-ai-coach-block"
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { getMorphHintAbbrev } from "@/lib/bible/greek-morph-hints"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
@@ -36,15 +51,20 @@ import {
 } from "@/app/devotions/greek/greek-pilot-verse-shared"
 
 const WORD_XP = 12
+const COACH_XP = 20
 const LEVEL_COMPLETE_XP = 24
 const PERFECT_LEVEL_BONUS_XP = 10
 const QUEST_MIN_TARGETS = 3
 const QUEST_MAX_TARGETS = 5
 const DAILY_VERSE_RUN_KEY = "daily-verse-run"
+const DAILY_VERSE_RUN_STATE_KEY = "fx_devotions_greek_v1_daily_run_state"
+const COACH_HISTORY_LIMIT = 6
 
 type QuestWordStage = "challenge" | "revealed"
 type QuestWordChallenge = {
   targetIndex: number
+  kind: "lemma" | "part-of-speech" | "case" | "number" | "gender" | "tense" | "voice" | "mood"
+  prompt: string
   options: string[]
   correctOptionIndex: number
 }
@@ -55,9 +75,211 @@ type LevelCompleteState = {
   learnedWords: number
   encouragement: string
 }
+type DailyVerseRunState = {
+  date: string
+  levelKey: string
+  completed: boolean
+}
+type DailyVerseAssignment = {
+  pilotIdx: number
+  verse: number
+  levelKey: string
+  label: string
+}
+type GreekCoachPayload = {
+  insight: string
+  prayerPrompt?: string
+  microGloss?: string
+  grammarHook?: string
+  reflectionPrompt?: string
+}
+type CoachHistoryItem = {
+  id: string
+  question: string
+  insight: string
+}
+type CoachQuickAction = {
+  id: string
+  label: string
+  prompt: string
+}
+
+const POS_LABELS: Record<string, string> = {
+  N: "Noun",
+  V: "Verb",
+  A: "Adjective",
+  D: "Adverb",
+  P: "Pronoun",
+  R: "Article / Pronoun",
+  C: "Conjunction",
+  I: "Interjection",
+  T: "Particle",
+}
+
+const CASE_LABELS: Record<string, string> = {
+  N: "Nominative",
+  G: "Genitive",
+  D: "Dative",
+  A: "Accusative",
+  V: "Vocative",
+}
+
+const NUMBER_LABELS: Record<string, string> = {
+  S: "Singular",
+  P: "Plural",
+}
+
+const GENDER_LABELS: Record<string, string> = {
+  M: "Masculine",
+  F: "Feminine",
+  N: "Neuter",
+}
+
+const TENSE_LABELS: Record<string, string> = {
+  P: "Present",
+  I: "Imperfect",
+  F: "Future",
+  A: "Aorist",
+  X: "Perfect",
+  Y: "Pluperfect",
+  T: "Future Perfect",
+}
+
+const VOICE_LABELS: Record<string, string> = {
+  A: "Active",
+  M: "Middle",
+  P: "Passive",
+}
+
+const MOOD_LABELS: Record<string, string> = {
+  I: "Indicative",
+  D: "Imperative",
+  S: "Subjunctive",
+  O: "Optative",
+  N: "Infinitive",
+  P: "Participle",
+}
+
+function todayDateKey(date = new Date()): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function dayNumberFromDateKey(dateKey: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey)
+  if (!match) return Math.floor(Date.now() / 86400000)
+  const y = Number.parseInt(match[1], 10)
+  const m = Number.parseInt(match[2], 10)
+  const d = Number.parseInt(match[3], 10)
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return Math.floor(Date.now() / 86400000)
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000)
+}
+
+function normalizeModulo(value: number, mod: number): number {
+  if (mod <= 0) return 0
+  const rem = value % mod
+  return rem < 0 ? rem + mod : rem
+}
+
+function buildDailyVerseAssignment(dateKey: string): DailyVerseAssignment {
+  if (MORPH_PILOT_CHAPTERS.length === 0) {
+    return {
+      pilotIdx: 0,
+      verse: 1,
+      levelKey: "john-1-1",
+      label: "John 1",
+    }
+  }
+  const totalVerses = MORPH_PILOT_CHAPTERS.reduce((sum, item) => sum + Math.max(1, item.maxVerse), 0)
+  const dayIndex = normalizeModulo(dayNumberFromDateKey(dateKey), Math.max(1, totalVerses))
+  let cursor = dayIndex
+  for (let i = 0; i < MORPH_PILOT_CHAPTERS.length; i++) {
+    const chapter = MORPH_PILOT_CHAPTERS[i]
+    if (cursor < chapter.maxVerse) {
+      const verse = cursor + 1
+      return {
+        pilotIdx: i,
+        verse,
+        levelKey: `${chapter.bookSlug}-${chapter.chapter}-${verse}`,
+        label: chapter.label,
+      }
+    }
+    cursor -= chapter.maxVerse
+  }
+  const fallback = MORPH_PILOT_CHAPTERS[0]
+  return {
+    pilotIdx: 0,
+    verse: 1,
+    levelKey: `${fallback.bookSlug}-${fallback.chapter}-1`,
+    label: fallback.label,
+  }
+}
+
+function parseDailyVerseRunState(raw: string | null): DailyVerseRunState | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<DailyVerseRunState>
+    if (
+      typeof parsed.date !== "string" ||
+      typeof parsed.levelKey !== "string" ||
+      typeof parsed.completed !== "boolean"
+    ) {
+      return null
+    }
+    return {
+      date: parsed.date,
+      levelKey: parsed.levelKey,
+      completed: parsed.completed,
+    }
+  } catch {
+    return null
+  }
+}
+
+function getDailyVerseRunState(): DailyVerseRunState | null {
+  if (typeof window === "undefined") return null
+  return parseDailyVerseRunState(window.localStorage.getItem(DAILY_VERSE_RUN_STATE_KEY))
+}
+
+function saveDailyVerseRunState(state: DailyVerseRunState): void {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(DAILY_VERSE_RUN_STATE_KEY, JSON.stringify(state))
+}
 
 function wordFormKey(token: GreekMorphToken): string {
   return `${token.lemma}|${token.parse}`
+}
+
+function normalizeParseTemplate(parse: string): string {
+  const raw = (parse || "").trim()
+  if (raw.length >= 8) return raw.slice(0, 8)
+  return raw.padEnd(8, "-")
+}
+
+function stableHash(input: string): number {
+  let h = 0
+  for (let i = 0; i < input.length; i++) {
+    h = (h * 31 + input.charCodeAt(i)) >>> 0
+  }
+  return h
+}
+
+function buildChallengeOptions(correct: string, pool: string[], seed: number): string[] {
+  const uniquePool = Array.from(new Set(pool.filter((item) => item && item !== correct))).sort((a, b) =>
+    a.localeCompare(b),
+  )
+  const limit = Math.min(3, uniquePool.length)
+  const start = uniquePool.length > 0 ? seed % uniquePool.length : 0
+  const distractors: string[] = []
+  for (let i = 0; i < limit; i++) {
+    distractors.push(uniquePool[(start + i) % uniquePool.length])
+  }
+  const options = Array.from(new Set([correct, ...distractors]))
+  const rotateBy = options.length > 0 ? seed % options.length : 0
+  const rotated = options.slice(rotateBy).concat(options.slice(0, rotateBy))
+  return rotated
 }
 
 function pickQuestTargetIndexes(
@@ -89,18 +311,98 @@ function pickQuestTargetIndexes(
 function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number): QuestWordChallenge | null {
   const target = tokens[targetIndex]
   if (!target) return null
-  const pool = Array.from(new Set(tokens.map((t) => t.lemma)))
-  const distractors = pool
-    .filter((lemma) => lemma !== target.lemma)
-    .sort((a, b) => a.localeCompare(b))
-    .slice(0, 3)
-  const optionSet = new Set<string>([target.lemma, ...distractors])
-  const options = Array.from(optionSet)
+  const parseTemplate = normalizeParseTemplate(target.parse)
+  const posKey = (target.pos || "").trim().charAt(0)
+  const posLabel = POS_LABELS[posKey]
+  const caseCode = parseTemplate[4]
+  const numberCode = parseTemplate[5]
+  const genderCode = parseTemplate[6]
+  const tenseCode = parseTemplate[1]
+  const voiceCode = parseTemplate[2]
+  const moodCode = parseTemplate[3]
+
+  const seed = stableHash(`${target.word}|${target.lemma}|${target.parse}|${targetIndex}`)
+  const challengeKinds: QuestWordChallenge["kind"][] = []
+
+  if (target.lemma) challengeKinds.push("lemma")
+  if (posLabel) challengeKinds.push("part-of-speech")
+  if (CASE_LABELS[caseCode]) challengeKinds.push("case")
+  if (NUMBER_LABELS[numberCode]) challengeKinds.push("number")
+  if (GENDER_LABELS[genderCode]) challengeKinds.push("gender")
+  if (target.pos.startsWith("V")) {
+    if (TENSE_LABELS[tenseCode]) challengeKinds.push("tense")
+    if (VOICE_LABELS[voiceCode]) challengeKinds.push("voice")
+    if (MOOD_LABELS[moodCode]) challengeKinds.push("mood")
+  }
+  if (challengeKinds.length === 0) return null
+
+  const kind = challengeKinds[seed % challengeKinds.length]
+
+  const lemmaPool = Array.from(new Set(tokens.map((t) => t.lemma).filter(Boolean)))
+  const posPool = Array.from(
+    new Set(
+      tokens
+        .map((t) => POS_LABELS[(t.pos || "").trim().charAt(0)])
+        .filter((label): label is string => Boolean(label)),
+    ),
+  )
+
+  let correct = ""
+  let prompt = ""
+  let pool: string[] = []
+
+  switch (kind) {
+    case "lemma":
+      correct = target.lemma
+      prompt = "Which lemma matches this word form?"
+      pool = lemmaPool
+      break
+    case "part-of-speech":
+      correct = posLabel
+      prompt = "What part of speech is this form?"
+      pool = posPool.length >= 2 ? posPool : Object.values(POS_LABELS)
+      break
+    case "case":
+      correct = CASE_LABELS[caseCode]
+      prompt = "Which case does this form use?"
+      pool = Object.values(CASE_LABELS)
+      break
+    case "number":
+      correct = NUMBER_LABELS[numberCode]
+      prompt = "Is this form singular or plural?"
+      pool = Object.values(NUMBER_LABELS)
+      break
+    case "gender":
+      correct = GENDER_LABELS[genderCode]
+      prompt = "What gender is this form?"
+      pool = Object.values(GENDER_LABELS)
+      break
+    case "tense":
+      correct = TENSE_LABELS[tenseCode]
+      prompt = "Which tense best matches this verb form?"
+      pool = Object.values(TENSE_LABELS)
+      break
+    case "voice":
+      correct = VOICE_LABELS[voiceCode]
+      prompt = "What voice is this verb form?"
+      pool = Object.values(VOICE_LABELS)
+      break
+    case "mood":
+      correct = MOOD_LABELS[moodCode]
+      prompt = "Which mood best matches this verb form?"
+      pool = Object.values(MOOD_LABELS)
+      break
+    default:
+      return null
+  }
+
+  if (!correct) return null
+  const options = buildChallengeOptions(correct, pool, seed)
   if (options.length < 2) return null
-  options.sort((a, b) => a.localeCompare(b))
-  const correctOptionIndex = options.findIndex((x) => x === target.lemma)
+  const correctOptionIndex = options.findIndex((x) => x === correct)
   if (correctOptionIndex < 0) return null
-  return { targetIndex, options, correctOptionIndex }
+
+  return { targetIndex, kind, prompt, options, correctOptionIndex }
 }
 
 export function GreekVerseQuestClient() {
@@ -143,13 +445,22 @@ export function GreekVerseQuestClient() {
   const [dailyVerseRunDone, setDailyVerseRunDone] = useState(false)
   const [levelComplete, setLevelComplete] = useState<LevelCompleteState | null>(null)
   const [microWinBurst, setMicroWinBurst] = useState<string | null>(null)
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [coachError, setCoachError] = useState<string | null>(null)
+  const [coachPayload, setCoachPayload] = useState<GreekCoachPayload | null>(null)
+  const [coachTokenKey, setCoachTokenKey] = useState<string | null>(null)
+  const [coachQuestion, setCoachQuestion] = useState("")
+  const [coachHistory, setCoachHistory] = useState<CoachHistoryItem[]>([])
+  const [coachCopied, setCoachCopied] = useState(false)
   const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
     getGreekProgressSnapshot(getGreekStudyProgress()),
   )
   const [xpBurst, setXpBurst] = useState<number | null>(null)
+  const todayKey = useMemo(() => todayDateKey(), [])
+  const dailyVerseAssignment = useMemo(() => buildDailyVerseAssignment(todayKey), [todayKey])
 
   const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
-  const verseGreekLine = useMemo(() => greekTokens.map((t) => t.word).join(" "), [greekTokens])
+  const onDailyVerse = levelKey === dailyVerseAssignment.levelKey
   const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 2), [wordMemory])
   const levelProgressPct = questTargetIndexes.length
     ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
@@ -213,7 +524,26 @@ export function GreekVerseQuestClient() {
     if (!hydrated) return
     if (initializedDailySession.current) return
     initializedDailySession.current = true
-  }, [hydrated])
+    const stored = getDailyVerseRunState()
+    const doneToday =
+      stored?.date === todayKey &&
+      stored.levelKey === dailyVerseAssignment.levelKey &&
+      stored.completed === true
+    setDailyVerseRunDone(doneToday)
+    saveDailyVerseRunState({
+      date: todayKey,
+      levelKey: dailyVerseAssignment.levelKey,
+      completed: doneToday,
+    })
+    setPilotIdx(dailyVerseAssignment.pilotIdx)
+    setVerse(dailyVerseAssignment.verse)
+  }, [
+    hydrated,
+    todayKey,
+    dailyVerseAssignment.levelKey,
+    dailyVerseAssignment.pilotIdx,
+    dailyVerseAssignment.verse,
+  ])
 
   useEffect(() => {
     if (loading) {
@@ -247,6 +577,13 @@ export function GreekVerseQuestClient() {
   const closeDetails = useCallback(() => {
     setSelectedWordIndex(null)
     setQuestStage("challenge")
+    setCoachPayload(null)
+    setCoachError(null)
+    setCoachLoading(false)
+    setCoachTokenKey(null)
+    setCoachQuestion("")
+    setCoachHistory([])
+    setCoachCopied(false)
   }, [])
 
   useEffect(() => {
@@ -257,6 +594,12 @@ export function GreekVerseQuestClient() {
     applyRolodexSelection()
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
+
+  const jumpToDailyVerse = useCallback(() => {
+    setPilotIdx(dailyVerseAssignment.pilotIdx)
+    setVerse(dailyVerseAssignment.verse)
+    setMenuOpen(false)
+  }, [dailyVerseAssignment.pilotIdx, dailyVerseAssignment.verse])
 
   const finishVerseIfComplete = useCallback(
     (nextCompleted: number[], nextCorrect: number[]) => {
@@ -296,13 +639,35 @@ export function GreekVerseQuestClient() {
         encouragement,
       })
       setMicroWinBurst(correctWords > 0 ? "Level complete" : "Level complete - no XP")
-      const runKey = `${levelKey}-${new Date().toISOString().slice(0, 10)}`
-      if (!dailyVerseRunDone && correctWords === questTargetIndexes.length) {
-        awardProgress({ kind: "session", key: `${DAILY_VERSE_RUN_KEY}-${runKey}`, xp: PERFECT_LEVEL_BONUS_XP })
+      if (!dailyVerseRunDone && levelKey === dailyVerseAssignment.levelKey) {
+        const perfectDailyRun = correctWords === questTargetIndexes.length
+        if (perfectDailyRun) {
+          awardProgress({
+            kind: "session",
+            key: `${DAILY_VERSE_RUN_KEY}-${todayKey}-${dailyVerseAssignment.levelKey}`,
+            xp: PERFECT_LEVEL_BONUS_XP,
+          })
+        }
         setDailyVerseRunDone(true)
+        saveDailyVerseRunState({
+          date: todayKey,
+          levelKey: dailyVerseAssignment.levelKey,
+          completed: true,
+        })
+        setMicroWinBurst(perfectDailyRun ? "Daily run complete + bonus XP" : "Daily run complete")
       }
     },
-    [questTargetIndexes, levelComplete?.levelKey, levelKey, greekTokens, wordMemory, awardProgress, dailyVerseRunDone],
+    [
+      questTargetIndexes,
+      levelComplete?.levelKey,
+      levelKey,
+      greekTokens,
+      wordMemory,
+      awardProgress,
+      dailyVerseRunDone,
+      todayKey,
+      dailyVerseAssignment.levelKey,
+    ],
   )
 
   const handleSelectGreekWord = useCallback(
@@ -310,6 +675,13 @@ export function GreekVerseQuestClient() {
       if (!questTargetIndexes.includes(wordIndex)) return
       setSelectedWordIndex(wordIndex)
       setQuestStage("challenge")
+      setCoachPayload(null)
+      setCoachError(null)
+      setCoachLoading(false)
+      setCoachTokenKey(null)
+      setCoachQuestion("")
+      setCoachHistory([])
+      setCoachCopied(false)
       const challenge = buildChallengeForTarget(greekTokens, wordIndex)
       setQuestChallenge(challenge)
     },
@@ -524,6 +896,161 @@ export function GreekVerseQuestClient() {
   const selectedMemory = selectedToken ? wordMemory[wordFormKey(selectedToken)] : null
   const selectedFamiliarity: GreekWordFamiliarity = selectedMemory?.familiarity ?? "new"
   const selectedFamiliarityLabel = getWordFamiliarityLabel(selectedFamiliarity)
+  const defaultCoachQuestion = selectedTokenLearningClues?.articleFunctionHint
+    ? "What is the article doing here?"
+    : "Why is this form parsed this way?"
+  const activeCoachKey =
+    selectedToken && selectedWordIndex != null
+      ? `${levelKey}-${selectedWordIndex}-${selectedToken.word}`
+      : null
+  const verseGreekContext = greekTokens.map((tok) => tok.word).join(" ")
+  const quickActions = useMemo<CoachQuickAction[]>(
+    () => [
+      { id: "article", label: "Article", prompt: "What is this article doing in this phrase?" },
+      { id: "syntax", label: "Syntax role", prompt: "What role does this word play in the sentence?" },
+      { id: "case", label: "Case logic", prompt: "Why this case here, and what does it signal?" },
+      { id: "tense", label: "Tense force", prompt: "What force does this tense/aspect add in context?" },
+      { id: "compare", label: "Compare forms", prompt: "How would the meaning change if a different form were used?" },
+      { id: "memory", label: "Memory hook", prompt: "Give me a memory hook for this exact form." },
+      { id: "prayer", label: "Prayer bridge", prompt: "Turn this grammar insight into a short prayer prompt." },
+    ],
+    [],
+  )
+  const coachCanAsk = Boolean(selectedToken && activeCoachKey && !coachLoading)
+  const coachMicroFocus = selectedTokenLearningClues?.parseTemplate ?? selectedToken?.parse ?? ""
+
+  useEffect(() => {
+    if (!activeCoachKey) {
+      setCoachPayload(null)
+      setCoachError(null)
+      setCoachQuestion("")
+      setCoachHistory([])
+      setCoachCopied(false)
+      return
+    }
+    if (coachTokenKey?.startsWith(`${activeCoachKey}|`)) return
+    setCoachPayload(null)
+    setCoachError(null)
+    setCoachQuestion("")
+    setCoachHistory([])
+    setCoachCopied(false)
+  }, [activeCoachKey, coachTokenKey])
+
+  const runCoach = useCallback(async (explicitQuestion?: string) => {
+    if (!selectedToken || !activeCoachKey || coachLoading) return
+    const resolvedQuestion = (explicitQuestion ?? coachQuestion).trim()
+    const requestKey = `${activeCoachKey}|${resolvedQuestion.toLowerCase()}`
+    if (coachTokenKey === requestKey && coachPayload) return
+    setCoachLoading(true)
+    setCoachError(null)
+    setCoachCopied(false)
+    try {
+      const response = await fetch("/api/devotions/greek-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: passageRef,
+          greekWord: selectedToken.word,
+          lemma: selectedToken.lemma,
+          parse: selectedToken.parse,
+          category: POS_LABELS[(selectedToken.pos || "").trim().charAt(0)] ?? selectedToken.pos,
+          parseSummary: selectedTokenLearningClues?.quickReason ?? selectedToken.parse,
+          english,
+          verseGreek: verseGreekContext,
+          userQuestion: resolvedQuestion || undefined,
+        }),
+      })
+      const data = (await response.json()) as
+        | {
+            insight?: string
+            prayerPrompt?: string
+            microGloss?: string
+            grammarHook?: string
+            reflectionPrompt?: string
+            error?: string
+          }
+        | undefined
+      const insight =
+        data?.insight ??
+        [data?.microGloss, data?.grammarHook]
+          .filter((s): s is string => typeof s === "string" && s.length > 0)
+          .join(" ")
+      const prayerPrompt = data?.prayerPrompt ?? data?.reflectionPrompt
+      if (!response.ok || !insight || !prayerPrompt) {
+        throw new Error(data?.error || "Coach insight unavailable right now.")
+      }
+      const nextPayload: GreekCoachPayload = {
+        insight: insight.trim(),
+        prayerPrompt: prayerPrompt.trim(),
+        microGloss: typeof data?.microGloss === "string" ? data.microGloss.trim() : undefined,
+        grammarHook: typeof data?.grammarHook === "string" ? data.grammarHook.trim() : undefined,
+        reflectionPrompt: typeof data?.reflectionPrompt === "string" ? data.reflectionPrompt.trim() : undefined,
+      }
+      setCoachPayload(nextPayload)
+      setCoachTokenKey(requestKey)
+      setCoachHistory((prev) => {
+        const nextItem: CoachHistoryItem = {
+          id: requestKey,
+          question: resolvedQuestion || "Coach me",
+          insight: nextPayload.insight,
+        }
+        return [nextItem, ...prev.filter((entry) => entry.id !== requestKey)].slice(0, COACH_HISTORY_LIMIT)
+      })
+      awardProgress({
+        kind: "coach",
+        key: requestKey,
+        xp: COACH_XP,
+      })
+    } catch (err) {
+      setCoachError(err instanceof Error ? err.message : "Coach insight unavailable right now.")
+    } finally {
+      setCoachLoading(false)
+    }
+  }, [
+    selectedToken,
+    activeCoachKey,
+    coachLoading,
+    coachTokenKey,
+    coachPayload,
+    coachQuestion,
+    passageRef,
+    english,
+    verseGreekContext,
+    selectedTokenLearningClues?.quickReason,
+    awardProgress,
+  ])
+
+  const handleAskCoach = useCallback(
+    (prompt?: string) => {
+      if (!coachCanAsk) return
+      if (typeof prompt === "string") {
+        setCoachQuestion(prompt)
+      }
+      void runCoach(prompt)
+    },
+    [coachCanAsk, runCoach],
+  )
+
+  const copyCoachInsight = useCallback(async () => {
+    if (!coachPayload || typeof navigator === "undefined" || !navigator.clipboard) return
+    const lines = [
+      `Word: ${selectedToken?.word ?? ""}`,
+      `Question: ${coachQuestion.trim() || "Coach me"}`,
+      `Insight: ${coachPayload.insight}`,
+      `Prayer Prompt: ${coachPayload.prayerPrompt ?? ""}`,
+    ]
+    if (coachPayload.grammarHook) lines.push(`Grammar Hook: ${coachPayload.grammarHook}`)
+    if (coachPayload.microGloss) lines.push(`Micro Gloss: ${coachPayload.microGloss}`)
+    if (coachPayload.reflectionPrompt) lines.push(`Reflection Prompt: ${coachPayload.reflectionPrompt}`)
+    await navigator.clipboard.writeText(lines.join("\n"))
+    setCoachCopied(true)
+    window.setTimeout(() => setCoachCopied(false), 1500)
+  }, [coachPayload, selectedToken?.word, coachQuestion])
+
+  const clearCoachHistory = useCallback(() => {
+    setCoachHistory([])
+  }, [])
+
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
 
   return (
@@ -744,6 +1271,23 @@ export function GreekVerseQuestClient() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
+                    onClick={jumpToDailyVerse}
+                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                      onDailyVerse
+                        ? dailyVerseRunDone
+                          ? "border-emerald-300/45 bg-emerald-400/18 text-emerald-50"
+                          : "border-emerald-300/45 bg-emerald-300/12 text-emerald-100"
+                        : "border-emerald-300/40 bg-emerald-400/12 text-emerald-100 hover:bg-emerald-400/20"
+                    }`}
+                  >
+                    {onDailyVerse
+                      ? dailyVerseRunDone
+                        ? "Daily run complete"
+                        : "Today's run active"
+                      : `Daily verse ${dailyVerseAssignment.label}:${dailyVerseAssignment.verse}`}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setReviewMode((v) => !v)}
                     className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
                       reviewMode
@@ -813,6 +1357,22 @@ export function GreekVerseQuestClient() {
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
           <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
+            <span
+              className={`rounded-full border px-2.5 py-1 ${
+                onDailyVerse
+                  ? dailyVerseRunDone
+                    ? "border-emerald-300/45 bg-emerald-400/14 text-emerald-50"
+                    : "border-emerald-300/35 bg-emerald-300/10 text-emerald-100"
+                  : "border-white/20 bg-white/[0.03] text-white/70"
+              }`}
+            >
+              <Target className="mr-1 inline size-3.5" />
+              {onDailyVerse
+                ? dailyVerseRunDone
+                  ? "Daily run done"
+                  : "Daily run in progress"
+                : `Today ${dailyVerseAssignment.label}:${dailyVerseAssignment.verse}`}
+            </span>
             <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1">
               Targets {completedTargetIndexes.length}/{questTargetIndexes.length}
             </span>
@@ -836,6 +1396,13 @@ export function GreekVerseQuestClient() {
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
               Verse {verse} of {pilot.maxVerse}
             </p>
+            {onDailyVerse ? (
+              <p className="font-mono text-[10px] uppercase tracking-[0.17em] text-emerald-200/70">
+                {dailyVerseRunDone
+                  ? "Daily run completed. Keep reviewing for mastery."
+                  : "Daily verse run active. Clear all targets to complete today."}
+              </p>
+            ) : null}
           </div>
 
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
@@ -988,7 +1555,7 @@ export function GreekVerseQuestClient() {
                 {questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
                   <div className="mb-3 rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
-                    <p className="mt-1 text-sm text-white/85">Which lemma matches this word form?</p>
+                    <p className="mt-1 text-sm text-white/85">{questChallenge.prompt}</p>
                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {questChallenge.options.map((option, idx) => (
                         <button
@@ -1021,22 +1588,182 @@ export function GreekVerseQuestClient() {
                       {selectedTokenLearningClues?.quickReason ??
                         `Lemma ${selectedToken.lemma} · parse ${selectedToken.parse}`}
                     </p>
-                    {selectedWordIndex != null ? (
-                      <GreekAiCoachBlock
-                        key={`${levelKey}-coach-${selectedWordIndex}`}
-                        passageRef={passageRef}
-                        levelKey={levelKey}
-                        wordIndex={selectedWordIndex}
-                        english={english}
-                        verseGreekLine={verseGreekLine}
-                        token={selectedToken}
-                        variant="emerald"
-                        onXpAwarded={(xp) => {
-                          refreshProgress()
-                          if (xp > 0) setXpBurst(xp)
-                        }}
-                      />
-                    ) : null}
+                    <div className="mt-2 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(3,14,20,0.55))] p-3 shadow-[0_10px_30px_rgba(16,185,129,0.12)]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach Lab</p>
+                          <p className="mt-0.5 text-xs text-white/65">Quick actions, follow-up prompts, and re-ask history.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAskCoach()}
+                          disabled={!coachCanAsk}
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-300/45 bg-emerald-400/25 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-50 hover:bg-emerald-400/35 disabled:opacity-60"
+                        >
+                          <Lightbulb className="size-3.5" />
+                          {coachLoading ? "Thinking..." : "Coach me"}
+                        </button>
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Current focus</p>
+                        <p className="mt-1 text-xs text-white/82">
+                          {selectedToken.word} ({selectedToken.lemma}) - {coachMicroFocus}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <input
+                            value={coachQuestion}
+                            onChange={(e) => setCoachQuestion(e.target.value)}
+                            placeholder="Ask a follow-up in plain English..."
+                            className="flex-1 rounded-xl border border-emerald-300/35 bg-black/35 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/60 focus:outline-none"
+                            aria-label="Ask AI Greek coach a question"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAskCoach()}
+                            disabled={!coachCanAsk}
+                            className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
+                          >
+                            Ask
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {quickActions.map((action) => (
+                            <button
+                              key={action.id}
+                              type="button"
+                              onClick={() => handleAskCoach(action.prompt)}
+                              disabled={!coachCanAsk}
+                              className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => handleAskCoach(defaultCoachQuestion)}
+                            disabled={!coachCanAsk}
+                            className="rounded-full border border-emerald-300/35 bg-emerald-300/10 px-3 py-1.5 text-[11px] text-emerald-100/90 hover:bg-emerald-300/20 disabled:opacity-60"
+                          >
+                            Deep dive this form
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleAskCoach(coachHistory[0]?.question)}
+                          disabled={!coachCanAsk || coachHistory.length === 0}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
+                        >
+                          <RefreshCw className="size-3.5" />
+                          Re-ask latest
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void copyCoachInsight()}
+                          disabled={!coachPayload}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
+                        >
+                          <Copy className="size-3.5" />
+                          {coachCopied ? "Copied" : "Copy insight"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearCoachHistory}
+                          disabled={coachHistory.length === 0}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-50"
+                        >
+                          <Trash2 className="size-3.5" />
+                          Clear history
+                        </button>
+                      </div>
+
+                      {coachHistory.length > 0 ? (
+                        <div className="mt-3 rounded-xl border border-white/15 bg-black/25 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Recent coach prompts</p>
+                            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
+                              {coachHistory.length}/{COACH_HISTORY_LIMIT}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {coachHistory.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleAskCoach(item.question)}
+                                disabled={!coachCanAsk}
+                                className="w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-left hover:bg-black/30 disabled:opacity-60"
+                              >
+                                <p className="text-[11px] text-white/85">{item.question}</p>
+                                <p className="mt-0.5 line-clamp-2 text-[10px] text-white/55">{item.insight}</p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {coachError ? (
+                        <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
+                      ) : null}
+                      {coachLoading ? (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="mt-3 rounded-xl border border-emerald-200/25 bg-black/30 p-3"
+                        >
+                          <div className="flex items-center gap-2 text-emerald-100">
+                            <Sparkles className="size-4 animate-pulse" />
+                            <p className="font-mono text-[10px] uppercase tracking-[0.16em]">Coach is parsing the form</p>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            <motion.div
+                              className="h-3 rounded bg-emerald-300/20"
+                              animate={{ opacity: [0.45, 1, 0.45], x: [0, 6, 0] }}
+                              transition={{ duration: 1.1, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+                            />
+                            <motion.div
+                              className="h-3 w-5/6 rounded bg-cyan-300/20"
+                              animate={{ opacity: [0.4, 0.95, 0.4], x: [0, 8, 0] }}
+                              transition={{ duration: 1.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut", delay: 0.12 }}
+                            />
+                          </div>
+                        </motion.div>
+                      ) : null}
+                      {coachPayload ? (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-3 space-y-2 rounded-xl border border-emerald-200/25 bg-black/25 p-3"
+                        >
+                          <p className="text-sm leading-relaxed text-white/92">{coachPayload.insight}</p>
+                          {coachPayload.grammarHook ? (
+                            <p className="text-xs leading-relaxed text-cyan-100/90">Grammar hook: {coachPayload.grammarHook}</p>
+                          ) : null}
+                          {coachPayload.microGloss ? (
+                            <p className="text-xs leading-relaxed text-white/70">Micro gloss: {coachPayload.microGloss}</p>
+                          ) : null}
+                          {coachPayload.prayerPrompt ? (
+                            <p className="text-xs leading-relaxed text-emerald-100/95">{coachPayload.prayerPrompt}</p>
+                          ) : null}
+                          {coachPayload.reflectionPrompt ? (
+                            <p className="text-xs leading-relaxed text-emerald-200/85">
+                              Reflection: {coachPayload.reflectionPrompt}
+                            </p>
+                          ) : null}
+                        </motion.div>
+                      ) : !coachLoading && !coachError ? (
+                        <p className="mt-3 text-xs leading-relaxed text-white/62">
+                          Tap quick actions to drill grammar, syntax, and prayer applications for this exact word.
+                        </p>
+                      ) : null}
+                    </div>
                     <button
                       type="button"
                       onClick={continueQuest}
