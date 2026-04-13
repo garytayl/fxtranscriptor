@@ -1433,6 +1433,59 @@ export function GreekOneVerseClient() {
                 {coachError ? (
                   <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
                 ) : null}
+                {coachLoading ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 overflow-hidden rounded-xl border border-emerald-200/25 bg-black/35"
+                  >
+                    <motion.div
+                      className="h-0.5 bg-gradient-to-r from-transparent via-emerald-300/70 to-transparent"
+                      animate={{ x: ["-100%", "100%"] }}
+                      transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                    />
+                    <div className="space-y-2 p-3">
+                      <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.15em] text-emerald-100/85">
+                        <Sparkles className="size-3.5 animate-pulse" />
+                        Coach is parsing the form
+                        <span className="inline-flex items-center gap-1 text-emerald-200/90">
+                          <motion.span
+                            className="h-1.5 w-1.5 rounded-full bg-emerald-200/90"
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
+                          />
+                          <motion.span
+                            className="h-1.5 w-1.5 rounded-full bg-emerald-200/90"
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.14 }}
+                          />
+                          <motion.span
+                            className="h-1.5 w-1.5 rounded-full bg-emerald-200/90"
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.28 }}
+                          />
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <motion.div
+                          className="h-2 rounded-full bg-white/15"
+                          animate={{ opacity: [0.35, 0.75, 0.35] }}
+                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                        />
+                        <motion.div
+                          className="h-2 w-11/12 rounded-full bg-white/12"
+                          animate={{ opacity: [0.35, 0.72, 0.35] }}
+                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: 0.12 }}
+                        />
+                        <motion.div
+                          className="h-2 w-8/12 rounded-full bg-white/12"
+                          animate={{ opacity: [0.35, 0.68, 0.35] }}
+                          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: 0.24 }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
                 {coachPayload ? (
                   <motion.div
                     initial={{ opacity: 0, y: 6 }}
