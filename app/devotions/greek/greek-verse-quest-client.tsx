@@ -407,6 +407,7 @@ function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number)
 
 export function GreekVerseQuestClient() {
   const {
+    setPilotIdx,
     pilot,
     passageRef,
     readerUrl,
@@ -416,6 +417,7 @@ export function GreekVerseQuestClient() {
     english,
     greekTokens,
     verse,
+    setVerse,
     prevVerse,
     nextVerse,
     rolodexBookSlug,
