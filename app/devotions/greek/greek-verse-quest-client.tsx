@@ -391,7 +391,7 @@ function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number)
   switch (kind) {
     case "lemma":
       correct = target.lemma
-      prompt = "Which lemma matches this word form?"
+      prompt = "What's the base word here—the form you'd look up in a dictionary?"
       pool = lemmaPool
       break
     case "part-of-speech":
