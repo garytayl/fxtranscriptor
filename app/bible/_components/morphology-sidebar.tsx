@@ -58,7 +58,10 @@ export function MorphologySidebarPanel({
               {token.word}
             </p>
             <p className="text-sm text-white/55 mt-0.5">
-              Lemma: <span lang="el">{token.lemma}</span>
+              Dictionary form (lemma): <span lang="el">{token.lemma}</span>
+            </p>
+            <p className="text-[11px] text-white/45 mt-0.5">
+              This is the base form you would look up in a Greek lexicon.
             </p>
           </div>
           <div>
