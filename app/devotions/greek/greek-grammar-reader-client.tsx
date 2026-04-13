@@ -551,10 +551,10 @@ export function GreekGrammarReaderClient() {
               animate={{ y: detailDragOffsetY }}
               exit={{ y: "100%" }}
               transition={detailDragOffsetY > 0 ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
-              className="relative z-[67] flex max-h-[min(90dvh,880px)] min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
+              className="relative z-[67] grid h-[min(90dvh,880px)] w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
             >
               <div
-                className="shrink-0 border-b border-white/10 px-4 pb-3 pt-3 sm:px-6"
+                className="border-b border-white/10 px-4 pb-3 pt-3 sm:px-6"
                 onTouchStart={onDetailTouchStart}
                 onTouchMove={onDetailTouchMove}
                 onTouchEnd={onDetailTouchEnd}
@@ -593,7 +593,7 @@ export function GreekGrammarReaderClient() {
               </div>
               <div
                 ref={detailContentRef}
-                className="touch-pan-y mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1 [-webkit-overflow-scrolling:touch] sm:px-6"
+                className="mx-auto h-full min-h-0 w-full max-w-4xl overflow-x-hidden overflow-y-scroll overscroll-y-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1 [-webkit-overflow-scrolling:touch] sm:px-6"
               >
                 <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
 
