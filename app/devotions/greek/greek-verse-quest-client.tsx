@@ -35,6 +35,7 @@ import {
   type GreekWordMemory,
 } from "@/lib/devotions-greek-word-memory"
 import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
+import { buildLemmaQuizLabelMap, normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
 
 import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
 import {
@@ -389,11 +390,16 @@ function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number)
   let pool: string[] = []
 
   switch (kind) {
-    case "lemma":
-      correct = target.lemma
-      prompt = "Which Greek word is this form of?"
+    case "lemma": {
+      const lemmaNorm = normalizeGreekLemma(target.lemma)
+      const labelByLemma = buildLemmaQuizLabelMap(lemmaPool)
+      correct = labelByLemma.get(lemmaNorm) ?? ""
       pool = lemmaPool
+        .map((l) => labelByLemma.get(normalizeGreekLemma(l)))
+        .filter((label): label is string => Boolean(label))
+      prompt = "Which English meaning matches this word's lemma?"
       break
+    }
     case "part-of-speech":
       correct = posLabel
       prompt = "What part of speech is this form?"

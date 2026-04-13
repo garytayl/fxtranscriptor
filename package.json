@@ -10,7 +10,8 @@
     "test": "vitest run",
     "populate-john-series": "npx tsx scripts/populate-john-series.ts",
     "merge-sources": "npx tsx scripts/merge-podbean-youtube.ts",
-    "extract-metadata": "npx tsx scripts/extract-metadata-from-existing.ts"
+    "extract-metadata": "npx tsx scripts/extract-metadata-from-existing.ts",
+    "generate:greek-lemma-english": "node scripts/generate-greek-lemma-english-map.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
