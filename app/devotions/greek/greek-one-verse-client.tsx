@@ -50,6 +50,8 @@ type PassageVerse = { number: number; text: string }
 type QuestWordStage = "challenge" | "revealed"
 type QuestWordChallenge = {
   targetIndex: number
+  kind: "lemma" | "part-of-speech" | "case" | "number" | "gender" | "tense" | "voice" | "mood"
+  prompt: string
   options: string[]
   correctOptionIndex: number
 }
@@ -75,6 +77,62 @@ type GreekCoachPayload = {
   insight: string
   microGloss?: string
   grammarHook?: string
+}
+
+const POS_LABELS: Record<string, string> = {
+  N: "Noun",
+  V: "Verb",
+  A: "Adjective",
+  D: "Adverb",
+  P: "Pronoun",
+  R: "Article / Pronoun",
+  C: "Conjunction",
+  I: "Interjection",
+  T: "Particle",
+}
+
+const CASE_LABELS: Record<string, string> = {
+  N: "Nominative",
+  G: "Genitive",
+  D: "Dative",
+  A: "Accusative",
+  V: "Vocative",
+}
+
+const NUMBER_LABELS: Record<string, string> = {
+  S: "Singular",
+  P: "Plural",
+}
+
+const GENDER_LABELS: Record<string, string> = {
+  M: "Masculine",
+  F: "Feminine",
+  N: "Neuter",
+}
+
+const TENSE_LABELS: Record<string, string> = {
+  P: "Present",
+  I: "Imperfect",
+  F: "Future",
+  A: "Aorist",
+  X: "Perfect",
+  Y: "Pluperfect",
+  T: "Future Perfect",
+}
+
+const VOICE_LABELS: Record<string, string> = {
+  A: "Active",
+  M: "Middle",
+  P: "Passive",
+}
+
+const MOOD_LABELS: Record<string, string> = {
+  I: "Indicative",
+  D: "Imperative",
+  S: "Subjunctive",
+  O: "Optative",
+  N: "Infinitive",
+  P: "Participle",
 }
 
 function todayDateKey(date = new Date()): string {
@@ -194,6 +252,36 @@ function wordFormKey(token: GreekMorphToken): string {
   return `${token.lemma}|${token.parse}`
 }
 
+function normalizeParseTemplate(parse: string): string {
+  const raw = (parse || "").trim()
+  if (raw.length >= 8) return raw.slice(0, 8)
+  return raw.padEnd(8, "-")
+}
+
+function stableHash(input: string): number {
+  let h = 0
+  for (let i = 0; i < input.length; i++) {
+    h = (h * 31 + input.charCodeAt(i)) >>> 0
+  }
+  return h
+}
+
+function buildChallengeOptions(correct: string, pool: string[], seed: number): string[] {
+  const uniquePool = Array.from(new Set(pool.filter((item) => item && item !== correct))).sort((a, b) =>
+    a.localeCompare(b),
+  )
+  const limit = Math.min(3, uniquePool.length)
+  const start = uniquePool.length > 0 ? seed % uniquePool.length : 0
+  const distractors: string[] = []
+  for (let i = 0; i < limit; i++) {
+    distractors.push(uniquePool[(start + i) % uniquePool.length])
+  }
+  const options = Array.from(new Set([correct, ...distractors]))
+  const rotateBy = options.length > 0 ? seed % options.length : 0
+  const rotated = options.slice(rotateBy).concat(options.slice(0, rotateBy))
+  return rotated
+}
+
 function pickQuestTargetIndexes(
   tokens: GreekMorphToken[],
   weakSet: Set<string>,
@@ -223,18 +311,98 @@ function pickQuestTargetIndexes(
 function buildChallengeForTarget(tokens: GreekMorphToken[], targetIndex: number): QuestWordChallenge | null {
   const target = tokens[targetIndex]
   if (!target) return null
-  const pool = Array.from(new Set(tokens.map((t) => t.lemma)))
-  const distractors = pool
-    .filter((lemma) => lemma !== target.lemma)
-    .sort((a, b) => a.localeCompare(b))
-    .slice(0, 3)
-  const optionSet = new Set<string>([target.lemma, ...distractors])
-  const options = Array.from(optionSet)
+  const parseTemplate = normalizeParseTemplate(target.parse)
+  const posKey = (target.pos || "").trim().charAt(0)
+  const posLabel = POS_LABELS[posKey]
+  const caseCode = parseTemplate[4]
+  const numberCode = parseTemplate[5]
+  const genderCode = parseTemplate[6]
+  const tenseCode = parseTemplate[1]
+  const voiceCode = parseTemplate[2]
+  const moodCode = parseTemplate[3]
+
+  const seed = stableHash(`${target.word}|${target.lemma}|${target.parse}|${targetIndex}`)
+  const challengeKinds: QuestWordChallenge["kind"][] = []
+
+  if (target.lemma) challengeKinds.push("lemma")
+  if (posLabel) challengeKinds.push("part-of-speech")
+  if (CASE_LABELS[caseCode]) challengeKinds.push("case")
+  if (NUMBER_LABELS[numberCode]) challengeKinds.push("number")
+  if (GENDER_LABELS[genderCode]) challengeKinds.push("gender")
+  if (target.pos.startsWith("V")) {
+    if (TENSE_LABELS[tenseCode]) challengeKinds.push("tense")
+    if (VOICE_LABELS[voiceCode]) challengeKinds.push("voice")
+    if (MOOD_LABELS[moodCode]) challengeKinds.push("mood")
+  }
+  if (challengeKinds.length === 0) return null
+
+  const kind = challengeKinds[seed % challengeKinds.length]
+
+  const lemmaPool = Array.from(new Set(tokens.map((t) => t.lemma).filter(Boolean)))
+  const posPool = Array.from(
+    new Set(
+      tokens
+        .map((t) => POS_LABELS[(t.pos || "").trim().charAt(0)])
+        .filter((label): label is string => Boolean(label)),
+    ),
+  )
+
+  let correct = ""
+  let prompt = ""
+  let pool: string[] = []
+
+  switch (kind) {
+    case "lemma":
+      correct = target.lemma
+      prompt = "Which lemma matches this word form?"
+      pool = lemmaPool
+      break
+    case "part-of-speech":
+      correct = posLabel
+      prompt = "What part of speech is this form?"
+      pool = posPool.length >= 2 ? posPool : Object.values(POS_LABELS)
+      break
+    case "case":
+      correct = CASE_LABELS[caseCode]
+      prompt = "Which case does this form use?"
+      pool = Object.values(CASE_LABELS)
+      break
+    case "number":
+      correct = NUMBER_LABELS[numberCode]
+      prompt = "Is this form singular or plural?"
+      pool = Object.values(NUMBER_LABELS)
+      break
+    case "gender":
+      correct = GENDER_LABELS[genderCode]
+      prompt = "What gender is this form?"
+      pool = Object.values(GENDER_LABELS)
+      break
+    case "tense":
+      correct = TENSE_LABELS[tenseCode]
+      prompt = "Which tense best matches this verb form?"
+      pool = Object.values(TENSE_LABELS)
+      break
+    case "voice":
+      correct = VOICE_LABELS[voiceCode]
+      prompt = "What voice is this verb form?"
+      pool = Object.values(VOICE_LABELS)
+      break
+    case "mood":
+      correct = MOOD_LABELS[moodCode]
+      prompt = "Which mood best matches this verb form?"
+      pool = Object.values(MOOD_LABELS)
+      break
+    default:
+      return null
+  }
+
+  if (!correct) return null
+  const options = buildChallengeOptions(correct, pool, seed)
   if (options.length < 2) return null
-  options.sort((a, b) => a.localeCompare(b))
-  const correctOptionIndex = options.findIndex((x) => x === target.lemma)
+  const correctOptionIndex = options.findIndex((x) => x === correct)
   if (correctOptionIndex < 0) return null
-  return { targetIndex, options, correctOptionIndex }
+
+  return { targetIndex, kind, prompt, options, correctOptionIndex }
 }
 
 export function GreekOneVerseClient() {
@@ -1365,7 +1533,7 @@ export function GreekOneVerseClient() {
                 {questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
                   <div className="mb-3 rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
-                    <p className="mt-1 text-sm text-white/85">Which lemma matches this word form?</p>
+                    <p className="mt-1 text-sm text-white/85">{questChallenge.prompt}</p>
                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {questChallenge.options.map((option, idx) => (
                         <button
