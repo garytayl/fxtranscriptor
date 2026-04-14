@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
         english?: unknown
         verseGreek?: unknown
         userQuestion?: unknown
+        /** Optional: learner just finished a verse-quest multiple-choice on this word */
+        quizContext?: unknown
       }
     | null
 
@@ -50,6 +52,28 @@ export async function POST(request: NextRequest) {
   const verseGreek = normalizeText(payload.verseGreek, "")
   const userQuestion = normalizeText(payload.userQuestion, "")
 
+  const rawQuiz = payload.quizContext
+  let quizBlock = ""
+  if (rawQuiz && typeof rawQuiz === "object" && rawQuiz !== null) {
+    const q = rawQuiz as Record<string, unknown>
+    const qKind = normalizeText(q.kind, "")
+    const qPrompt = normalizeText(q.prompt, "")
+    const qOutcome = normalizeText(q.outcome, "")
+    const qCorrect = normalizeText(q.correctAnswer, "")
+    const qChosen = normalizeText(q.chosenAnswer, "")
+    const qOptions = Array.isArray(q.options) ? q.options.filter((x): x is string => typeof x === "string") : []
+    if (qPrompt && qOutcome) {
+      quizBlock = `
+Recent in-app quiz (same word):
+- Quiz type: ${qKind || "grammar"}
+- Question: ${qPrompt}
+- Outcome: ${qOutcome}${qChosen ? ` (learner chose: ${qChosen})` : ""}
+- Correct option: ${qCorrect || "(see question)"}
+- Options were: ${qOptions.length > 0 ? qOptions.join(" | ") : "(not listed)"}
+The learner may ask follow-ups about this quiz. Relate answers to the morphology/lemma above and why the correct option fits.`
+    }
+  }
+
   if (!greekWord || !lemma || !parse) {
     return NextResponse.json({ error: "Missing required Greek word payload fields." }, { status: 400 })
   }
@@ -65,6 +89,7 @@ Give a very concise coaching response for this selected Greek word:
 - Parse summary: ${parseSummary}
 - Greek phrase context: ${verseGreek || "(not provided)"}
 - English context: ${english || "(not provided)"}
+${quizBlock}
 ${userQuestion ? `- Learner's exact question: ${userQuestion}` : ""}
 
 Respond with strict JSON only:

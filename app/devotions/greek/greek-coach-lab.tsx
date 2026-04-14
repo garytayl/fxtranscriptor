@@ -44,6 +44,16 @@ type CoachQuickAction = {
   prompt: string
 }
 
+/** Verse quest multiple-choice context; sent to the coach API for grounded follow-ups. */
+export type GreekQuizCoachContext = {
+  kind: string
+  prompt: string
+  options: string[]
+  correctAnswer: string
+  outcome: "correct" | "incorrect" | "skipped"
+  chosenAnswer?: string
+}
+
 export function GreekCoachLab({
   levelKey,
   passageRef,
@@ -54,6 +64,7 @@ export function GreekCoachLab({
   learningClues,
   awardProgress,
   className,
+  quizContext = null,
 }: {
   levelKey: string
   passageRef: string
@@ -66,6 +77,8 @@ export function GreekCoachLab({
   awardProgress: (event: GreekProgressEvent) => number
   /** Extra classes on the outer card (e.g. top margin when below morphology). */
   className?: string
+  /** When set (e.g. after a verse-quest question), follow-ups include quiz + answer context. */
+  quizContext?: GreekQuizCoachContext | null
 }) {
   const [coachLoading, setCoachLoading] = useState(false)
   const [coachError, setCoachError] = useState<string | null>(null)
@@ -75,11 +88,38 @@ export function GreekCoachLab({
   const [coachHistory, setCoachHistory] = useState<CoachHistoryItem[]>([])
   const [coachCopied, setCoachCopied] = useState(false)
 
+  const quizSig = useMemo(() => JSON.stringify(quizContext ?? null), [quizContext])
+
   const activeCoachKey = `${levelKey}-${wordIndex}-${selectedToken.word}`
   const defaultCoachQuestion = learningClues?.articleFunctionHint
     ? "What is the article doing here?"
     : "Why is this form parsed this way?"
   const coachMicroFocus = learningClues?.parseTemplate ?? selectedToken.parse ?? ""
+
+  const quizFollowUpActions = useMemo<CoachQuickAction[]>(() => {
+    if (!quizContext) return []
+    const q = quizContext
+    const actions: CoachQuickAction[] = [
+      {
+        id: "quiz-why",
+        label: "Why this answer?",
+        prompt: `For this quiz: "${q.prompt}" — Explain why "${q.correctAnswer}" is the right choice for the Greek form ${selectedToken.word} (lemma ${selectedToken.lemma}).`,
+      },
+    ]
+    if (q.outcome === "incorrect" && q.chosenAnswer) {
+      actions.push({
+        id: "quiz-contrast",
+        label: "My pick vs correct",
+        prompt: `I answered "${q.chosenAnswer}" but the correct option was "${q.correctAnswer}" on: "${q.prompt}". What is the decisive difference for this word?`,
+      })
+    }
+    actions.push({
+      id: "quiz-next",
+      label: "What to notice next time",
+      prompt: `For a ${q.kind} question like "${q.prompt}", what should I check on the word ${selectedToken.word} before I choose?`,
+    })
+    return actions
+  }, [quizContext, selectedToken.lemma, selectedToken.word])
 
   const quickActions = useMemo<CoachQuickAction[]>(
     () => [
@@ -97,19 +137,19 @@ export function GreekCoachLab({
   const coachCanAsk = Boolean(selectedToken && activeCoachKey && !coachLoading)
 
   useEffect(() => {
-    if (coachTokenKey?.startsWith(`${activeCoachKey}|`)) return
     setCoachPayload(null)
     setCoachError(null)
     setCoachQuestion("")
     setCoachHistory([])
     setCoachCopied(false)
-  }, [activeCoachKey, coachTokenKey])
+    setCoachTokenKey(null)
+  }, [activeCoachKey, quizSig])
 
   const runCoach = useCallback(
     async (explicitQuestion?: string) => {
       if (!selectedToken || !activeCoachKey || coachLoading) return
       const resolvedQuestion = (explicitQuestion ?? coachQuestion).trim()
-      const requestKey = `${activeCoachKey}|${resolvedQuestion.toLowerCase()}`
+      const requestKey = `${activeCoachKey}|${quizSig}|${resolvedQuestion.toLowerCase()}`
       if (coachTokenKey === requestKey && coachPayload) return
       setCoachLoading(true)
       setCoachError(null)
@@ -128,6 +168,7 @@ export function GreekCoachLab({
             english,
             verseGreek: verseGreekLine,
             userQuestion: resolvedQuestion || undefined,
+            quizContext: quizContext ?? undefined,
           }),
         })
         const data = (await response.json()) as
@@ -189,6 +230,8 @@ export function GreekCoachLab({
       verseGreekLine,
       learningClues?.quickReason,
       awardProgress,
+      quizSig,
+      quizContext,
     ],
   )
 
@@ -233,7 +276,11 @@ export function GreekCoachLab({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach Lab</p>
-          <p className="mt-1 text-xs leading-relaxed text-white/65">Quick actions, follow-up prompts, and re-ask history.</p>
+          <p className="mt-1 text-xs leading-relaxed text-white/65">
+            {quizContext
+              ? "Ask GPT about this word — your last quiz is included in every request."
+              : "Quick actions, follow-up prompts, and re-ask history."}
+          </p>
         </div>
         <button
           type="button"
@@ -252,6 +299,28 @@ export function GreekCoachLab({
           {selectedToken.word} ({selectedToken.lemma}) — {coachMicroFocus}
         </p>
       </div>
+
+      {quizContext ? (
+        <div className="rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-amber-950/25 p-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-amber-100/85">Ask about this quiz</p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-white/88">
+            <span className="text-white/50">Prompt · </span>
+            {quizContext.prompt}
+          </p>
+          <p className="mt-1 text-[10px] text-white/55">
+            Result:{" "}
+            <span className="text-white/75">
+              {quizContext.outcome === "correct"
+                ? "Correct"
+                : quizContext.outcome === "skipped"
+                  ? "Revealed"
+                  : "Incorrect"}
+            </span>
+            {" · "}
+            Answer: <span className="text-amber-100/95">{quizContext.correctAnswer}</span>
+          </p>
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -273,6 +342,17 @@ export function GreekCoachLab({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {quizFollowUpActions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              onClick={() => handleAskCoach(action.prompt)}
+              disabled={!coachCanAsk}
+              className="rounded-full border border-amber-300/50 bg-amber-400/15 px-3 py-1.5 text-[11px] text-amber-50 hover:bg-amber-400/25 disabled:opacity-60"
+            >
+              {action.label}
+            </button>
+          ))}
           {quickActions.map((action) => (
             <button
               key={action.id}

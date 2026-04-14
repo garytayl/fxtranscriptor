@@ -41,7 +41,7 @@ import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
 import { buildLemmaQuizLabelMap, normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
 import { useGreekUiPreferences } from "@/lib/devotions-greek-ui-preferences"
 
-import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
+import { GreekCoachLab, type GreekQuizCoachContext } from "@/app/devotions/greek/greek-coach-lab"
 import {
   DETAIL_SWIPE_CLOSE_THRESHOLD,
   DETAIL_SWIPE_CLOSE_VELOCITY,
@@ -1007,6 +1007,27 @@ export function GreekVerseQuestClient() {
   const selectedFamiliarityLabel = getWordFamiliarityLabel(selectedFamiliarity)
   const verseGreekLine = greekTokens.map((tok) => tok.word).join(" ")
 
+  const greekCoachQuizContext = useMemo((): GreekQuizCoachContext | null => {
+    if (
+      !questQuizFeedback ||
+      !questChallenge ||
+      selectedWordIndex == null ||
+      questChallenge.targetIndex !== selectedWordIndex
+    ) {
+      return null
+    }
+    const correctAnswer = questChallenge.options[questChallenge.correctOptionIndex] ?? ""
+    return {
+      kind: questChallenge.kind,
+      prompt: questQuizFeedback.prompt,
+      options: questChallenge.options,
+      correctAnswer,
+      outcome: questQuizFeedback.outcome,
+      chosenAnswer:
+        questQuizFeedback.outcome === "incorrect" ? questQuizFeedback.chosenAnswer : undefined,
+    }
+  }, [questQuizFeedback, questChallenge, selectedWordIndex])
+
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
 
   return (
@@ -1655,22 +1676,37 @@ export function GreekVerseQuestClient() {
                   </div>
                 ) : null}
 
-                <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
+                {questStage === "revealed" ? (
+                  <div className="flex flex-col gap-4">
+                    <div className={greekCoachQuizContext ? "order-1" : "order-2"}>
+                      <GreekCoachLab
+                        key={`${levelKey}-lab-${selectedWordIndex}`}
+                        levelKey={levelKey}
+                        passageRef={passageRef}
+                        english={english}
+                        verseGreekLine={verseGreekLine}
+                        selectedToken={selectedToken}
+                        wordIndex={selectedWordIndex ?? 0}
+                        learningClues={selectedTokenLearningClues}
+                        awardProgress={awardProgress}
+                        quizContext={greekCoachQuizContext}
+                        className={greekCoachQuizContext ? "mt-0" : "mt-6"}
+                      />
+                    </div>
+                    <div className={greekCoachQuizContext ? "order-2" : "order-1"}>
+                      <MorphologySidebarPanel
+                        token={selectedToken}
+                        verseNumber={verse}
+                        wordIndex={selectedWordIndex ?? 0}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
+                )}
 
                 {questStage === "revealed" ? (
                   <>
-                    <GreekCoachLab
-                      key={`${levelKey}-lab-${selectedWordIndex}`}
-                      levelKey={levelKey}
-                      passageRef={passageRef}
-                      english={english}
-                      verseGreekLine={verseGreekLine}
-                      selectedToken={selectedToken}
-                      wordIndex={selectedWordIndex ?? 0}
-                      learningClues={selectedTokenLearningClues}
-                      awardProgress={awardProgress}
-                      className="mt-6"
-                    />
                     <button
                       type="button"
                       onClick={continueQuest}
