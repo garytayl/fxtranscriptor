@@ -16,11 +16,15 @@ import {
   resetRomansJourney,
   type RomansJourneyMode,
 } from "@/lib/romans-journey-progress"
-import { getReaderUrlFromReference } from "@/lib/bible/reference"
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 import { toast } from "sonner"
 
 type Screen = "landing" | "step" | "done"
+
+type PassagePayload = {
+  reference: string
+  verses: { number: number; text: string }[]
+}
 
 const JOURNEY_XP = 10
 
@@ -30,6 +34,10 @@ export function RomansJourneyClient() {
   const [screen, setScreen] = useState<Screen>("landing")
   const [mode, setMode] = useState<RomansJourneyMode>("free")
   const [stepIndex, setStepIndex] = useState(0)
+  const [passageOpen, setPassageOpen] = useState(false)
+  const [passage, setPassage] = useState<PassagePayload | null>(null)
+  const [passageLoading, setPassageLoading] = useState(false)
+  const [passageError, setPassageError] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -43,12 +51,48 @@ export function RomansJourneyClient() {
     }
   }, [])
 
+  useEffect(() => {
+    setPassageOpen(false)
+    setPassage(null)
+    setPassageError(null)
+    setPassageLoading(false)
+  }, [stepIndex])
+
   const step = useMemo((): RomansJourneyStep | null => {
     if (stepIndex < 0 || stepIndex >= ROMANS_JOURNEY_TOTAL) return null
     return ROMANS_JOURNEY_STEPS[stepIndex] ?? null
   }, [stepIndex])
 
-  const readerUrl = step ? getReaderUrlFromReference(step.passageRef) : null
+  const togglePassage = useCallback(async () => {
+    if (!step) return
+    if (passageOpen) {
+      setPassageOpen(false)
+      return
+    }
+    if (passage && passage.verses.length > 0) {
+      setPassageOpen(true)
+      return
+    }
+    setPassageLoading(true)
+    setPassageError(null)
+    try {
+      const res = await fetch(`/api/bible/passage?ref=${encodeURIComponent(step.passageRef)}`)
+      const data = (await res.json()) as { error?: string; reference?: string; verses?: { number: number; text: string }[] }
+      if (data.error) throw new Error(data.error)
+      const verses = data.verses ?? []
+      if (verses.length === 0) throw new Error("No verses returned for this range.")
+      setPassage({
+        reference: data.reference ?? step.passageRef,
+        verses,
+      })
+      setPassageOpen(true)
+    } catch (e) {
+      setPassageError(e instanceof Error ? e.message : "Could not load passage.")
+      toast.error("Could not load passage")
+    } finally {
+      setPassageLoading(false)
+    }
+  }, [step, passage, passageOpen])
 
   const startJourney = useCallback(() => {
     const p = getRomansJourneyProgress()
@@ -239,16 +283,16 @@ export function RomansJourneyClient() {
                 <p className="font-serif text-lg sm:text-xl text-amber-50/95 font-light leading-relaxed">{step.reflectionPrompt}</p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 mb-10">
-                {readerUrl && (
-                  <Link
-                    href={readerUrl}
-                    className="flex-1 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-white/15 bg-white/[0.04] font-mono text-[10px] tracking-[0.15em] uppercase text-white/85 hover:bg-white/[0.08] transition-colors"
-                  >
-                    <BookOpen className="w-4 h-4 text-white/50" aria-hidden />
-                    Read passage
-                  </Link>
-                )}
+              <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                <button
+                  type="button"
+                  onClick={togglePassage}
+                  disabled={passageLoading}
+                  className="flex-1 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-white/15 bg-white/[0.04] font-mono text-[10px] tracking-[0.15em] uppercase text-white/85 hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                >
+                  <BookOpen className="w-4 h-4 text-white/50" aria-hidden />
+                  {passageLoading ? "Loading…" : passageOpen ? "Hide passage" : "Read passage"}
+                </button>
                 <Link
                   href="/devotions/greek"
                   className="flex-1 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-emerald-500/25 bg-emerald-950/30 font-mono text-[10px] tracking-[0.15em] uppercase text-emerald-100/90 hover:bg-emerald-950/50 transition-colors"
@@ -257,8 +301,42 @@ export function RomansJourneyClient() {
                   Greek lab
                 </Link>
               </div>
-              <p className="font-sans text-[11px] text-white/35 text-center mb-8 -mt-4">
-                Grammar reader uses pilot verses; use Scripture for full text, Greek for word skills.
+
+              <AnimatePresence>
+                {passageOpen && passage && passage.verses.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: reduced ? 0.12 : 0.22 }}
+                    className="mb-8"
+                  >
+                    <div className="rounded-2xl border border-white/[0.08] bg-black/30 px-4 py-5 sm:px-6 max-h-[min(56vh,520px)] overflow-y-auto overscroll-contain">
+                      <p className="text-center font-mono text-[10px] tracking-[0.35em] text-amber-200/55 mb-6 uppercase">
+                        {passage.reference}
+                      </p>
+                      <div className="max-w-2xl mx-auto space-y-5">
+                        {passage.verses.map((v) => (
+                          <p
+                            key={v.number}
+                            className="font-serif text-[1.05rem] sm:text-[1.2rem] leading-[1.65] text-white/[0.92] font-light"
+                          >
+                            <sup className="font-mono text-[0.55em] text-amber-200/45 mr-1.5 tabular-nums">{v.number}</sup>
+                            {v.text}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {passageError && (
+                <p className="font-sans text-sm text-red-400/90 text-center mb-6">{passageError}</p>
+              )}
+
+              <p className="font-sans text-[11px] text-white/35 text-center mb-8">
+                Passage loads here so you stay in the journey. Greek lab uses pilot verses for morphology drills.
               </p>
 
               <div className="flex flex-col gap-3">
