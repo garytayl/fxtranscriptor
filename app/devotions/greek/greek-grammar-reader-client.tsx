@@ -462,7 +462,7 @@ export function GreekGrammarReaderClient() {
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
           </div>
 
-          <section className="flex min-h-[56vh] sm:min-h-[60vh] flex-col items-center justify-start sm:justify-center pt-3 sm:pt-0">
+          <section className="shrink-0 py-2 sm:py-3">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
@@ -479,13 +479,13 @@ export function GreekGrammarReaderClient() {
               ) : greekTokens.length > 0 ? (
                 <motion.div
                   key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
-                  initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.28, ease: "easeOut" }}
                   lang="el"
                   className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
-                  style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
+                  style={{ fontSize: "clamp(2rem, 7.2vw, 4.8rem)" }}
                 >
                   {greekTokens.map((tok, wi) => {
                     const selected = selectedWordIndex === wi
