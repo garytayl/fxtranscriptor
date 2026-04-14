@@ -78,9 +78,11 @@ The learner may ask follow-ups about this quiz. Relate answers to the morphology
     return NextResponse.json({ error: "Missing required Greek word payload fields." }, { status: 400 })
   }
 
-  const prompt = `You are a warm, spiritually grounded Koine Greek tutor helping a learner in a devotional reading app.
+  const prompt = `You are a friendly Koine Greek tutor. The learner wants to learn how to *read Greek forms*, not get a sermon about historical figures.
 
-Give a very concise coaching response for this selected Greek word:
+Priority: teach what to **notice in this exact surface word** (letters, common endings, rough breathing, obvious suffix patterns) and how that lines up with the parse code—like a coach pointing at the word, not like a commentary on Roman history.
+
+Word data:
 - Reference: ${reference}
 - Surface word: ${greekWord}
 - Lemma: ${lemma}
@@ -94,17 +96,17 @@ ${userQuestion ? `- Learner's exact question: ${userQuestion}` : ""}
 
 Respond with strict JSON only:
 {
-  "insight": "1-2 short sentences. If a learner question is provided, answer it directly first, then connect to grammar",
-  "prayerPrompt": "1 short reflective question that turns grammar into prayerful meditation",
-  "microGloss": "1 short sentence, plain English gloss and sense in context",
-  "grammarHook": "1 short sentence that teaches why this form matters",
-  "reflectionPrompt": "1 reflective question that turns grammar into prayerful meditation"
+  "insight": "1-2 sentences: what to look at in THIS spelling (e.g. ending letters, recognizable suffix, stem shape) and what that suggests. If the learner asked something, answer it briefly here first.",
+  "grammarHook": "1 sentence: tie a visible part of the surface word to the grammar (case/tense/voice/etc.). Say it in plain English—no tables, but be concrete (e.g. how -οι/-αι/-α often signal plural, augment patterns, article + noun shape).",
+  "microGloss": "1 short sentence: plain English gloss or who/what it names in this verse.",
+  "prayerPrompt": "ONE short line only: optional God-honoring takeaway from how this word works in the sentence. Do NOT repeat the same theme as reflectionPrompt.",
+  "reflectionPrompt": "ONE short question or habit: either a reading-strategy tip (what to scan for next time you see this ending) OR one light devotional angle—never two questions about authorities, rulers, or parallel themes."
 }
 
-Constraints:
-- Each field max 240 characters.
-- Never mention AI, model, or uncertainty.
-- Avoid markdown and avoid extra keys.`
+Hard rules:
+- Do not output two similar questions (e.g. both about "leaders" or "Festus in your life"). Make prayerPrompt and reflectionPrompt clearly different, or make one a concrete reading tip.
+- Do not waste the whole insight on "it's a proper noun" without saying what in the **form** supports the parse (ending, capitalization pattern in context, etc.).
+- Each field max 240 characters. No markdown. No extra keys. Never mention AI or models.`
 
   const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -120,7 +122,7 @@ Constraints:
         {
           role: "system",
           content:
-            "You are a concise Koine Greek devotional coach. Return strict JSON with the requested keys only.",
+            "You are a concise Koine Greek morphology coach for readers. Favor spelling cues and endings over abstract morals. Return strict JSON with the requested keys only.",
         },
         { role: "user", content: prompt },
       ],
@@ -153,13 +155,22 @@ Constraints:
   }
 
   return NextResponse.json({
-    insight: normalizeText(parsed.insight, normalizeText(parsed.microGloss, "This word shapes the verse's meaning in context.")),
+    insight: normalizeText(
+      parsed.insight,
+      normalizeText(parsed.microGloss, "Compare the letters at the end of this form to what your parse code names."),
+    ),
     prayerPrompt: normalizeText(
       parsed.prayerPrompt,
-      normalizeText(parsed.reflectionPrompt, "How does this word deepen your attention to Christ here?"),
+      normalizeText(parsed.reflectionPrompt, "What small spelling cue will you look for next time you meet this form?"),
     ),
     microGloss: normalizeText(parsed.microGloss, "This word helps shape the line's meaning in context."),
-    grammarHook: normalizeText(parsed.grammarHook, "Its form carries a key grammatical cue for interpretation."),
-    reflectionPrompt: normalizeText(parsed.reflectionPrompt, "How does this word deepen your attention to Christ here?"),
+    grammarHook: normalizeText(
+      parsed.grammarHook,
+      "Look at the ending (or visible suffix) and match it to case, number, or tense in your parse.",
+    ),
+    reflectionPrompt: normalizeText(
+      parsed.reflectionPrompt,
+      "Which part of this word would you trace first when checking the parse?",
+    ),
   } satisfies GreekCoachResponse)
 }

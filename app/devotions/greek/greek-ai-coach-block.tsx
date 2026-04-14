@@ -71,7 +71,8 @@ export function GreekAiCoachBlock({
           parseSummary: expanded?.parseSummary ?? token.parse,
           english,
           verseGreek: verseGreekLine,
-          userQuestion: "Give me a 1-2 sentence learning hint for this exact form.",
+          userQuestion:
+            "What should I notice in the spelling of this word (endings, letters) and how does that match the parse?",
         }),
       })
       const data = (await response.json()) as
