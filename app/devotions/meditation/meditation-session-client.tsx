@@ -59,6 +59,8 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
   const [aiError, setAiError] = useState<string | null>(null)
   /** 1-based position in series for header (non-daily). */
   const [ordinalLabel, setOrdinalLabel] = useState<string | null>(null)
+  /** Section title when series defines passageLabels (e.g. Romans). */
+  const [sectionLabel, setSectionLabel] = useState<string | null>(null)
   const [prepare, setPrepare] = useState<MeditationPrepareResponse | null>(null)
   const [prepareLoading, setPrepareLoading] = useState(false)
 
@@ -75,8 +77,10 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
     const total = passageCountForSeries(seriesId)
     if (!isDailySeriesId(seriesId) && total > 0) {
       setOrdinalLabel(`${idx + 1} / ${total}`)
+      setSectionLabel(series.passageLabels?.[idx] ?? null)
     } else {
       setOrdinalLabel(null)
+      setSectionLabel(null)
     }
     setLoadingPassage(true)
     setLoadError(null)
@@ -263,10 +267,17 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
         </Link>
       </header>
 
-      <p className="relative z-10 text-center font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase px-4 -mt-1 pb-2">
-        {seriesTitle}
-        {ordinalLabel && <span className="text-white/45"> · {ordinalLabel}</span>}
-      </p>
+      <div className="relative z-10 text-center px-4 -mt-1 pb-2 space-y-1">
+        <p className="font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase">
+          {seriesTitle}
+          {ordinalLabel && <span className="text-white/45"> · {ordinalLabel}</span>}
+        </p>
+        {sectionLabel && (
+          <p className="font-sans text-[11px] sm:text-xs text-white/45 font-light leading-snug max-w-md mx-auto">
+            {sectionLabel}
+          </p>
+        )}
+      </div>
 
       <main className="relative z-10 flex-1 min-h-0 flex flex-col">
         {loadingPassage && (

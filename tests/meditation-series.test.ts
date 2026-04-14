@@ -16,9 +16,11 @@ describe("meditation-series", () => {
 
   it("cycles romans passages by index", () => {
     const s = getMeditationSeries("romans")
-    expect(s?.passages.length).toBeGreaterThan(2)
+    expect(s?.passages.length).toBe(25)
+    expect(s?.passageLabels?.length).toBe(25)
     const n = passageCountForSeries("romans")
     expect(passageRefForSeries("romans", 0)).toBe(s!.passages[0])
     expect(passageRefForSeries("romans", n)).toBe(s!.passages[0])
+    expect(s!.passages[0]).toBe("Romans 1:1-17")
   })
 })
