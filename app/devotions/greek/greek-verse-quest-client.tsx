@@ -5,14 +5,17 @@ import Link from "next/link"
 import {
   ArrowLeft,
   BookOpen,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Eye,
   Flame,
   Menu,
   Sparkles,
   Target,
   X,
+  XCircle,
 } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
@@ -50,6 +53,17 @@ import {
 
 const WORD_XP = 12
 const LEVEL_COMPLETE_XP = 24
+
+function vibrateQuest(kind: "correct" | "incorrect" | "skipped") {
+  if (typeof navigator === "undefined" || !navigator.vibrate) return
+  try {
+    if (kind === "correct") navigator.vibrate([12, 65, 14])
+    else if (kind === "incorrect") navigator.vibrate([32, 55, 48])
+    else navigator.vibrate(14)
+  } catch {
+    /* ignore */
+  }
+}
 const PERFECT_LEVEL_BONUS_XP = 10
 const QUEST_MIN_TARGETS = 3
 const QUEST_MAX_TARGETS = 5
@@ -71,6 +85,12 @@ type LevelCompleteState = {
   learnedWords: number
   encouragement: string
 }
+
+/** Set when a quick challenge is answered; drives the outcome banner in the word sheet. */
+type QuestQuizFeedback =
+  | { outcome: "correct"; xpGained: number; prompt: string }
+  | { outcome: "incorrect"; correctAnswer: string; chosenAnswer?: string; prompt: string }
+  | { outcome: "skipped"; correctAnswer: string; prompt: string }
 type DailyVerseRunState = {
   date: string
   levelKey: string
@@ -484,6 +504,7 @@ export function GreekVerseQuestClient() {
   const [wordMemory, setWordMemory] = useState<GreekWordMemory>(() => getGreekWordMemory())
   const [questStage, setQuestStage] = useState<QuestWordStage>("challenge")
   const [questChallenge, setQuestChallenge] = useState<QuestWordChallenge | null>(null)
+  const [questQuizFeedback, setQuestQuizFeedback] = useState<QuestQuizFeedback | null>(null)
   const [questTargetIndexes, setQuestTargetIndexes] = useState<number[]>([])
   const [questCluster, setQuestCluster] = useState<{ start: number; end: number } | null>(null)
   const [completedTargetIndexes, setCompletedTargetIndexes] = useState<number[]>([])
@@ -564,7 +585,7 @@ export function GreekVerseQuestClient() {
 
   useEffect(() => {
     if (!microWinBurst) return
-    const t = window.setTimeout(() => setMicroWinBurst(null), 1500)
+    const t = window.setTimeout(() => setMicroWinBurst(null), 2200)
     return () => window.clearTimeout(t)
   }, [microWinBurst])
 
@@ -633,6 +654,7 @@ export function GreekVerseQuestClient() {
   const closeDetails = useCallback(() => {
     setSelectedWordIndex(null)
     setQuestStage("challenge")
+    setQuestQuizFeedback(null)
   }, [])
 
   useEffect(() => {
@@ -726,8 +748,10 @@ export function GreekVerseQuestClient() {
       if (completedTargetIndexes.includes(wordIndex)) {
         setQuestStage("revealed")
         setQuestChallenge(null)
+        setQuestQuizFeedback(null)
         return
       }
+      setQuestQuizFeedback(null)
       const challenge = buildChallengeForTarget(greekTokens, wordIndex)
       if (challenge) {
         setQuestStage("challenge")
@@ -741,10 +765,39 @@ export function GreekVerseQuestClient() {
   )
 
   const revealQuestWord = useCallback(
-    (wasCorrect: boolean) => {
+    (wasCorrect: boolean, meta?: { chosenIndex?: number; skipped?: boolean }) => {
       if (selectedWordIndex == null) return
       const token = greekTokens[selectedWordIndex]
       if (!token) return
+
+      const ch = questChallenge?.targetIndex === selectedWordIndex ? questChallenge : null
+      const correctAnswer =
+        ch && ch.correctOptionIndex >= 0 ? (ch.options[ch.correctOptionIndex] ?? "") : ""
+      const chosenAnswer =
+        meta?.chosenIndex != null && ch && meta.chosenIndex >= 0
+          ? (ch.options[meta.chosenIndex] ?? "")
+          : undefined
+
+      if (ch) {
+        if (meta?.skipped) {
+          setQuestQuizFeedback({ outcome: "skipped", correctAnswer, prompt: ch.prompt })
+          vibrateQuest("skipped")
+        } else if (wasCorrect) {
+          setQuestQuizFeedback({ outcome: "correct", xpGained: WORD_XP, prompt: ch.prompt })
+          vibrateQuest("correct")
+        } else {
+          setQuestQuizFeedback({
+            outcome: "incorrect",
+            correctAnswer,
+            chosenAnswer: chosenAnswer || undefined,
+            prompt: ch.prompt,
+          })
+          vibrateQuest("incorrect")
+        }
+      } else {
+        setQuestQuizFeedback(null)
+      }
+
       const key = wordFormKey(token)
       const { memory, previouslySeen, entry } = recordGreekWordMemoryTap(key, wasCorrect)
       setWordMemory(memory)
@@ -759,14 +812,16 @@ export function GreekVerseQuestClient() {
         })
       }
 
-      if (!wasCorrect) {
-        setMicroWinBurst(`Not quite: ${token.word}`)
+      if (meta?.skipped) {
+        setMicroWinBurst("Answer revealed — compare below")
+      } else if (!wasCorrect) {
+        setMicroWinBurst(`Not quite — ${correctAnswer ? "see panel" : "try the next word"}`)
       } else if (entry.familiarity === "learned") {
-        setMicroWinBurst(`Learned: ${token.word}`)
+        setMicroWinBurst(`+${WORD_XP} XP · Learned: ${token.word}`)
       } else if (previouslySeen || entry.familiarity === "seen") {
-        setMicroWinBurst(`Seen again: ${token.word}`)
+        setMicroWinBurst(`+${WORD_XP} XP · Seen again: ${token.word}`)
       } else {
-        setMicroWinBurst(`New form: ${token.word}`)
+        setMicroWinBurst(`+${WORD_XP} XP · New form: ${token.word}`)
       }
 
       const nextCompleted = completedTargetIndexes.includes(selectedWordIndex)
@@ -786,6 +841,7 @@ export function GreekVerseQuestClient() {
     [
       selectedWordIndex,
       greekTokens,
+      questChallenge,
       awardProgress,
       levelKey,
       completedTargetIndexes,
@@ -804,6 +860,7 @@ export function GreekVerseQuestClient() {
       return
     }
     const nextIndex = remaining[0]
+    setQuestQuizFeedback(null)
     setSelectedWordIndex(nextIndex)
     setQuestStage("challenge")
     setQuestChallenge(buildChallengeForTarget(greekTokens, nextIndex))
@@ -1485,8 +1542,10 @@ export function GreekVerseQuestClient() {
                         <button
                           key={option}
                           type="button"
-                          onClick={() => revealQuestWord(idx === questChallenge.correctOptionIndex)}
-                          className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white/88 hover:bg-black/45"
+                          onClick={() =>
+                            revealQuestWord(idx === questChallenge.correctOptionIndex, { chosenIndex: idx })
+                          }
+                          className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white/88 hover:bg-black/45 active:scale-[0.99]"
                         >
                           {option}
                         </button>
@@ -1494,7 +1553,7 @@ export function GreekVerseQuestClient() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => revealQuestWord(false)}
+                      onClick={() => revealQuestWord(false, { skipped: true })}
                       className="mt-2 rounded-lg border border-white/20 bg-white/[0.03] px-3 py-1.5 text-xs text-white/72 hover:bg-white/[0.08]"
                     >
                       Reveal without guessing
@@ -1502,9 +1561,90 @@ export function GreekVerseQuestClient() {
                   </div>
                 ) : null}
 
+                {questStage === "revealed" && questQuizFeedback ? (
+                  <AnimatePresence mode="wait">
+                    {questQuizFeedback.outcome === "correct" ? (
+                      <motion.div
+                        key="fb-correct"
+                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ type: "spring", damping: 26, stiffness: 380 }}
+                        className="mb-3 rounded-xl border border-emerald-400/45 bg-gradient-to-br from-emerald-500/25 to-emerald-600/10 p-3 shadow-[0_0_24px_-8px_rgba(52,211,153,0.45)]"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-emerald-200" aria-hidden />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/95">
+                              Correct
+                            </p>
+                            <p className="mt-1 text-base font-medium text-white">Nice work.</p>
+                            <p className="mt-1 text-xs text-white/75">
+                              +{questQuizFeedback.xpGained} XP · {questQuizFeedback.prompt}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ) : questQuizFeedback.outcome === "incorrect" ? (
+                      <motion.div
+                        key="fb-wrong"
+                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ type: "spring", damping: 26, stiffness: 380 }}
+                        className="mb-3 rounded-xl border border-rose-400/40 bg-gradient-to-br from-rose-500/20 to-rose-950/30 p-3 shadow-[0_0_22px_-8px_rgba(251,113,133,0.35)]"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <XCircle className="mt-0.5 size-6 shrink-0 text-rose-200" aria-hidden />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rose-100/90">
+                              Not quite
+                            </p>
+                            <p className="mt-1 text-sm text-white/92">
+                              Correct answer:{" "}
+                              <span className="font-medium text-rose-50">{questQuizFeedback.correctAnswer}</span>
+                            </p>
+                            {questQuizFeedback.chosenAnswer &&
+                            questQuizFeedback.chosenAnswer !== questQuizFeedback.correctAnswer ? (
+                              <p className="mt-1 text-xs text-white/65">
+                                Your choice:{" "}
+                                <span className="text-white/85">{questQuizFeedback.chosenAnswer}</span>
+                              </p>
+                            ) : null}
+                            <p className="mt-1.5 text-[11px] text-white/55">{questQuizFeedback.prompt}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="fb-skip"
+                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ type: "spring", damping: 26, stiffness: 380 }}
+                        className="mb-3 rounded-xl border border-sky-400/35 bg-gradient-to-br from-sky-500/15 to-slate-900/40 p-3"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <Eye className="mt-0.5 size-6 shrink-0 text-sky-200" aria-hidden />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-sky-100/85">
+                              Revealed
+                            </p>
+                            <p className="mt-1 text-sm text-white/90">
+                              Answer:{" "}
+                              <span className="font-medium text-sky-50">{questQuizFeedback.correctAnswer}</span>
+                            </p>
+                            <p className="mt-1.5 text-[11px] text-white/55">{questQuizFeedback.prompt}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                ) : null}
+
                 {questStage === "revealed" ? (
                   <div className="mb-3 rounded-xl border border-emerald-300/30 bg-emerald-400/[0.08] p-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100/85">Reveal</p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100/85">Word memory</p>
                     <p className="mt-1 text-sm text-white/92">
                       Familiarity: <span className="text-emerald-100">{selectedFamiliarityLabel}</span>
                     </p>
