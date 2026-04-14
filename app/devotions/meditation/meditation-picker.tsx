@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ArrowLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, ChevronRight, Footprints } from "lucide-react"
 import { listMeditationSeries } from "@/lib/meditation-series"
 
 export function MeditationPicker() {
@@ -72,6 +72,27 @@ export function MeditationPicker() {
               </Link>
             </section>
           )}
+
+          <section>
+            <p className="font-mono text-[9px] tracking-[0.35em] text-white/35 uppercase mb-3">Journeys</p>
+            <Link
+              href="/devotions/meditation/romans-journey"
+              className="group block rounded-2xl border border-violet-400/25 bg-violet-950/[0.25] px-5 py-5 sm:px-6 sm:py-6 hover:bg-violet-950/40 hover:border-violet-400/40 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <Footprints className="w-5 h-5 text-violet-300/80 shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <h2 className="font-sans text-lg sm:text-xl font-medium text-white/95">Romans Journey</h2>
+                    <p className="mt-2 font-sans text-sm text-violet-200/60 font-light leading-relaxed">
+                      One step at a time—short summary, one reflection, then read or Greek. Not a wall of text; optional one step per day.
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-violet-400/50 group-hover:text-violet-300/70 shrink-0 mt-1 transition-colors" aria-hidden />
+              </div>
+            </Link>
+          </section>
 
           {Array.from(groups.entries()).map(([groupName, items]) => (
             <section key={groupName}>
