@@ -4,7 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { ArrowLeft } from "lucide-react"
-import { getPassageRefForDate } from "@/lib/devotions-passages"
+import {
+  getMeditationSeries,
+  passageRefForSeries,
+  isDailySeriesId,
+  passageCountForSeries,
+} from "@/lib/meditation-series"
+import { getMeditationPassageIndex, advanceMeditationPassageIndex } from "@/lib/meditation-series-progress"
 import { savePassageEntry } from "@/lib/devotions-storage"
 import { recordDevotionSession } from "@/lib/devotions-tracking"
 import { getDevotionsSettings } from "@/lib/devotions-settings"
@@ -17,8 +23,9 @@ type PassageData = {
 
 type Phase = "read" | "compose" | "reflect"
 
-export function MeditationClient() {
+export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
   const reduced = useReducedMotion()
+  const series = getMeditationSeries(seriesId)
   const [phase, setPhase] = useState<Phase>("read")
   const [passage, setPassage] = useState<PassageData | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -28,19 +35,36 @@ export function MeditationClient() {
   const [opening, setOpening] = useState("")
   const [prompts, setPrompts] = useState<string[]>([])
   const [aiError, setAiError] = useState<string | null>(null)
+  /** 1-based position in series for header (non-daily). */
+  const [ordinalLabel, setOrdinalLabel] = useState<string | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composeBootRef = useRef(false)
+  const loadTokenRef = useRef(0)
 
-  useEffect(() => {
-    const ref = getPassageRefForDate(new Date())
-    let cancelled = false
+  const loadPassageForSeries = useCallback(() => {
+    if (!series) return
+    const token = ++loadTokenRef.current
+    const idx = getMeditationPassageIndex(seriesId)
+    const ref = passageRefForSeries(seriesId, idx)
+    const total = passageCountForSeries(seriesId)
+    if (!isDailySeriesId(seriesId) && total > 0) {
+      setOrdinalLabel(`${idx + 1} / ${total}`)
+    } else {
+      setOrdinalLabel(null)
+    }
     setLoadingPassage(true)
     setLoadError(null)
+    setReflection("")
+    setOpening("")
+    setPrompts([])
+    setAiError(null)
+    setPhase("read")
+    composeBootRef.current = false
     fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (cancelled) return
+        if (token !== loadTokenRef.current) return
         if (data.error) throw new Error(data.error)
         const p = { reference: data.reference as string, verses: (data.verses ?? []) as PassageData["verses"] }
         setPassage(p)
@@ -48,15 +72,17 @@ export function MeditationClient() {
         recordDevotionSession(p.reference, settings.showTracking)
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Could not load passage.")
+        if (token !== loadTokenRef.current) return
+        setLoadError(err instanceof Error ? err.message : "Could not load passage.")
       })
       .finally(() => {
-        if (!cancelled) setLoadingPassage(false)
+        if (token === loadTokenRef.current) setLoadingPassage(false)
       })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  }, [series, seriesId])
+
+  useEffect(() => {
+    loadPassageForSeries()
+  }, [loadPassageForSeries])
 
   const passagePlain = passage
     ? passage.verses.map((v) => `${v.number} ${v.text}`).join("\n")
@@ -104,6 +130,10 @@ export function MeditationClient() {
         reflection:
           `${reflection.trim()}\n\n—\nPrompts:\n` + (data.prompts ?? []).map((p, i) => `${i + 1}. ${p}`).join("\n"),
       })
+      const count = passageCountForSeries(seriesId)
+      if (count > 0) {
+        advanceMeditationPassageIndex(seriesId, count)
+      }
       toast.success("Saved to your journal on this device")
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Something went wrong."
@@ -112,7 +142,25 @@ export function MeditationClient() {
     } finally {
       setAiLoading(false)
     }
-  }, [passage, passagePlain, reflection])
+  }, [passage, passagePlain, reflection, seriesId])
+
+  const goToNextInSeries = useCallback(() => {
+    loadPassageForSeries()
+  }, [loadPassageForSeries])
+
+  const seriesTitle = series?.title ?? "Meditation"
+
+  if (!series) {
+    return (
+      <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-[#030303] text-white px-6">
+        <p className="font-sans text-white/70 mb-4">This meditation track is not available.</p>
+        <Link href="/devotions/meditation" className="font-mono text-xs text-amber-400/90 underline-offset-4 hover:underline">
+          Back to series
+        </Link>
+      </div>
+    )
+  }
+  const showNextInSeries = !isDailySeriesId(seriesId) && passageCountForSeries(seriesId) > 0
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-[#030303] text-white overflow-hidden">
@@ -127,19 +175,29 @@ export function MeditationClient() {
 
       <header className="relative z-10 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 min-h-[52px] sm:px-8">
         <Link
-          href="/devotions"
+          href="/devotions/meditation"
           className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-white/45 hover:text-white/75 transition-colors min-h-[44px]"
         >
           <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
-          Devotions
+          Series
         </Link>
         {passage && (
-          <span className="font-mono text-[10px] tracking-[0.25em] text-white/35 truncate max-w-[50vw] text-right">
+          <span className="font-mono text-[10px] tracking-[0.25em] text-white/35 truncate max-w-[45vw] text-right">
             {phase === "read" ? "Read" : phase === "compose" ? "Write" : "Reflect"}
           </span>
         )}
-        <span className="w-[72px]" aria-hidden />
+        <Link
+          href="/devotions"
+          className="w-[72px] text-right font-mono text-[9px] tracking-wider text-white/30 hover:text-white/55"
+        >
+          Exit
+        </Link>
       </header>
+
+      <p className="relative z-10 text-center font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase px-4 -mt-1 pb-2">
+        {seriesTitle}
+        {ordinalLabel && <span className="text-white/45"> · {ordinalLabel}</span>}
+      </p>
 
       <main className="relative z-10 flex-1 min-h-0 flex flex-col">
         {loadingPassage && (
@@ -149,8 +207,8 @@ export function MeditationClient() {
         {loadError && !loadingPassage && (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
             <p className="font-sans text-white/70">{loadError}</p>
-            <Link href="/devotions" className="font-mono text-xs tracking-wider text-amber-400/90 underline-offset-4 hover:underline">
-              Back to devotions
+            <Link href="/devotions/meditation" className="font-mono text-xs tracking-wider text-amber-400/90 underline-offset-4 hover:underline">
+              Back to series
             </Link>
           </div>
         )}
@@ -290,10 +348,25 @@ export function MeditationClient() {
                       </li>
                     ))}
                   </ul>
-                  <div className="pt-6 flex flex-col sm:flex-row gap-4 justify-center">
+                  <div className="pt-6 flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
+                    <Link
+                      href="/devotions/meditation"
+                      className="inline-flex justify-center min-h-[48px] items-center rounded-full px-8 font-mono text-[11px] tracking-[0.2em] uppercase bg-white/[0.08] border border-white/15 text-white/90 hover:bg-white/12 transition-colors"
+                    >
+                      All series
+                    </Link>
+                    {showNextInSeries && (
+                      <button
+                        type="button"
+                        onClick={goToNextInSeries}
+                        className="inline-flex justify-center min-h-[48px] items-center rounded-full px-8 font-mono text-[11px] tracking-[0.2em] uppercase bg-violet-500/15 border border-violet-400/35 text-violet-100/95 hover:bg-violet-500/25 transition-colors"
+                      >
+                        Next in series
+                      </button>
+                    )}
                     <Link
                       href="/devotions"
-                      className="inline-flex justify-center min-h-[48px] items-center rounded-full px-8 font-mono text-[11px] tracking-[0.2em] uppercase bg-white/[0.08] border border-white/15 text-white/90 hover:bg-white/12 transition-colors"
+                      className="inline-flex justify-center min-h-[48px] items-center rounded-full px-8 font-mono text-[11px] tracking-[0.2em] uppercase text-white/50 border border-white/10 hover:bg-white/[0.05] transition-colors"
                     >
                       Done
                     </Link>

@@ -1,10 +1,10 @@
-import { MeditationClient } from "./meditation-client"
+import { MeditationPicker } from "./meditation-picker"
 
 export const metadata = {
   title: "Meditation",
-  description: "One passage, full screen — read, write, receive gentle reflection prompts.",
+  description: "Choose a scripture meditation series or today’s passage — read, write, reflect.",
 }
 
 export default function MeditationPage() {
-  return <MeditationClient />
+  return <MeditationPicker />
 }
