@@ -462,7 +462,7 @@ export function GreekGrammarReaderClient() {
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
           </div>
 
-          <section className="flex min-h-[min(40vh,440px)] flex-1 flex-col items-center justify-center">
+          <section className="flex min-h-[56vh] sm:min-h-[60vh] flex-col items-center justify-start sm:justify-center pt-3 sm:pt-0">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
