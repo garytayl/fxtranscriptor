@@ -1416,9 +1416,9 @@ export function GreekVerseQuestClient() {
               ) : greekTokens.length > 0 ? (
                 <motion.div
                   key={`${pilot.bookSlug}-${pilot.chapter}-${verse}`}
-                  initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -12, filter: "blur(3px)" }}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.28, ease: "easeOut" }}
                   lang="el"
                   className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
