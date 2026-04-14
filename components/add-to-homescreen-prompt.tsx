@@ -1,10 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { Download, Share2 } from "lucide-react"
 
-const STORAGE_KEY = "fxarchives-add-to-homescreen-dismissed"
+const STORAGE_KEY = "fx_devotions_a2hs_v1"
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>
+}
 
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false
@@ -15,7 +22,7 @@ function isIOS(): boolean {
 function isStandalone(): boolean {
   if (typeof window === "undefined") return true
   const nav = window.navigator as Navigator & { standalone?: boolean }
-  return !!nav.standalone || (window.matchMedia("(display-mode: standalone)").matches)
+  return !!nav.standalone || window.matchMedia("(display-mode: standalone)").matches
 }
 
 function wasDismissed(): boolean {
@@ -27,95 +34,134 @@ function setDismissed(): void {
   try {
     localStorage.setItem(STORAGE_KEY, "1")
   } catch {
-    // ignore
+    /* ignore */
   }
 }
 
+/** Phones & small tablets — avoid a full-width install bar on desktop browsers. */
+function isInstallPromptViewport(): boolean {
+  if (typeof window === "undefined") return false
+  if (window.matchMedia("(max-width: 1024px)").matches) return true
+  return isIOS() || /Android/i.test(navigator.userAgent)
+}
+
 export function AddToHomeScreenPrompt() {
-  const [show, setShow] = useState(false)
+  const pathname = usePathname()
+  const onDevotionsRoute =
+    pathname === "/devotions" || (typeof pathname === "string" && pathname.startsWith("/devotions/"))
+
   const [mounted, setMounted] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [installing, setInstalling] = useState(false)
+  const [show, setShow] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   useEffect(() => {
-    if (!mounted) return
-    if (!isIOS() || isStandalone() || wasDismissed()) {
+    const onBip = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+    window.addEventListener("beforeinstallprompt", onBip)
+    return () => window.removeEventListener("beforeinstallprompt", onBip)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted || !onDevotionsRoute || isStandalone() || wasDismissed() || !isInstallPromptViewport()) {
       setShow(false)
       return
     }
     setShow(true)
-  }, [mounted])
+  }, [mounted, onDevotionsRoute])
 
-  const dismiss = () => {
+  const dismiss = useCallback(() => {
     setDismissed()
     setShow(false)
-  }
+  }, [])
+
+  const runInstall = useCallback(async () => {
+    if (!deferredPrompt) return
+    setInstalling(true)
+    try {
+      await deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      setDeferredPrompt(null)
+      if (outcome === "accepted") {
+        setDismissed()
+        setShow(false)
+      }
+    } catch {
+      /* user dismissed OS sheet */
+    } finally {
+      setInstalling(false)
+    }
+  }, [deferredPrompt])
 
   if (!show) return null
+
+  const canInstall = deferredPrompt != null
 
   return (
     <div
       role="dialog"
-      aria-label="Add to Home Screen"
+      aria-label="Add devotions to Home Screen"
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 flex justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]",
-        "animate-in slide-in-from-bottom-4 duration-300"
+        "fixed bottom-0 left-0 right-0 z-[90] flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        "animate-in slide-in-from-bottom-4 duration-300",
       )}
     >
-      <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
-        <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent" aria-hidden>
-            <ShareIcon />
+      <div className="flex w-full max-w-lg items-stretch gap-2 rounded-2xl border border-white/15 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/85">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300"
+            aria-hidden
+          >
+            {isIOS() ? <Share2 className="size-5" /> : <Download className="size-5" />}
           </span>
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="font-semibold text-card-foreground">Add fxarchives to your Home Screen</p>
-            <p className="text-sm text-muted-foreground">
-              Get quick access like an app: tap the <strong className="text-foreground">Share</strong> button{" "}
-              <ShareIcon className="inline size-4" /> at the bottom of Safari, then choose{" "}
-              <strong className="text-foreground">Add to Home Screen</strong>. After adding, you can enable notifications in the app menu for reminders.
-            </p>
+            <p className="text-sm font-semibold leading-tight text-white">Add devotions to your Home Screen</p>
+            {canInstall ? (
+              <p className="text-xs leading-snug text-white/65">One tap installs this site like an app for faster return.</p>
+            ) : isIOS() ? (
+              <p className="text-xs leading-snug text-white/65">
+                Tap <strong className="text-white/90">Share</strong>{" "}
+                <Share2 className="inline size-3.5 align-text-bottom opacity-90" /> in Safari, then{" "}
+                <strong className="text-white/90">Add to Home Screen</strong>.
+              </p>
+            ) : (
+              <p className="text-xs leading-snug text-white/65">
+                Open your browser <strong className="text-white/90">menu (⋮)</strong> and choose{" "}
+                <strong className="text-white/90">Install app</strong> or{" "}
+                <strong className="text-white/90">Add to Home screen</strong>.
+              </p>
+            )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={dismiss}
-            aria-label="Dismiss"
-          >
-            <XIcon />
-          </Button>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" className="flex-1" onClick={dismiss}>
-            Maybe later
-          </Button>
-          <Button size="sm" className="flex-1" onClick={dismiss}>
-            Got it
+        <div className="flex shrink-0 flex-col justify-center gap-1.5 sm:flex-row sm:items-center">
+          {canInstall ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 min-w-[5.5rem] whitespace-nowrap bg-emerald-600 text-white hover:bg-emerald-500"
+              disabled={installing}
+              onClick={() => void runInstall()}
+            >
+              {installing ? "…" : "Install"}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-9 text-white/70 hover:bg-white/10 hover:text-white"
+            onClick={dismiss}
+          >
+            Not now
           </Button>
         </div>
       </div>
     </div>
-  )
-}
-
-function ShareIcon({ className }: { className?: string }) {
-  return (
-    <svg className={cn("size-5", className)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-      />
-    </svg>
-  )
-}
-
-function XIcon() {
-  return (
-    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
   )
 }
