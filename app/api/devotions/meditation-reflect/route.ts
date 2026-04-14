@@ -20,7 +20,13 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = (await request.json().catch(() => null)) as
-    | { reference?: unknown; passageText?: unknown; userReflection?: unknown }
+    | {
+        reference?: unknown
+        passageText?: unknown
+        userReflection?: unknown
+        /** Opening guide from meditation-prepare — keeps the arc coherent */
+        prepareContext?: unknown
+      }
     | null
 
   if (!payload) {
@@ -30,10 +36,20 @@ export async function POST(request: NextRequest) {
   const reference = normalize(payload.reference, "Scripture")
   const passageText = normalize(payload.passageText, "")
   const userReflection = normalize(payload.userReflection, "")
+  const prepareContext = normalize(payload.prepareContext, "")
 
   if (userReflection.length < 4) {
     return NextResponse.json({ error: "Add a few words about what you noticed or felt first." }, { status: 400 })
   }
+
+  const guideBlock = prepareContext
+    ? `
+How they were invited into the passage (your continuity — build on this, do not repeat it verbatim):
+"""
+${prepareContext}
+"""
+`
+    : ""
 
   const prompt = `You help someone reflect prayerfully after they sat with a Bible passage and wrote freely.
 
@@ -42,7 +58,7 @@ Passage text:
 """
 ${passageText || "(not provided)"}
 """
-
+${guideBlock}
 What they wrote (their words, preserve meaning; do not moralize at them):
 """
 ${userReflection}
@@ -50,14 +66,15 @@ ${userReflection}
 
 Respond with strict JSON only:
 {
-  "opening": "1-2 short sentences: warm, specific to their words and the passage. No scolding. No \"As an AI\".",
-  "prompts": ["3 or 4 distinct reflection questions or invitations — concise, plain English, rooted in their writing and the passage. No numbering in the strings."]
+  "opening": "2-3 short sentences: acknowledge what they wrote, tie it to the passage AND any opening guidance above. Warm, specific. No scolding. No \"As an AI\".",
+  "prompts": ["4 or 5 distinct reflection questions or invitations — concise, plain English, deepening what they started. At least one prompt should extend the meditation (imagination, prayer, or concrete next step). No numbering in the strings."]
 }
 
 Rules:
-- prompts must be an array of 3 to 4 strings.
+- prompts must be an array of 4 or 5 strings.
 - No markdown in any field. No duplicate questions.
-- Honor Christian contemplative tone; avoid generic self-help clichés.`
+- Honor Christian contemplative tone; avoid generic self-help clichés.
+- If opening guidance was provided, your voice should feel like the same companion continuing — not a new stranger.`
 
   const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -73,7 +90,7 @@ Rules:
         {
           role: "system",
           content:
-            "You write brief, humane spiritual reflection prompts. Return strict JSON with keys opening (string) and prompts (array of strings) only.",
+            "You write brief, humane spiritual reflection prompts in one continuous arc with any prior opening guidance. Return strict JSON with keys opening (string) and prompts (array of strings) only.",
         },
         { role: "user", content: prompt },
       ],
@@ -112,18 +129,19 @@ Rules:
 
   const opening = normalize(parsed.opening, "Here are a few ways to stay with this passage.")
 
-  if (prompts.length < 2) {
+  if (prompts.length < 3) {
     return NextResponse.json(
       {
         opening,
         prompts: [
           ...prompts,
+          "Where does this passage leave you with God today?",
           "What word or phrase from the passage stayed with you longest?",
           "What would it look like to carry one line of this into today?",
-        ].slice(0, 4),
+        ].slice(0, 5),
       } satisfies ReflectResponse,
     )
   }
 
-  return NextResponse.json({ opening, prompts: prompts.slice(0, 4) } satisfies ReflectResponse)
+  return NextResponse.json({ opening, prompts: prompts.slice(0, 5) } satisfies ReflectResponse)
 }

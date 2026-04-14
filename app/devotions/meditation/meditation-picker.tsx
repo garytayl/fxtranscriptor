@@ -51,7 +51,7 @@ export function MeditationPicker() {
               Choose a track
             </h1>
             <p className="mt-3 font-sans text-sm text-white/50 font-light leading-relaxed max-w-lg">
-              Each series is an ordered set of short passages—sit with one, write freely, then invite prompts. Your place is remembered on this device.
+              Each track opens with a short reading guide, then scripture, then writing, then deeper prompts—one arc, with your place in the series saved on this device.
             </p>
           </div>
 

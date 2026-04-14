@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Sparkles } from "lucide-react"
 import {
   getMeditationSeries,
   passageRefForSeries,
@@ -15,6 +15,7 @@ import { savePassageEntry } from "@/lib/devotions-storage"
 import { recordDevotionSession } from "@/lib/devotions-tracking"
 import { getDevotionsSettings } from "@/lib/devotions-settings"
 import { toast } from "sonner"
+import type { MeditationPrepareResponse } from "@/lib/meditation-prepare-types"
 
 type PassageData = {
   reference: string
@@ -22,6 +23,27 @@ type PassageData = {
 }
 
 type Phase = "read" | "compose" | "reflect"
+
+function fallbackPrepare(passage: PassageData): MeditationPrepareResponse {
+  const first = passage.verses[0]
+  const raw = first ? `${first.text}`.replace(/\s+/g, " ").trim() : ""
+  const snippet = raw.length > 0 ? raw.slice(0, 72) + (raw.length > 72 ? "…" : "") : "this passage"
+  return {
+    settling: "Pause. You do not need to finish quickly.",
+    readWith: "Read at a walking pace. Let a word or line land before you move on.",
+    phraseToLinger: snippet,
+    journalHint: "What surfaced—image, feeling, or question—as you stayed with the text?",
+  }
+}
+
+function formatPrepareForApi(p: MeditationPrepareResponse): string {
+  return [
+    `Settling: ${p.settling}`,
+    `How to read: ${p.readWith}`,
+    `Phrase to linger on: ${p.phraseToLinger}`,
+    `Writing invite: ${p.journalHint}`,
+  ].join("\n")
+}
 
 export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
   const reduced = useReducedMotion()
@@ -37,10 +59,13 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
   const [aiError, setAiError] = useState<string | null>(null)
   /** 1-based position in series for header (non-daily). */
   const [ordinalLabel, setOrdinalLabel] = useState<string | null>(null)
+  const [prepare, setPrepare] = useState<MeditationPrepareResponse | null>(null)
+  const [prepareLoading, setPrepareLoading] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composeBootRef = useRef(false)
   const loadTokenRef = useRef(0)
+  const prepareTokenRef = useRef(0)
 
   const loadPassageForSeries = useCallback(() => {
     if (!series) return
@@ -59,6 +84,8 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
     setOpening("")
     setPrompts([])
     setAiError(null)
+    setPrepare(null)
+    setPrepareLoading(false)
     setPhase("read")
     composeBootRef.current = false
     fetch(`/api/bible/passage?ref=${encodeURIComponent(ref)}`)
@@ -88,6 +115,42 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
     ? passage.verses.map((v) => `${v.number} ${v.text}`).join("\n")
     : ""
 
+  useEffect(() => {
+    if (!passage || passagePlain.length < 12) return
+    const token = ++prepareTokenRef.current
+    setPrepareLoading(true)
+    fetch("/api/devotions/meditation-prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reference: passage.reference,
+        passageText: passagePlain,
+        seriesTitle: series?.title ?? "",
+      }),
+    })
+      .then(async (res) => {
+        const data = (await res.json()) as { error?: string } & Partial<MeditationPrepareResponse>
+        if (!res.ok || data.error) throw new Error(data.error ?? "prepare failed")
+        return data
+      })
+      .then((data) => {
+        if (token !== prepareTokenRef.current) return
+        setPrepare({
+          settling: String(data.settling ?? ""),
+          readWith: String(data.readWith ?? ""),
+          phraseToLinger: String(data.phraseToLinger ?? ""),
+          journalHint: String(data.journalHint ?? ""),
+        })
+      })
+      .catch(() => {
+        if (token !== prepareTokenRef.current) return
+        setPrepare(fallbackPrepare(passage))
+      })
+      .finally(() => {
+        if (token === prepareTokenRef.current) setPrepareLoading(false)
+      })
+  }, [passage, passagePlain, series?.title])
+
   const beginWriting = useCallback(() => {
     setPhase("compose")
   }, [])
@@ -109,6 +172,7 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
     setAiLoading(true)
     setAiError(null)
     try {
+      const prepareContext = prepare ? formatPrepareForApi(prepare) : ""
       const res = await fetch("/api/devotions/meditation-reflect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -116,6 +180,7 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
           reference: passage.reference,
           passageText: passagePlain,
           userReflection: reflection.trim(),
+          ...(prepareContext ? { prepareContext } : {}),
         }),
       })
       const data = (await res.json()) as { error?: string; opening?: string; prompts?: string[] }
@@ -125,10 +190,14 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
       setOpening(data.opening ?? "")
       setPrompts(Array.isArray(data.prompts) ? data.prompts : [])
       setPhase("reflect")
+      const guideBlock =
+        prepare != null
+          ? `Opening guide:\n${formatPrepareForApi(prepare)}\n\n`
+          : ""
       savePassageEntry(passage.reference, {
         prayer: "",
         reflection:
-          `${reflection.trim()}\n\n—\nPrompts:\n` + (data.prompts ?? []).map((p, i) => `${i + 1}. ${p}`).join("\n"),
+          `${guideBlock}${reflection.trim()}\n\n—\nPrompts:\n` + (data.prompts ?? []).map((p, i) => `${i + 1}. ${p}`).join("\n"),
       })
       const count = passageCountForSeries(seriesId)
       if (count > 0) {
@@ -142,7 +211,7 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
     } finally {
       setAiLoading(false)
     }
-  }, [passage, passagePlain, reflection, seriesId])
+  }, [passage, passagePlain, reflection, seriesId, prepare])
 
   const goToNextInSeries = useCallback(() => {
     loadPassageForSeries()
@@ -224,9 +293,43 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
                 transition={{ duration: reduced ? 0.12 : 0.35 }}
                 className="flex-1 min-h-0 flex flex-col px-6 sm:px-12 md:px-16 pb-[max(1rem,env(safe-area-inset-bottom))]"
               >
-                <p className="text-center font-mono text-[10px] tracking-[0.35em] text-amber-200/50 mb-8 mt-2 uppercase">
+                <p className="text-center font-mono text-[10px] tracking-[0.35em] text-amber-200/50 mb-6 mt-2 uppercase">
                   {passage.reference}
                 </p>
+
+                <div className="max-w-2xl mx-auto w-full mb-8 rounded-2xl border border-violet-400/20 bg-violet-950/[0.2] px-5 py-5 sm:px-6 sm:py-6">
+                  <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.25em] text-violet-200/70 uppercase mb-4">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-300/80 shrink-0" aria-hidden />
+                    Guide
+                    {prepareLoading && (
+                      <span className="text-white/35 font-sans normal-case tracking-normal text-[11px]"> · preparing…</span>
+                    )}
+                  </div>
+                  {prepare ? (
+                    <div className="space-y-4 text-left">
+                      <p className="font-sans text-sm text-white/80 font-light leading-relaxed border-l-2 border-violet-400/35 pl-3">
+                        {prepare.settling}
+                      </p>
+                      <div>
+                        <p className="font-mono text-[9px] tracking-wider text-white/40 uppercase mb-1.5">Read with</p>
+                        <p className="font-sans text-sm text-white/[0.88] font-light leading-relaxed">{prepare.readWith}</p>
+                      </div>
+                      <div>
+                        <p className="font-mono text-[9px] tracking-wider text-white/40 uppercase mb-1.5">Linger on</p>
+                        <p className="font-serif text-base sm:text-lg text-amber-100/90 font-light leading-snug italic">
+                          {prepare.phraseToLinger}
+                        </p>
+                      </div>
+                    </div>
+                  ) : prepareLoading ? (
+                    <div className="space-y-3 animate-pulse">
+                      <div className="h-3 bg-white/10 rounded w-full" />
+                      <div className="h-3 bg-white/10 rounded w-[92%]" />
+                      <div className="h-3 bg-white/10 rounded w-4/5" />
+                    </div>
+                  ) : null}
+                </div>
+
                 <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
                   <div className="max-w-2xl mx-auto space-y-5 pb-24">
                     {passage.verses.map((v) => (
@@ -245,7 +348,7 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
                     className="group flex flex-col items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded-lg px-4 py-2"
                   >
                     <span className="font-mono text-xs text-white/50 group-hover:text-white/70 transition-colors">
-                      Continue to reflection
+                      Continue to writing
                     </span>
                     <span className="flex items-center gap-0.5 h-8" aria-hidden>
                       <motion.span
@@ -268,9 +371,14 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
                 transition={{ duration: reduced ? 0.12 : 0.4 }}
                 className="flex-1 min-h-0 flex flex-col px-4 sm:px-10 md:px-16 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]"
               >
-                <p className="text-center font-mono text-[10px] tracking-[0.3em] text-white/35 mb-6 uppercase truncate px-2">
+                <p className="text-center font-mono text-[10px] tracking-[0.3em] text-white/35 mb-3 uppercase truncate px-2">
                   {passage.reference}
                 </p>
+                {prepare && (
+                  <p className="text-center font-serif text-sm text-violet-200/75 font-light italic max-w-xl mx-auto mb-6 px-2 leading-snug">
+                    “{prepare.phraseToLinger}”
+                  </p>
+                )}
                 <div
                   role="presentation"
                   onClick={() => textareaRef.current?.focus()}
@@ -286,7 +394,7 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
                         animate={{ opacity: [1, 0.2, 1] }}
                         transition={{ duration: 1.05, repeat: Infinity, ease: "easeInOut" }}
                       />
-                      <span>What surfaced as you sat with this passage?</span>
+                      <span>{prepare?.journalHint ?? "What surfaced as you sat with this passage?"}</span>
                     </div>
                   )}
                   <textarea
@@ -319,7 +427,7 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
                     onClick={requestReflection}
                     className="min-h-[48px] rounded-full px-8 font-mono text-[11px] tracking-[0.2em] uppercase bg-white/[0.08] border border-white/15 text-white/90 hover:bg-white/12 disabled:opacity-35 disabled:pointer-events-none transition-colors"
                   >
-                    {aiLoading ? "…" : "Ask for prompts"}
+                    {aiLoading ? "…" : "Next step with guide"}
                   </button>
                 </div>
                 {aiError && (
@@ -337,6 +445,11 @@ export function MeditationSessionClient({ seriesId }: { seriesId: string }) {
                 className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 sm:px-12 md:px-16 pb-[max(2rem,env(safe-area-inset-bottom))]"
               >
                 <div className="max-w-xl mx-auto space-y-10 pt-4">
+                  {prepare && (
+                    <p className="font-mono text-[10px] tracking-[0.15em] text-violet-300/50 uppercase">
+                      With what you began
+                    </p>
+                  )}
                   <p className="font-serif text-xl sm:text-2xl text-white/[0.9] font-light leading-snug">{opening}</p>
                   <ul className="space-y-6">
                     {prompts.map((p, i) => (
