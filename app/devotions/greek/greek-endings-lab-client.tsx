@@ -42,6 +42,12 @@ type EndingsSectionRow = {
   notes?: string
 }
 
+type GrammarGlossaryItem = {
+  term: string
+  plainMeaning: string
+  quickExample: string
+}
+
 export type EndingsSection = {
   id: string
   title: string
@@ -218,6 +224,49 @@ export const ENDINGS_SECTIONS: EndingsSection[] = [
       { label: "Neuter nom/acc pl", ending: "τά" },
       { label: "Genitive plural (all genders)", ending: "τῶν" },
     ],
+  },
+]
+
+const GRAMMAR_GLOSSARY: GrammarGlossaryItem[] = [
+  {
+    term: "Nominative",
+    plainMeaning: "Usually the subject - who/what is doing the action.",
+    quickExample: "ὁ ἄνθρωπος γράφει -> 'the man writes' (man = subject).",
+  },
+  {
+    term: "Genitive",
+    plainMeaning: "Usually possession or source - often 'of'.",
+    quickExample: "λόγος θεοῦ -> 'word of God'.",
+  },
+  {
+    term: "Dative",
+    plainMeaning: "Often indirect object, location, or means - 'to/for/in/by'.",
+    quickExample: "διδάσκει τοῖς μαθηταῖς -> 'he teaches the disciples'.",
+  },
+  {
+    term: "Accusative",
+    plainMeaning: "Usually direct object - who/what receives the action.",
+    quickExample: "βλέπω τὸν ἄνθρωπον -> 'I see the man'.",
+  },
+  {
+    term: "Tense",
+    plainMeaning: "The kind of action (ongoing, completed, simple snapshot, etc.).",
+    quickExample: "Present often feels ongoing; aorist often feels like a whole event.",
+  },
+  {
+    term: "Voice",
+    plainMeaning: "How subject relates to action (does it, receives it, or acts with stake in it).",
+    quickExample: "Active = 'he writes', passive = 'he is written/treated'.",
+  },
+  {
+    term: "Mood",
+    plainMeaning: "How the verb is framed (statement, command, wish, possibility).",
+    quickExample: "Indicative states facts; imperative gives commands.",
+  },
+  {
+    term: "Person + Number",
+    plainMeaning: "Who is involved and how many (I/you/he, singular/plural).",
+    quickExample: "-ω = I..., -εις = you..., -ομεν = we....",
   },
 ]
 
@@ -441,6 +490,24 @@ export function GreekEndingsLabClient() {
               </div>
             </article>
           ))}
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-cyan-400/30 bg-cyan-500/[0.07] p-4 sm:p-5">
+          <div className="mb-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/90">What these grammar words mean</p>
+            <p className="mt-1 text-sm text-white/82">
+              Quick plain-English definitions so terms like genitive and dative stop feeling abstract.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GRAMMAR_GLOSSARY.map((item) => (
+              <article key={item.term} className="rounded-xl border border-white/12 bg-black/30 p-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-100/90">{item.term}</p>
+                <p className="mt-1 text-sm text-white/88">{item.plainMeaning}</p>
+                <p className="mt-1 text-xs text-white/65">{item.quickExample}</p>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.07] p-4 sm:p-5">
