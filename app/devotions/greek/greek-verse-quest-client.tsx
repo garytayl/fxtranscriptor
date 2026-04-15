@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -545,6 +545,9 @@ export function GreekVerseQuestClient() {
   const detailSwipeStartX = useRef<number | null>(null)
   const detailSwipeCurrentX = useRef<number | null>(null)
   const detailSwipeStartedAt = useRef<number | null>(null)
+  const detailHandleSwipeStartY = useRef<number | null>(null)
+  const detailPointerStartY = useRef<number | null>(null)
+  const detailPointerStartX = useRef<number | null>(null)
   const detailContentRef = useRef<HTMLDivElement | null>(null)
   const [detailDragOffsetY, setDetailDragOffsetY] = useState(0)
   const initializedDailySession = useRef(false)
@@ -655,6 +658,15 @@ export function GreekVerseQuestClient() {
     setSelectedWordIndex(null)
     setQuestStage("challenge")
     setQuestQuizFeedback(null)
+    detailSwipeStartY.current = null
+    detailSwipeCurrentY.current = null
+    detailSwipeStartX.current = null
+    detailSwipeCurrentX.current = null
+    detailSwipeStartedAt.current = null
+    detailHandleSwipeStartY.current = null
+    detailPointerStartY.current = null
+    detailPointerStartX.current = null
+    setDetailDragOffsetY(0)
   }, [])
 
   useEffect(() => {
@@ -944,13 +956,24 @@ export function GreekVerseQuestClient() {
       const deltaX = Math.abs(x - startX)
       const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
       const mostlyVertical = deltaY > 0 && deltaY > deltaX * 1.15
+      const strongPullDown = deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD * 1.5
+      if (mostlyVertical && (atTop ? deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD : strongPullDown)) {
+        closeDetails()
+        detailSwipeStartY.current = null
+        detailSwipeCurrentY.current = null
+        detailSwipeStartX.current = null
+        detailSwipeCurrentX.current = null
+        detailSwipeStartedAt.current = null
+        setDetailDragOffsetY(0)
+        return
+      }
       if (atTop && mostlyVertical) {
         setDetailDragOffsetY(Math.min(170, deltaY * 0.85))
       } else if (detailDragOffsetY !== 0) {
         setDetailDragOffsetY(0)
       }
     },
-    [detailDragOffsetY],
+    [detailDragOffsetY, closeDetails],
   )
 
   const onDetailTouchEnd = useCallback(
@@ -971,16 +994,86 @@ export function GreekVerseQuestClient() {
       const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
       const elapsedMs = startedAt == null ? 999 : Math.max(1, Date.now() - startedAt)
       const velocity = deltaY / elapsedMs
+      const strongPullDown = deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD * 1.5
       const shouldClose =
-        atTop &&
         deltaY > 0 &&
         deltaY > deltaX * 1.15 &&
-        (deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD || velocity > DETAIL_SWIPE_CLOSE_VELOCITY)
+        ((atTop && (deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD || velocity > DETAIL_SWIPE_CLOSE_VELOCITY)) ||
+          strongPullDown)
       if (shouldClose) closeDetails()
       setDetailDragOffsetY(0)
     },
     [closeDetails],
   )
+
+  const onDetailHandleTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    const y = e.changedTouches[0]?.clientY
+    detailHandleSwipeStartY.current = typeof y === "number" ? y : null
+  }, [])
+
+  const onDetailHandleTouchEnd = useCallback(
+    (e: TouchEvent<HTMLDivElement>) => {
+      const startY = detailHandleSwipeStartY.current
+      detailHandleSwipeStartY.current = null
+      const endY = e.changedTouches[0]?.clientY
+      if (typeof startY !== "number" || typeof endY !== "number") return
+      if (endY - startY > 48) closeDetails()
+    },
+    [closeDetails],
+  )
+
+  const onDetailHandleTouchMove = useCallback(
+    (e: TouchEvent<HTMLDivElement>) => {
+      const startY = detailHandleSwipeStartY.current
+      const currentY = e.changedTouches[0]?.clientY
+      if (typeof startY !== "number" || typeof currentY !== "number") return
+      if (currentY - startY > 36) {
+        detailHandleSwipeStartY.current = null
+        closeDetails()
+      }
+    },
+    [closeDetails],
+  )
+
+  const resetDetailPointerGesture = useCallback(() => {
+    detailPointerStartY.current = null
+    detailPointerStartX.current = null
+    setDetailDragOffsetY(0)
+  }, [])
+
+  const onDetailPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    detailPointerStartY.current = e.clientY
+    detailPointerStartX.current = e.clientX
+  }, [])
+
+  const onDetailPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const startY = detailPointerStartY.current
+      const startX = detailPointerStartX.current
+      if (startY == null || startX == null) return
+      const deltaY = e.clientY - startY
+      const deltaX = Math.abs(e.clientX - startX)
+      const atTop = (detailContentRef.current?.scrollTop ?? 0) <= 4
+      const mostlyVertical = deltaY > 0 && deltaY > deltaX * 1.15
+      const strongPullDown = deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD * 1.5
+      if (mostlyVertical && (atTop ? deltaY > DETAIL_SWIPE_CLOSE_THRESHOLD : strongPullDown)) {
+        closeDetails()
+        resetDetailPointerGesture()
+        return
+      }
+      if (atTop && mostlyVertical) {
+        setDetailDragOffsetY(Math.min(170, deltaY * 0.85))
+      } else if (detailDragOffsetY !== 0) {
+        setDetailDragOffsetY(0)
+      }
+    },
+    [closeDetails, detailDragOffsetY, resetDetailPointerGesture],
+  )
+
+  const onDetailPointerUp = useCallback(() => {
+    resetDetailPointerGesture()
+  }, [resetDetailPointerGesture])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1514,22 +1607,35 @@ export function GreekVerseQuestClient() {
               exit={{ y: "100%" }}
               transition={detailDragOffsetY > 0 ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
               className="relative z-[67] flex w-full max-h-[min(72dvh,640px)] flex-col overflow-hidden rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
+              onTouchStart={onDetailTouchStart}
+              onTouchMove={onDetailTouchMove}
+              onTouchEnd={onDetailTouchEnd}
+              onTouchCancel={() => {
+                detailSwipeStartY.current = null
+                detailSwipeCurrentY.current = null
+                detailSwipeStartX.current = null
+                detailSwipeCurrentX.current = null
+                detailSwipeStartedAt.current = null
+                setDetailDragOffsetY(0)
+              }}
+              onPointerDown={onDetailPointerDown}
+              onPointerMove={onDetailPointerMove}
+              onPointerUp={onDetailPointerUp}
+              onPointerCancel={onDetailPointerUp}
             >
               <div
                 className="shrink-0 border-b border-white/10 px-4 pb-3 pt-3 sm:px-6"
-                onTouchStart={onDetailTouchStart}
-                onTouchMove={onDetailTouchMove}
-                onTouchEnd={onDetailTouchEnd}
-                onTouchCancel={() => {
-                  detailSwipeStartY.current = null
-                  detailSwipeCurrentY.current = null
-                  detailSwipeStartX.current = null
-                  detailSwipeCurrentX.current = null
-                  detailSwipeStartedAt.current = null
-                  setDetailDragOffsetY(0)
-                }}
               >
-                <div data-detail-swipe-handle className="mb-2 flex flex-col items-center gap-1.5 pb-1 text-center select-none">
+                <div
+                  data-detail-swipe-handle
+                  className="mb-2 flex flex-col items-center gap-1.5 pb-1 text-center select-none"
+                  onTouchStart={onDetailHandleTouchStart}
+                  onTouchMove={onDetailHandleTouchMove}
+                  onTouchEnd={onDetailHandleTouchEnd}
+                  onTouchCancel={() => {
+                    detailHandleSwipeStartY.current = null
+                  }}
+                >
                   <div className="h-1.5 w-14 rounded-full bg-white/25" />
                   <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Swipe down from here to close</p>
                 </div>

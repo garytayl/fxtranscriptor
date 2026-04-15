@@ -555,20 +555,20 @@ export function GreekGrammarReaderClient() {
               exit={{ y: "100%" }}
               transition={detailDragOffsetY > 0 ? { duration: 0 } : { type: "spring", damping: 32, stiffness: 360 }}
               className="relative z-[67] flex w-full max-h-[min(72dvh,640px)] flex-col overflow-hidden rounded-t-3xl border-t border-white/20 bg-[#060b14]/95"
+              onTouchStart={onDetailTouchStart}
+              onTouchMove={onDetailTouchMove}
+              onTouchEnd={onDetailTouchEnd}
+              onTouchCancel={() => {
+                detailSwipeStartY.current = null
+                detailSwipeCurrentY.current = null
+                detailSwipeStartX.current = null
+                detailSwipeCurrentX.current = null
+                detailSwipeStartedAt.current = null
+                setDetailDragOffsetY(0)
+              }}
             >
               <div
                 className="shrink-0 border-b border-white/10 px-4 pb-3 pt-3 sm:px-6"
-                onTouchStart={onDetailTouchStart}
-                onTouchMove={onDetailTouchMove}
-                onTouchEnd={onDetailTouchEnd}
-                onTouchCancel={() => {
-                  detailSwipeStartY.current = null
-                  detailSwipeCurrentY.current = null
-                  detailSwipeStartX.current = null
-                  detailSwipeCurrentX.current = null
-                  detailSwipeStartedAt.current = null
-                  setDetailDragOffsetY(0)
-                }}
               >
                 <div
                   data-detail-swipe-handle
