@@ -1,11 +1,11 @@
-import { GreekGrammarReaderClient } from "./greek-grammar-reader-client"
+import { redirect } from "next/navigation"
 
 export const metadata = {
-  title: "Learn Greek · Grammar reader",
+  title: "Learn Greek · Endings lab",
   description:
-    "Read pilot NT verses one at a time: tap any word for morphology, grammar notes, and optional hints—without quizzes or XP.",
+    "Start with memorization tables and quick endings drills before entering Verse Quest or Grammar Reader.",
 }
 
 export default function DevotionsGreekPage() {
-  return <GreekGrammarReaderClient />
+  redirect("/devotions/greek/endings")
 }

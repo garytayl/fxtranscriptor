@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, Menu, Sparkles, X } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, GraduationCap, Menu, Sparkles, X } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
@@ -253,6 +253,13 @@ export function GreekGrammarReaderClient() {
         </div>
         <div className="flex justify-center pb-2 px-3">
           <Link
+            href="/devotions/greek/endings"
+            className="mr-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/90 hover:bg-cyan-500/20"
+          >
+            <GraduationCap className="size-3.5" />
+            Endings Lab
+          </Link>
+          <Link
             href="/devotions/greek/quest"
             className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-200/90 hover:bg-emerald-500/20"
           >
@@ -408,6 +415,14 @@ export function GreekGrammarReaderClient() {
                   >
                     Full Reader
                     <ExternalLink className="size-3.5 opacity-70" />
+                  </Link>
+                  <Link
+                    href="/devotions/greek/endings"
+                    onClick={closeMenu}
+                    className="inline-flex items-center gap-2 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/90 hover:bg-cyan-500/20"
+                  >
+                    Endings Lab
+                    <GraduationCap className="size-3.5 opacity-80" />
                   </Link>
                   <Link
                     href="/devotions/greek/quest"

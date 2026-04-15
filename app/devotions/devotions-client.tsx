@@ -1082,11 +1082,11 @@ export function DevotionsClient() {
                       {studyLoading ? "Loading…" : "Guided studies"}
                     </button>
                     <Link
-                      href="/devotions/greek"
+                      href="/devotions/greek/endings"
                       className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/15 hover:border-emerald-500/40 transition-colors flex items-center justify-center gap-2"
                     >
                       <Languages className="w-5 h-5 text-emerald-400/85 shrink-0" aria-hidden />
-                      Learn Greek · grammar reader
+                      Learn Greek · endings lab
                     </Link>
                     <Link
                       href="/devotions/greek/quest"
@@ -1959,12 +1959,12 @@ export function DevotionsClient() {
               Open in full Scripture reader
             </Link>
             <Link
-              href="/devotions/greek"
+              href="/devotions/greek/endings"
               onClick={() => setMoreOpen(false)}
               className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/25 hover:bg-emerald-500/10 transition-colors text-left"
             >
               <Languages className="w-4 h-4 shrink-0" />
-              Learn Greek · grammar reader
+              Learn Greek · endings lab
             </Link>
             <Link
               href="/devotions/greek/quest"

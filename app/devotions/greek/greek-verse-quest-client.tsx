@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Eye,
   Flame,
+  GraduationCap,
   Menu,
   Sparkles,
   Target,
@@ -1150,7 +1151,14 @@ export function GreekVerseQuestClient() {
         </div>
         <div className="flex justify-center pb-2 px-3">
           <Link
-            href="/devotions/greek"
+            href="/devotions/greek/endings"
+            className="mr-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/90 hover:bg-cyan-500/20"
+          >
+            <GraduationCap className="size-3.5" />
+            Endings Lab
+          </Link>
+          <Link
+            href="/devotions/greek/reader"
             className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
           >
             <BookOpen className="size-3.5" />
@@ -1398,7 +1406,15 @@ export function GreekVerseQuestClient() {
                     <ExternalLink className="size-3.5 opacity-70" />
                   </Link>
                   <Link
-                    href="/devotions/greek"
+                    href="/devotions/greek/endings"
+                    onClick={closeMenu}
+                    className="inline-flex items-center gap-2 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/90 hover:bg-cyan-500/20"
+                  >
+                    Endings Lab
+                    <GraduationCap className="size-3.5 opacity-80" />
+                  </Link>
+                  <Link
+                    href="/devotions/greek/reader"
                     onClick={closeMenu}
                     className="inline-flex items-center gap-2 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-amber-200/90 hover:bg-amber-500/20"
                   >
