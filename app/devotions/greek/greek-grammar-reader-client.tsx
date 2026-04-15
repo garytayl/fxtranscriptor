@@ -85,6 +85,15 @@ export function GreekGrammarReaderClient() {
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
 
+  const setRolodexVerseFromValue = useCallback(
+    (value: string) => {
+      const nextVerse = Number.parseInt(value, 10)
+      if (!Number.isFinite(nextVerse) || nextVerse < 1) return
+      setRolodexVerse(nextVerse)
+    },
+    [setRolodexVerse],
+  )
+
   const onRolodexBookChange = useCallback(
     (nextBook: string) => {
       const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
@@ -268,7 +277,7 @@ export function GreekGrammarReaderClient() {
               Back
             </Link>
             <div className="text-center min-w-0 px-1">
-              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar reader</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar Reader</p>
               <p className="text-sm text-white/80 truncate">Choose your starting verse</p>
             </div>
             <Link
@@ -321,7 +330,7 @@ export function GreekGrammarReaderClient() {
                 <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
                 <select
                   value={rolodexVerse}
-                  onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
+                  onChange={(e) => setRolodexVerseFromValue(e.target.value)}
                   className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
                   aria-label="Select Greek study verse"
                 >
@@ -366,7 +375,7 @@ export function GreekGrammarReaderClient() {
             Back
           </Link>
           <div className="text-center min-w-0 px-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar reader</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar Reader</p>
             <p className="text-sm text-white/80 truncate">{pilot.label}</p>
           </div>
           <button
@@ -423,7 +432,7 @@ export function GreekGrammarReaderClient() {
               <div className="mb-4 flex items-center justify-between">
                 <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200/80">
                   <Sparkles className="size-3.5" />
-                  Verse controls
+                  Study menu
                 </p>
                 <button
                   type="button"
@@ -472,7 +481,7 @@ export function GreekGrammarReaderClient() {
                       <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
                       <select
                         value={rolodexVerse}
-                        onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
+                        onChange={(e) => setRolodexVerseFromValue(e.target.value)}
                         className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
                         aria-label="Select Greek study verse"
                       >
@@ -773,7 +782,7 @@ export function GreekGrammarReaderClient() {
           href={readerUrl}
           className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-300/90 hover:text-amber-200"
         >
-          Word study &amp; grammar in full chapter
+          Word study &amp; grammar in reader
           <ExternalLink className="size-3.5 opacity-80" />
         </Link>
       </footer>

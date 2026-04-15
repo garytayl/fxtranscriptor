@@ -1086,14 +1086,21 @@ export function DevotionsClient() {
                       className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/15 hover:border-emerald-500/40 transition-colors flex items-center justify-center gap-2"
                     >
                       <Languages className="w-5 h-5 text-emerald-400/85 shrink-0" aria-hidden />
-                      Learn Greek · endings lab
+                      Greek Endings Lab
+                    </Link>
+                    <Link
+                      href="/devotions/greek/reader"
+                      className="w-full min-h-[52px] rounded-xl font-sans text-sm font-light text-white/90 bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/12 hover:border-amber-500/35 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <BookOpen className="w-5 h-5 text-amber-400/75 shrink-0" aria-hidden />
+                      Grammar Reader · tap words
                     </Link>
                     <Link
                       href="/devotions/greek/quest"
                       className="w-full min-h-[52px] rounded-xl font-sans text-sm font-light text-white/90 bg-emerald-500/5 border border-emerald-500/20 hover:bg-emerald-500/12 hover:border-emerald-500/35 transition-colors flex items-center justify-center gap-2"
                     >
                       <Gamepad2 className="w-5 h-5 text-emerald-400/75 shrink-0" aria-hidden />
-                      Verse Quest · quiz & XP
+                      Verse Quest · quick quiz loop
                     </Link>
                     <button
                       type="button"
@@ -1964,7 +1971,15 @@ export function DevotionsClient() {
               className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/25 hover:bg-emerald-500/10 transition-colors text-left"
             >
               <Languages className="w-4 h-4 shrink-0" />
-              Learn Greek · endings lab
+              Greek Endings Lab
+            </Link>
+            <Link
+              href="/devotions/greek/reader"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-amber-200/90 hover:text-amber-100 py-3 px-4 rounded-lg border border-amber-500/25 hover:bg-amber-500/10 transition-colors text-left"
+            >
+              <BookOpen className="w-4 h-4 shrink-0" />
+              Grammar Reader
             </Link>
             <Link
               href="/devotions/greek/quest"
@@ -1972,7 +1987,7 @@ export function DevotionsClient() {
               className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors text-left"
             >
               <Gamepad2 className="w-4 h-4 shrink-0" />
-              Verse Quest · quiz & XP
+              Verse Quest · quick quiz loop
             </Link>
             <button
               type="button"

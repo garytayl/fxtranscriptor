@@ -298,7 +298,7 @@ export function RomansJourneyClient() {
                   className="flex-1 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-emerald-500/25 bg-emerald-950/30 font-mono text-[10px] tracking-[0.15em] uppercase text-emerald-100/90 hover:bg-emerald-950/50 transition-colors"
                 >
                   <Languages className="w-4 h-4 text-emerald-400/70" aria-hidden />
-                  Greek lab
+                  Greek Endings Lab
                 </Link>
               </div>
 
@@ -336,7 +336,7 @@ export function RomansJourneyClient() {
               )}
 
               <p className="font-sans text-[11px] text-white/35 text-center mb-8">
-                Passage loads here so you stay in the journey. Greek lab uses pilot verses for morphology drills.
+                Passage loads here so you stay in the journey. Greek Study uses pilot verses for morphology drills.
               </p>
 
               <div className="flex flex-col gap-3">

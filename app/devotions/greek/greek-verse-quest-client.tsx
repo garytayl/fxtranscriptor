@@ -1143,10 +1143,10 @@ export function GreekVerseQuestClient() {
             type="button"
             onClick={() => setMenuOpen(true)}
             className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
-            aria-label="Open study controls"
+            aria-label="Open study menu"
           >
             <Menu className="size-3.5" />
-            Menu
+            Study
           </button>
         </div>
         <div className="flex justify-center pb-2 px-3">
@@ -1162,11 +1162,12 @@ export function GreekVerseQuestClient() {
             className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
           >
             <BookOpen className="size-3.5" />
-            Grammar reader
+            Grammar Reader
           </Link>
         </div>
         <div className="px-4 pb-3 sm:px-8 md:px-14">
-          <div className="mx-auto max-w-5xl space-y-2">
+          <div className="mx-auto max-w-5xl space-y-1.5">
+            <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Today's XP progress</p>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
@@ -1175,6 +1176,7 @@ export function GreekVerseQuestClient() {
                 transition={xpBurst != null ? { duration: 0.4 } : undefined}
               />
             </div>
+            <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Verse progress</p>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-cyan-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-250"
@@ -1247,7 +1249,7 @@ export function GreekVerseQuestClient() {
               transition={{ duration: 0.22, ease: "easeOut" }}
               className="mx-auto w-full max-w-2xl rounded-3xl border border-white/20 bg-[#0a1020]/95 p-4 sm:p-5"
               role="dialog"
-              aria-label="Study controls"
+              aria-label="Greek study menu"
               onClick={(e) => e.stopPropagation()}
               onTouchStart={onMenuTouchStart}
               onTouchMove={onMenuTouchMove}
@@ -1256,7 +1258,7 @@ export function GreekVerseQuestClient() {
               <div className="mb-4 flex items-center justify-between">
                 <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-emerald-200/80">
                   <Sparkles className="size-3.5" />
-                  Verse controls
+                  Greek study menu
                 </p>
                 <button
                   type="button"
@@ -1346,6 +1348,10 @@ export function GreekVerseQuestClient() {
                   </div>
                 </div>
 
+                <p className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-[11px] text-cyan-100/90">
+                  Tip: tap highlighted target words (with a small status label under them) to advance the verse.
+                </p>
+
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -1418,7 +1424,7 @@ export function GreekVerseQuestClient() {
                     onClick={closeMenu}
                     className="inline-flex items-center gap-2 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-amber-200/90 hover:bg-amber-500/20"
                   >
-                    Grammar reader
+                    Grammar Reader
                     <BookOpen className="size-3.5 opacity-80" />
                   </Link>
                 </div>
@@ -1495,6 +1501,9 @@ export function GreekVerseQuestClient() {
                 Phrase focus
               </p>
             ) : null}
+            <p className="mx-auto max-w-3xl text-[11px] text-white/62">
+              Tap words with status tags (new/seen/learned or done). Non-tagged words are context only.
+            </p>
             {clusterGreekPreview ? (
               <p
                 lang="el"
@@ -1871,7 +1880,7 @@ export function GreekVerseQuestClient() {
           href={readerUrl}
           className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-300/90 hover:text-amber-200"
         >
-          Word study &amp; grammar in reader
+          Word study &amp; grammar in full chapter
           <ExternalLink className="size-3.5 opacity-80" />
         </Link>
       </footer>

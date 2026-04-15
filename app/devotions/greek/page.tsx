@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation"
 
 export const metadata = {
-  title: "Learn Greek · Endings lab",
+  title: "Greek Study · Endings Lab",
   description:
-    "Start with memorization tables and quick endings drills before entering Verse Quest or Grammar Reader.",
+    "Greek Study routes here first: memorize endings, then move into Grammar Reader or Verse Quest.",
 }
 
 export default function DevotionsGreekPage() {

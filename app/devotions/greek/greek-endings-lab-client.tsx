@@ -436,7 +436,7 @@ export function GreekEndingsLabClient() {
           <p className="text-sm text-white/85">
             Drill the patterns first, then jump into live reading. These are the endings you will keep seeing in the text.
           </p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Link
               href="/devotions/greek/reader"
               className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
@@ -450,6 +450,13 @@ export function GreekEndingsLabClient() {
             >
               <Gamepad2 className="size-4" />
               Verse Quest
+            </Link>
+            <Link
+              href="/bible"
+              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.1]"
+            >
+              <ArrowLeft className="size-4 rotate-180" />
+              Scripture Reader
             </Link>
           </div>
         </section>
@@ -541,7 +548,8 @@ export function GreekEndingsLabClient() {
           {activeQuest ? (
             <div className="mt-4 rounded-xl border border-white/12 bg-black/35 p-4">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/58">
-                {activeQuest.group} quest · {activeQuest.id}
+                {activeQuest.group} question · {Math.min(completedFilteredCount + 1, Math.max(filteredQuests.length, 1))} of{" "}
+                {Math.max(filteredQuests.length, 1)}
               </p>
               <p className="mt-2 text-sm text-white/92">{activeQuest.prompt}</p>
               {(() => {
