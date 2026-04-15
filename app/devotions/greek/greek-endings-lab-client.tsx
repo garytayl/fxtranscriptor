@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, CheckCircle2, Gamepad2, Languages, Sparkles, XCircle } from "lucide-react"
+import { ArrowLeft, BookOpen, CheckCircle2, Gamepad2, Sparkles, XCircle } from "lucide-react"
 
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 
@@ -387,7 +387,7 @@ export function GreekEndingsLabClient() {
           <p className="text-sm text-white/85">
             Drill the patterns first, then jump into live reading. These are the endings you will keep seeing in the text.
           </p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Link
               href="/devotions/greek/reader"
               className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
@@ -401,13 +401,6 @@ export function GreekEndingsLabClient() {
             >
               <Gamepad2 className="size-4" />
               Verse Quest
-            </Link>
-            <Link
-              href="/bible"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-cyan-200/90 hover:bg-cyan-500/20"
-            >
-              <Languages className="size-4" />
-              Full Reader
             </Link>
           </div>
         </section>
