@@ -50,6 +50,7 @@ export function GreekGrammarReaderClient() {
   } = useGreekPilotVerse()
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const [startPickerOpen, setStartPickerOpen] = useState(true)
   const { prefs: uiPrefs, updatePrefs: updateUiPrefs } = useGreekUiPreferences()
   const { wordHintsEnabled, showEnglish } = uiPrefs
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
@@ -83,6 +84,34 @@ export function GreekGrammarReaderClient() {
     applyRolodexSelection()
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
+
+  const onRolodexBookChange = useCallback(
+    (nextBook: string) => {
+      const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
+      setRolodexBookSlug(nextBook)
+      if (firstChapter) {
+        setRolodexChapter(firstChapter.chapter)
+        setRolodexVerse((current) => Math.min(current, firstChapter.maxVerse))
+      }
+    },
+    [setRolodexBookSlug, setRolodexChapter, setRolodexVerse],
+  )
+
+  const onRolodexChapterChange = useCallback(
+    (nextChapter: number) => {
+      const chapterItem = rolodexChapters.find((item) => item.chapter === nextChapter)
+      setRolodexChapter(nextChapter)
+      if (chapterItem) {
+        setRolodexVerse((current) => Math.min(current, chapterItem.maxVerse))
+      }
+    },
+    [rolodexChapters, setRolodexChapter, setRolodexVerse],
+  )
+
+  const startReaderFromRolodex = useCallback(() => {
+    applyRolodexSelection()
+    setStartPickerOpen(false)
+  }, [applyRolodexSelection])
 
   const handleSelectGreekWord = useCallback((wordIndex: number) => {
     setSelectedWordIndex(wordIndex)
@@ -226,6 +255,105 @@ export function GreekGrammarReaderClient() {
   const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
   const verseGreekLine = greekTokens.map((t) => t.word).join(" ")
 
+  if (startPickerOpen) {
+    return (
+      <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
+        <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
+          <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
+            <Link
+              href="/devotions/greek/endings"
+              className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
+            >
+              <ArrowLeft className="size-3.5" />
+              Back
+            </Link>
+            <div className="text-center min-w-0 px-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar reader</p>
+              <p className="text-sm text-white/80 truncate">Choose your starting verse</p>
+            </div>
+            <Link
+              href="/devotions/greek/quest"
+              className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-200/90 hover:bg-emerald-500/20"
+            >
+              <Gamepad2 className="size-3.5" />
+              Quest
+            </Link>
+          </div>
+        </header>
+
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-10 pt-6 sm:px-8 md:px-14">
+          <div className="mx-auto w-full max-w-2xl rounded-3xl border border-white/15 bg-black/35 p-4 sm:p-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-200/85">Verse rolodex</p>
+            <p className="mt-1 text-sm text-white/78">Start Grammar Reader by picking a book, chapter, and verse first.</p>
+
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <label className="space-y-1">
+                <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
+                <select
+                  value={rolodexBookSlug}
+                  onChange={(e) => onRolodexBookChange(e.target.value)}
+                  className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
+                  aria-label="Select Greek study book"
+                >
+                  {rolodexBooks.map((item) => (
+                    <option key={item.bookSlug} value={item.bookSlug}>
+                      {item.bookName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
+                <select
+                  value={rolodexChapter}
+                  onChange={(e) => onRolodexChapterChange(Number.parseInt(e.target.value, 10))}
+                  className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
+                  aria-label="Select Greek study chapter"
+                >
+                  {rolodexChapters.map((item) => (
+                    <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
+                      {item.chapter}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
+                <select
+                  value={rolodexVerse}
+                  onChange={(e) => setRolodexVerse(Number.parseInt(e.target.value, 10))}
+                  className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
+                  aria-label="Select Greek study verse"
+                >
+                  {rolodexVerseOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 px-3 py-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-100/90">
+                Start at {selectedRolodexChapter.label}:{rolodexVerse}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={startReaderFromRolodex}
+              disabled={!hydrated}
+              className="mt-4 inline-flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl border border-amber-300/45 bg-amber-400/15 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-400/25 disabled:opacity-50"
+            >
+              {hydrated ? "Start grammar reader" : "Loading verse options..."}
+            </button>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
       <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
@@ -314,15 +442,7 @@ export function GreekGrammarReaderClient() {
                       <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
                       <select
                         value={rolodexBookSlug}
-                        onChange={(e) => {
-                          const nextBook = e.target.value
-                          const firstChapter = MORPH_PILOT_CHAPTERS.find((item) => item.bookSlug === nextBook)
-                          setRolodexBookSlug(nextBook)
-                          if (firstChapter) {
-                            setRolodexChapter(firstChapter.chapter)
-                            setRolodexVerse((current) => Math.min(current, firstChapter.maxVerse))
-                          }
-                        }}
+                        onChange={(e) => onRolodexBookChange(e.target.value)}
                         className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
                         aria-label="Select Greek study book"
                       >
@@ -337,14 +457,7 @@ export function GreekGrammarReaderClient() {
                       <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
                       <select
                         value={rolodexChapter}
-                        onChange={(e) => {
-                          const nextChapter = Number.parseInt(e.target.value, 10)
-                          const chapterItem = rolodexChapters.find((item) => item.chapter === nextChapter)
-                          setRolodexChapter(nextChapter)
-                          if (chapterItem) {
-                            setRolodexVerse((current) => Math.min(current, chapterItem.maxVerse))
-                          }
-                        }}
+                        onChange={(e) => onRolodexChapterChange(Number.parseInt(e.target.value, 10))}
                         className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
                         aria-label="Select Greek study chapter"
                       >
