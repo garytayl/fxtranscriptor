@@ -1447,7 +1447,7 @@ export function GreekVerseQuestClient() {
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-6">
+        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-6 md:gap-8">
           <div className="flex shrink-0 flex-col gap-6">
           <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
             <span
@@ -1507,7 +1507,7 @@ export function GreekVerseQuestClient() {
             {clusterGreekPreview ? (
               <p
                 lang="el"
-                className="mx-auto mt-1 max-w-3xl px-3 text-center text-sm leading-snug text-amber-200/80"
+                className="mx-auto mt-1 max-w-3xl border-b border-white/10 px-3 pb-4 text-center text-sm leading-snug text-amber-200/80"
               >
                 {clusterGreekPreview}
               </p>
@@ -1517,7 +1517,7 @@ export function GreekVerseQuestClient() {
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
           </div>
 
-          <section className="flex min-h-[min(52vh,520px)] flex-1 flex-col items-center justify-center">
+          <section className="relative z-0 flex min-h-0 flex-1 flex-col items-stretch justify-start pt-1 sm:min-h-[min(36vh,420px)] sm:pt-2 md:min-h-0 md:pt-1">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
@@ -1539,8 +1539,10 @@ export function GreekVerseQuestClient() {
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.28, ease: "easeOut" }}
                   lang="el"
-                  className="w-full text-center leading-[1.28] text-amber-100/95 flex flex-wrap justify-center gap-x-3 gap-y-4"
-                  style={{ fontSize: "clamp(2.25rem, 8.4vw, 6rem)" }}
+                  className="mx-auto w-full max-w-4xl text-center leading-[1.15] text-amber-100/95 flex flex-wrap justify-center gap-x-2.5 gap-y-3 sm:leading-[1.2] sm:gap-x-3 sm:gap-y-3.5 md:max-w-5xl"
+                  style={{
+                    fontSize: "clamp(1.5rem, min(5.5vw, 3.25rem), 3.25rem)",
+                  }}
                 >
                   {greekTokens.map((tok, wi) => {
                     const key = wordFormKey(tok)
