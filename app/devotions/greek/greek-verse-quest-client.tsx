@@ -1165,70 +1165,79 @@ export function GreekVerseQuestClient() {
             Grammar Reader
           </Link>
         </div>
-        <div className="px-4 pb-3 sm:px-8 md:px-14">
-          <div className="mx-auto max-w-5xl space-y-1.5">
-            <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Today's XP progress</p>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
-                style={{ width: `${dailyXpPct}%` }}
-                animate={xpBurst != null ? { filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : undefined}
-                transition={xpBurst != null ? { duration: 0.4 } : undefined}
-              />
+        <div className="px-4 pb-2.5 sm:px-8 md:px-14">
+          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:gap-4">
+            <div className="min-w-0 space-y-1">
+              <p className="font-mono text-[8px] uppercase tracking-[0.14em] text-white/45">Today&apos;s XP</p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
+                  style={{ width: `${dailyXpPct}%` }}
+                  animate={xpBurst != null ? { filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : undefined}
+                  transition={xpBurst != null ? { duration: 0.4 } : undefined}
+                />
+              </div>
             </div>
-            <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45">Verse progress</p>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-250"
-                style={{ width: `${levelProgressPct}%` }}
-              />
+            <div className="min-w-0 space-y-1">
+              <p className="font-mono text-[8px] uppercase tracking-[0.14em] text-white/45">Verse targets</p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-250"
+                  style={{ width: `${levelProgressPct}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
       </header>
 
-      <AnimatePresence>
-        {xpBurst != null ? (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.92 }}
-            transition={{ duration: 0.24 }}
-            className="pointer-events-none absolute right-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-emerald-300/50 bg-emerald-400/25 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-50"
-          >
-            +{xpBurst} XP
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {microWinBurst ? (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.94 }}
-            transition={{ duration: 0.24 }}
-            className="pointer-events-none absolute left-4 top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-[74] rounded-full border border-cyan-300/50 bg-cyan-400/20 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-50"
-          >
-            {microWinBurst}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
+      {/* In-flow feedback strip — avoids overlapping header, verse line, and toasts colliding */}
+      <AnimatePresence mode="wait">
         {levelComplete ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="pointer-events-none absolute left-1/2 top-[max(5.6rem,calc(env(safe-area-inset-top)+5rem))] z-[74] w-[min(92vw,460px)] -translate-x-1/2 rounded-2xl border border-emerald-300/45 bg-black/55 px-4 py-3 backdrop-blur-lg"
+          <motion.aside
+            key="level-hud"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative z-[65] shrink-0 overflow-hidden border-b border-emerald-400/20 bg-emerald-950/40 px-3 py-2.5 sm:px-5"
+            aria-live="polite"
           >
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/90">Level Complete</p>
-            <p className="mt-1 text-sm text-white/90">{levelComplete.encouragement}</p>
-            <p className="mt-1 text-xs text-white/70">
-              +{levelComplete.xpGained} XP · Learned words {levelComplete.learnedWords}/{questTargetIndexes.length}
-            </p>
-          </motion.div>
+            <div className="mx-auto max-w-5xl">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/90">Level complete</p>
+              <p className="mt-0.5 text-sm leading-snug text-white/90">{levelComplete.encouragement}</p>
+              <p className="mt-1 text-xs leading-snug text-white/70">
+                +{levelComplete.xpGained} XP · Learned words {levelComplete.learnedWords}/{questTargetIndexes.length}
+              </p>
+            </div>
+          </motion.aside>
+        ) : xpBurst != null || microWinBurst ? (
+          <motion.aside
+            key="burst-hud"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative z-[65] shrink-0 overflow-hidden border-b border-white/10 bg-black/35 px-3 py-2 sm:px-5"
+            aria-live="polite"
+          >
+            <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1">
+              {microWinBurst ? (
+                <p className="min-w-0 flex-1 font-mono text-[10px] uppercase leading-snug tracking-[0.14em] text-cyan-100/95">
+                  {microWinBurst}
+                </p>
+              ) : null}
+              {xpBurst != null ? (
+                <p
+                  className={`shrink-0 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-200/95 ${
+                    microWinBurst ? "sm:ml-auto" : ""
+                  }`}
+                >
+                  +{xpBurst} XP
+                </p>
+              ) : null}
+            </div>
+          </motion.aside>
         ) : null}
       </AnimatePresence>
 
@@ -1443,13 +1452,13 @@ export function GreekVerseQuestClient() {
       </AnimatePresence>
 
       <main
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 pb-32 pt-4 sm:px-8 md:px-14"
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-6 md:gap-8">
-          <div className="flex shrink-0 flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
+        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-5 md:gap-7">
+          <div className="flex shrink-0 flex-col gap-5">
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
             <span
               className={`rounded-full border px-2.5 py-1 ${
                 onDailyVerse
@@ -1478,7 +1487,7 @@ export function GreekVerseQuestClient() {
             </span>
           </div>
 
-          <div className="space-y-2 text-center">
+          <div className="space-y-3 text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-300/75">{passageRef.replace(":", " · ")}</p>
             <div className="mx-auto h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
               <div
@@ -1490,24 +1499,24 @@ export function GreekVerseQuestClient() {
               Verse {verse} of {pilot.maxVerse}
             </p>
             {onDailyVerse ? (
-              <p className="font-mono text-[10px] uppercase tracking-[0.17em] text-emerald-200/70">
+              <p className="mx-auto max-w-md font-mono text-[10px] uppercase leading-relaxed tracking-[0.12em] text-emerald-200/70">
                 {dailyVerseRunDone
                   ? "Daily run completed. Keep reviewing for mastery."
                   : "Daily verse run active. Clear all targets to complete today."}
               </p>
             ) : null}
             {clusterGreekPreview ? (
-              <p className="mx-auto mt-2 max-w-3xl px-2 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+              <p className="mx-auto max-w-3xl px-2 pt-1 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
                 Phrase focus
               </p>
             ) : null}
-            <p className="mx-auto max-w-3xl text-[11px] text-white/62">
-              Tap words with status tags (new/seen/learned or done). Non-tagged words are context only.
+            <p className="mx-auto max-w-md px-1 text-[11px] leading-relaxed text-white/62">
+              Tap words with status tags (new / seen / learned or done). Other words are context only.
             </p>
             {clusterGreekPreview ? (
               <p
                 lang="el"
-                className="mx-auto mt-1 max-w-3xl border-b border-white/10 px-3 pb-4 text-center text-sm leading-snug text-amber-200/80"
+                className="mx-auto max-w-3xl border-b border-white/10 px-2 pb-3 pt-1 text-center text-sm leading-relaxed text-amber-200/85"
               >
                 {clusterGreekPreview}
               </p>
@@ -1517,7 +1526,7 @@ export function GreekVerseQuestClient() {
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
           </div>
 
-          <section className="relative z-0 flex min-h-0 flex-1 flex-col items-stretch justify-start pt-1 sm:min-h-[min(36vh,420px)] sm:pt-2 md:min-h-0 md:pt-1">
+          <section className="relative isolate z-0 w-full min-h-0 flex-1 py-2">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
@@ -1539,9 +1548,9 @@ export function GreekVerseQuestClient() {
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.28, ease: "easeOut" }}
                   lang="el"
-                  className="mx-auto w-full max-w-4xl text-center leading-[1.15] text-amber-100/95 flex flex-wrap justify-center gap-x-2.5 gap-y-3 sm:leading-[1.2] sm:gap-x-3 sm:gap-y-3.5 md:max-w-5xl"
+                  className="mx-auto flex w-full max-w-4xl flex-wrap content-start justify-center gap-x-2 gap-y-5 text-center leading-[1.38] text-amber-100/95 sm:gap-x-2.5 sm:gap-y-6 md:max-w-5xl"
                   style={{
-                    fontSize: "clamp(1.5rem, min(5.5vw, 3.25rem), 3.25rem)",
+                    fontSize: "clamp(1.2rem, min(4.8vw, 2.65rem), 2.65rem)",
                   }}
                 >
                   {greekTokens.map((tok, wi) => {
@@ -1556,34 +1565,39 @@ export function GreekVerseQuestClient() {
                     const selected = selectedWordIndex === wi
                     const hint = wordHintsEnabled ? getMorphHintAbbrev(tok) : null
                     return (
-                      <span key={`${verse}-${wi}-${tok.word}`} className="inline-flex flex-col items-center">
+                      <span
+                        key={`${verse}-${wi}-${tok.word}`}
+                        className="inline-flex min-h-[3rem] max-w-[min(100%,18rem)] flex-col items-center justify-end gap-1 px-1 sm:min-h-[3.25rem]"
+                      >
                         <button
                           type="button"
                           onClick={() => handleSelectGreekWord(wi)}
                           disabled={!targetWord}
                           className={
                             selected
-                              ? "border-b-2 border-amber-300/85 text-amber-200"
+                              ? "border-b-2 border-amber-300/85 pb-px text-amber-200"
                               : !targetWord
                                 ? inPhraseCluster
-                                  ? "border-b border-dotted border-white/25 text-amber-100/55"
-                                  : "border-b border-transparent text-amber-100/35"
+                                  ? "border-b border-dotted border-white/25 pb-px text-amber-100/55"
+                                  : "border-b border-transparent pb-px text-amber-100/35"
                                 : weakWord
-                                  ? "border-b border-dashed border-cyan-300/80 text-cyan-100 hover:border-cyan-200 hover:text-cyan-50"
+                                  ? "border-b border-dashed border-cyan-300/80 pb-px text-cyan-100 hover:border-cyan-200 hover:text-cyan-50"
                                   : familiarity === "learned"
-                                    ? "border-b border-dashed border-emerald-300/70 text-emerald-100 hover:border-emerald-200 hover:text-emerald-50"
-                                    : "border-b border-dashed border-amber-300/55 text-amber-100/95 hover:border-amber-300/80 hover:text-amber-50"
+                                    ? "border-b border-dashed border-emerald-300/70 pb-px text-emerald-100 hover:border-emerald-200 hover:text-emerald-50"
+                                    : "border-b border-dashed border-amber-300/55 pb-px text-amber-100/95 hover:border-amber-300/80 hover:text-amber-50"
                           }
                         >
                           {tok.word}
                         </button>
                         {targetWord ? (
-                          <span className="mt-0.5 font-mono text-[8px] sm:text-[9px] text-white/55">
+                          <span className="max-w-[8.5rem] text-center font-mono text-[8px] leading-tight text-white/55 sm:max-w-none sm:text-[9px]">
                             {completedWord ? "done" : familiarity}
                           </span>
                         ) : null}
                         {hint ? (
-                          <span className="mt-0.5 font-mono text-[9px] sm:text-[10px] text-amber-400/70">{hint}</span>
+                          <span className="max-w-[9rem] text-center font-mono text-[9px] leading-tight text-amber-400/75 sm:max-w-[11rem] sm:text-[10px]">
+                            {hint}
+                          </span>
                         ) : null}
                       </span>
                     )
@@ -1604,12 +1618,14 @@ export function GreekVerseQuestClient() {
           </section>
 
           {showEnglish && english ? (
-            <p
-              className="mx-auto max-w-3xl shrink-0 border-t border-white/10 pt-5 text-center text-white/70 leading-relaxed"
-              style={{ fontSize: "clamp(1.05rem, 3.3vw, 1.6rem)" }}
-            >
-              {english}
-            </p>
+            <div className="mx-auto max-w-3xl shrink-0 border-t border-white/10 pt-5">
+              <p
+                className="text-center text-balance text-white/75 leading-relaxed"
+                style={{ fontSize: "clamp(1rem, 3vw, 1.45rem)" }}
+              >
+                {english}
+              </p>
+            </div>
           ) : null}
         </div>
       </main>
@@ -1685,10 +1701,10 @@ export function GreekVerseQuestClient() {
               </div>
               <div
                 ref={detailContentRef}
-                className="mx-auto min-h-0 w-full max-w-4xl max-h-[calc(min(72dvh,640px)-9.25rem)] overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-1 [-webkit-overflow-scrolling:touch] sm:px-6"
+                className="mx-auto flex min-h-0 w-full max-w-4xl max-h-[calc(min(72dvh,640px)-9.25rem)] flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-2 [-webkit-overflow-scrolling:touch] sm:px-6"
               >
                 {questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
-                  <div className="mb-3 rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
+                  <div className="rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
                     <p className="mt-1 text-sm text-white/85">{questChallenge.prompt}</p>
                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1724,7 +1740,7 @@ export function GreekVerseQuestClient() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ type: "spring", damping: 26, stiffness: 380 }}
-                        className="mb-3 rounded-xl border border-emerald-400/45 bg-gradient-to-br from-emerald-500/25 to-emerald-600/10 p-3 shadow-[0_0_24px_-8px_rgba(52,211,153,0.45)]"
+                        className="rounded-xl border border-emerald-400/45 bg-gradient-to-br from-emerald-500/25 to-emerald-600/10 p-3 shadow-[0_0_24px_-8px_rgba(52,211,153,0.45)]"
                       >
                         <div className="flex items-start gap-2.5">
                           <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-emerald-200" aria-hidden />
@@ -1746,7 +1762,7 @@ export function GreekVerseQuestClient() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ type: "spring", damping: 26, stiffness: 380 }}
-                        className="mb-3 rounded-xl border border-rose-400/40 bg-gradient-to-br from-rose-500/20 to-rose-950/30 p-3 shadow-[0_0_22px_-8px_rgba(251,113,133,0.35)]"
+                        className="rounded-xl border border-rose-400/40 bg-gradient-to-br from-rose-500/20 to-rose-950/30 p-3 shadow-[0_0_22px_-8px_rgba(251,113,133,0.35)]"
                       >
                         <div className="flex items-start gap-2.5">
                           <XCircle className="mt-0.5 size-6 shrink-0 text-rose-200" aria-hidden />
@@ -1776,7 +1792,7 @@ export function GreekVerseQuestClient() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ type: "spring", damping: 26, stiffness: 380 }}
-                        className="mb-3 rounded-xl border border-sky-400/35 bg-gradient-to-br from-sky-500/15 to-slate-900/40 p-3"
+                        className="rounded-xl border border-sky-400/35 bg-gradient-to-br from-sky-500/15 to-slate-900/40 p-3"
                       >
                         <div className="flex items-start gap-2.5">
                           <Eye className="mt-0.5 size-6 shrink-0 text-sky-200" aria-hidden />
@@ -1797,7 +1813,7 @@ export function GreekVerseQuestClient() {
                 ) : null}
 
                 {questStage === "revealed" ? (
-                  <div className="mb-3 rounded-xl border border-emerald-300/30 bg-emerald-400/[0.08] p-3">
+                  <div className="rounded-xl border border-emerald-300/30 bg-emerald-400/[0.08] p-3">
                     <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100/85">Word memory</p>
                     <p className="mt-1 text-sm text-white/92">
                       Familiarity: <span className="text-emerald-100">{selectedFamiliarityLabel}</span>
@@ -1823,7 +1839,7 @@ export function GreekVerseQuestClient() {
                         learningClues={selectedTokenLearningClues}
                         awardProgress={awardProgress}
                         quizContext={greekCoachQuizContext}
-                        className={greekCoachQuizContext ? "mt-0" : "mt-6"}
+                        className="mt-0"
                       />
                     </div>
                     <div className={greekCoachQuizContext ? "order-2" : "order-1"}>
@@ -1843,7 +1859,7 @@ export function GreekVerseQuestClient() {
                     <button
                       type="button"
                       onClick={continueQuest}
-                      className="mt-5 w-full rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2 text-xs text-emerald-50 hover:bg-emerald-400/30"
+                      className="w-full rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2.5 text-xs text-emerald-50 hover:bg-emerald-400/30"
                     >
                       Continue quest
                     </button>
