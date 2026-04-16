@@ -56,10 +56,8 @@ function InlineStrongsLexicon({ code, surfaceWord }: { code: string; surfaceWord
       ) : phase === "error" || !entry ? (
         <p className="text-xs text-white/55">Could not load this Strong&apos;s entry.</p>
       ) : (
-        <div
-          className="border-t border-white/15 pt-2 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white/92 [&_.border-border]:border-white/20"
-        >
-          <WordStudyEntryContent entry={entry} />
+        <div className="border-t border-white/15 pt-2 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white/92 [&_.border-border]:border-white/20">
+          <WordStudyEntryContent entry={entry} hideTitleRow />
         </div>
       )}
     </div>

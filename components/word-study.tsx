@@ -23,26 +23,31 @@ type WordStudyProps = {
 export function WordStudyEntryContent({
   entry,
   showKjvAlignmentNote = false,
+  hideTitleRow = false,
 }: {
   entry: StrongsEntry
   /** When true, explains that lexicon English may differ from KJV verse wording used for Strong’s. */
   showKjvAlignmentNote?: boolean
+  /** When true, omit lemma + code header (caller shows context above). */
+  hideTitleRow?: boolean
 }) {
   const isGreek = entry.language === "greek"
   return (
     <div className="space-y-2 text-left">
-      <div className="flex items-center gap-2 border-b border-border pb-2">
-        <span
-          className="text-xl font-semibold text-foreground"
-          lang={isGreek ? "el" : "he"}
-          dir={isGreek ? "ltr" : "rtl"}
-        >
-          {entry.lemma}
-        </span>
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
-          {entry.code}
-        </span>
-      </div>
+      {!hideTitleRow ? (
+        <div className="flex items-center gap-2 border-b border-border pb-2">
+          <span
+            className="text-xl font-semibold text-foreground"
+            lang={isGreek ? "el" : "he"}
+            dir={isGreek ? "ltr" : "rtl"}
+          >
+            {entry.lemma}
+          </span>
+          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
+            {entry.code}
+          </span>
+        </div>
+      ) : null}
       {entry.transliteration && (
         <p className="font-mono text-sm text-muted-foreground">
           {entry.transliteration}
