@@ -1144,16 +1144,16 @@ export function DevotionsClient() {
                           transition={{ duration: reduced ? 0.12 : 0.22 }}
                           className="space-y-4"
                         >
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-center gap-3">
                             <button
                               type="button"
                               onClick={() => setOpenLandingTile(null)}
-                              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/75 transition-colors hover:bg-white/[0.1]"
+                              className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/85 transition-colors hover:bg-white/[0.09] hover:text-white"
+                              aria-label="Back"
                             >
-                              <ArrowLeft className="size-3.5" aria-hidden />
-                              All options
+                              <ArrowLeft className="size-4" aria-hidden />
                             </button>
-                            <div className="min-w-0 pt-0.5 text-left">
+                            <div className="min-w-0 text-left">
                               <p className="font-sans text-lg font-medium text-white/95">
                                 {openLandingTile === "read" && "Read"}
                                 {openLandingTile === "guided" && "Guided"}
@@ -1300,7 +1300,7 @@ export function DevotionsClient() {
                           )}
                           </div>
                           <p className="text-center font-mono text-[9px] tracking-[0.2em] text-white/35 uppercase">
-                            Back or Esc to return
+                            Esc to go back
                           </p>
                         </motion.div>
                       )}
