@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -68,13 +67,10 @@ export function MorphologySidebarPanel({
   token,
   verseNumber,
   wordIndex,
-  scriptureReaderUrl,
 }: {
   token: GreekMorphToken | null
   verseNumber: number
   wordIndex: number
-  /** Link to fx-greek / full chapter in the main scripture reader. */
-  scriptureReaderUrl?: string
 }) {
   const expanded = token ? expandGreekMorphToken(token) : null
   const lemmaStrongsCode = token ? strongsCodeForGreekLemma(token.lemma) : null
@@ -136,14 +132,6 @@ export function MorphologySidebarPanel({
             <p className="text-[10px] leading-snug text-white/45">
               Lexicon is matched from this word&apos;s dictionary form (lemma), not from KJV word order in this verse.
             </p>
-            {scriptureReaderUrl ? (
-              <Link
-                href={scriptureReaderUrl}
-                className="inline-flex text-[11px] font-medium text-amber-200/90 underline underline-offset-2 hover:text-amber-100"
-              >
-                Open this verse in Scripture reader
-              </Link>
-            ) : null}
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-white/45">Category</p>

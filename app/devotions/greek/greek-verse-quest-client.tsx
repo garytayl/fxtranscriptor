@@ -1854,7 +1854,6 @@ export function GreekVerseQuestClient() {
                         token={selectedToken}
                         verseNumber={verse}
                         wordIndex={selectedWordIndex ?? 0}
-                        scriptureReaderUrl={readerUrl}
                       />
                     </div>
                   </div>
@@ -1863,7 +1862,6 @@ export function GreekVerseQuestClient() {
                     token={selectedToken}
                     verseNumber={verse}
                     wordIndex={selectedWordIndex ?? 0}
-                    scriptureReaderUrl={readerUrl}
                   />
                 )}
 

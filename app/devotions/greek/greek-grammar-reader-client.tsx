@@ -756,7 +756,6 @@ export function GreekGrammarReaderClient() {
                   token={selectedToken}
                   verseNumber={verse}
                   wordIndex={selectedWordIndex ?? 0}
-                  scriptureReaderUrl={readerUrl}
                 />
 
                 <GreekCoachLab
