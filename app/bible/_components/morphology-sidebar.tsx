@@ -67,10 +67,13 @@ export function MorphologySidebarPanel({
   token,
   verseNumber,
   wordIndex,
+  wordBank = false,
 }: {
   token: GreekMorphToken | null
   verseNumber: number
   wordIndex: number
+  /** When true, header copy is for saved word-bank forms (no verse context). */
+  wordBank?: boolean
 }) {
   const expanded = token ? expandGreekMorphToken(token) : null
   const lemmaStrongsCode = token ? strongsCodeForGreekLemma(token.lemma) : null
@@ -99,7 +102,7 @@ export function MorphologySidebarPanel({
         </motion.p>
       ) : expanded ? (
         <motion.div
-          key={`${verseNumber}-${wordIndex}`}
+          key={wordBank ? `bank-${token.lemma}|${token.parse}` : `${verseNumber}-${wordIndex}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
@@ -108,7 +111,9 @@ export function MorphologySidebarPanel({
         >
           <div className="border-b border-white/15 pb-2">
             <p className="font-mono text-[10px] tracking-[0.2em] text-amber-200/70 uppercase">
-              Greek · verse {verseNumber} · word {wordIndex + 1}
+              {wordBank
+                ? "Greek · word bank · Strong's & grammar"
+                : `Greek · verse ${verseNumber} · word ${wordIndex + 1}`}
             </p>
             <p className="text-xl font-semibold text-white mt-1" lang="el">
               {token.word}

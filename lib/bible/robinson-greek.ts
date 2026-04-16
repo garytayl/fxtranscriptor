@@ -169,6 +169,46 @@ function finishExpanded(token: GreekMorphToken, partial: Omit<GreekMorphExpanded
   }
 }
 
+/**
+ * Best-effort POS for MorphGNT-style parses when only lemma + parse are stored (e.g. word bank).
+ * Does not replace API `pos`; used so `expandGreekMorphToken` can branch like live morphology.
+ */
+export function inferPosFromMorphgntParse(parse: string): string {
+  const p = normParse(parse.trim())
+  if (!p || isUnderspecified(p)) return "P-"
+
+  const tense = p[1]
+  const mood = p[3]
+  const caseSlot = p[4]
+  const hasTense = tense !== "-" && "PIAFXYT".includes(tense)
+
+  if (hasTense && mood !== "-") {
+    if ("IDSON".includes(mood)) return "V-"
+    if (mood === "P") return "V-"
+    if (mood === "N") return "V-"
+  }
+
+  if (caseSlot !== "-" && "NGDAV".includes(caseSlot)) {
+    return "N-"
+  }
+
+  return "X-"
+}
+
+/** Reconstruct a token for sidebar expansion from word-bank memory (lemma + parse only). */
+export function greekMorphTokenFromLemmaAndParse(lemma: string, parse: string): GreekMorphToken {
+  const parseTrim = parse.trim()
+  const w = lemma.trim()
+  const pos = inferPosFromMorphgntParse(parseTrim)
+  return {
+    text: w,
+    word: w,
+    lemma: w,
+    parse: parseTrim,
+    pos,
+  }
+}
+
 export function expandGreekMorphToken(token: GreekMorphToken): GreekMorphExpanded {
   const pos = token.pos.trim()
   const parseRaw = token.parse.trim()

@@ -2,7 +2,10 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { BookOpen } from "lucide-react"
 
+import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
+import { greekMorphTokenFromLemmaAndParse } from "@/lib/bible/robinson-greek"
 import {
   filterAndSortWordMemoryRows,
   getGreekWordMemory,
@@ -53,6 +56,7 @@ export function GreekWordBankPanel({
   const [filter, setFilter] = useState<WordBankFilter>("all")
   const [sort, setSort] = useState<WordBankSort>("recent")
   const [query, setQuery] = useState("")
+  const [expandedFormKey, setExpandedFormKey] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
     setRows(listGreekWordMemoryRows(getGreekWordMemory()))
@@ -155,7 +159,9 @@ export function GreekWordBankPanel({
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map((r) => (
+          {filtered.map((r) => {
+            const breakdownOpen = expandedFormKey === r.formKey
+            return (
             <li
               key={r.formKey}
               className="rounded-xl border border-white/10 bg-black/25 px-3 py-3 sm:px-4"
@@ -187,8 +193,37 @@ export function GreekWordBankPanel({
                 {r.weakScore > 0 ? <span>Review weight {r.weakScore}</span> : null}
                 <span>Seen {formatSeenAt(r.lastSeenAt)}</span>
               </div>
+              <button
+                type="button"
+                aria-expanded={breakdownOpen}
+                onClick={() => setExpandedFormKey((k) => (k === r.formKey ? null : r.formKey))}
+                className={cn(
+                  "mt-3 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors sm:w-auto",
+                  breakdownOpen
+                    ? accent === "emerald"
+                      ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-50"
+                      : "border-amber-400/50 bg-amber-500/20 text-amber-50"
+                    : accent === "emerald"
+                      ? "border-emerald-400/35 bg-emerald-500/10 text-emerald-100/90 hover:bg-emerald-500/18"
+                      : "border-amber-400/35 bg-amber-500/10 text-amber-100/90 hover:bg-amber-500/18",
+                )}
+              >
+                <BookOpen className="size-3.5 shrink-0 opacity-90" aria-hidden />
+                {breakdownOpen ? "Hide Strong's & grammar" : "Strong's & grammar breakdown"}
+              </button>
+              {breakdownOpen ? (
+                <div className="mt-3 rounded-xl border border-white/12 bg-black/40 p-3 sm:p-4">
+                  <MorphologySidebarPanel
+                    token={greekMorphTokenFromLemmaAndParse(r.lemma, r.parse)}
+                    verseNumber={0}
+                    wordIndex={0}
+                    wordBank
+                  />
+                </div>
+              ) : null}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
 
