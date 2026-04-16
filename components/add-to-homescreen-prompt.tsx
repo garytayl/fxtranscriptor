@@ -49,6 +49,7 @@ export function AddToHomeScreenPrompt() {
   const pathname = usePathname()
   const onDevotionsRoute =
     pathname === "/devotions" || (typeof pathname === "string" && pathname.startsWith("/devotions/"))
+  const hideOnVerseQuest = pathname === "/devotions/greek/quest"
 
   const [mounted, setMounted] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -69,12 +70,19 @@ export function AddToHomeScreenPrompt() {
   }, [])
 
   useEffect(() => {
-    if (!mounted || !onDevotionsRoute || isStandalone() || wasDismissed() || !isInstallPromptViewport()) {
+    if (
+      !mounted ||
+      !onDevotionsRoute ||
+      hideOnVerseQuest ||
+      isStandalone() ||
+      wasDismissed() ||
+      !isInstallPromptViewport()
+    ) {
       setShow(false)
       return
     }
     setShow(true)
-  }, [mounted, onDevotionsRoute])
+  }, [mounted, onDevotionsRoute, hideOnVerseQuest])
 
   const dismiss = useCallback(() => {
     setDismissed()

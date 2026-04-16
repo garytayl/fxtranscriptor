@@ -1125,7 +1125,7 @@ export function GreekVerseQuestClient() {
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
 
   return (
-    <div className="fixed inset-0 z-[60] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
+    <div className="fixed inset-0 z-[100] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
       <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
           <Link
@@ -1456,7 +1456,7 @@ export function GreekVerseQuestClient() {
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-5 md:gap-7">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 md:gap-7">
           <div className="flex shrink-0 flex-col gap-5">
           <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[10px] font-mono uppercase tracking-[0.14em] text-white/55">
             <span
@@ -1526,7 +1526,7 @@ export function GreekVerseQuestClient() {
           {error ? <p className="text-center text-sm text-red-300/90">{error}</p> : null}
           </div>
 
-          <section className="relative isolate z-0 w-full min-h-0 flex-1 py-2">
+          <section className="relative isolate z-0 w-full shrink-0 py-2">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
