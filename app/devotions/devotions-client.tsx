@@ -21,6 +21,7 @@ import {
   Bell,
   Languages,
   Gamepad2,
+  Library,
   Sparkles,
   TextCursor,
 } from "lucide-react"
@@ -1234,6 +1235,14 @@ export function DevotionsClient() {
                                 <Gamepad2 className="w-5 h-5 text-emerald-400/75 shrink-0" aria-hidden />
                                 Verse Quest
                               </Link>
+                              <Link
+                                href="/devotions/greek/words"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[44px] rounded-xl font-sans text-sm font-light text-white/88 bg-white/[0.04] border border-white/15 hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Library className="w-5 h-5 text-emerald-300/70 shrink-0" aria-hidden />
+                                Word bank · all forms
+                              </Link>
                             </div>
                           )}
 
@@ -2135,6 +2144,14 @@ export function DevotionsClient() {
             >
               <Gamepad2 className="w-4 h-4 shrink-0" />
               Verse Quest · quick quiz loop
+            </Link>
+            <Link
+              href="/devotions/greek/words"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/85 hover:text-emerald-100 py-3 px-4 rounded-lg border border-white/12 hover:bg-white/5 transition-colors text-left"
+            >
+              <Library className="w-4 h-4 shrink-0" />
+              Greek word bank
             </Link>
             <button
               type="button"

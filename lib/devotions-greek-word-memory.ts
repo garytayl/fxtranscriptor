@@ -136,3 +136,64 @@ export function getWordFamiliarityLabel(familiarity: GreekWordFamiliarity): stri
   if (familiarity === "seen") return "Seen"
   return "New"
 }
+
+/** One tracked word form: key is `lemma|parse` (see wordFormKey in verse UI). */
+export type GreekWordMemoryRow = {
+  formKey: string
+  lemma: string
+  parse: string
+  taps: number
+  correct: number
+  weakScore: number
+  familiarity: GreekWordFamiliarity
+  lastSeenAt: string
+}
+
+export function splitWordFormKey(formKey: string): { lemma: string; parse: string } {
+  const i = formKey.indexOf("|")
+  if (i < 0) return { lemma: formKey.trim(), parse: "" }
+  return { lemma: formKey.slice(0, i).trim(), parse: formKey.slice(i + 1).trim() }
+}
+
+export function listGreekWordMemoryRows(memory: GreekWordMemory): GreekWordMemoryRow[] {
+  return Object.entries(memory).map(([formKey, e]) => {
+    const { lemma, parse } = splitWordFormKey(formKey)
+    return {
+      formKey,
+      lemma,
+      parse,
+      taps: e.taps,
+      correct: e.correct,
+      weakScore: e.weakScore,
+      familiarity: e.familiarity,
+      lastSeenAt: e.lastSeenAt,
+    }
+  })
+}
+
+export type WordBankSort = "recent" | "weak" | "lemma"
+export type WordBankFilter = "all" | "active" | "learned" | "weak"
+
+export function filterAndSortWordMemoryRows(
+  rows: GreekWordMemoryRow[],
+  filter: WordBankFilter,
+  sort: WordBankSort,
+): GreekWordMemoryRow[] {
+  let out = rows
+  if (filter === "active") {
+    out = rows.filter((r) => r.familiarity !== "learned")
+  } else if (filter === "learned") {
+    out = rows.filter((r) => r.familiarity === "learned")
+  } else if (filter === "weak") {
+    out = rows.filter((r) => r.weakScore >= 4 || (r.familiarity !== "learned" && r.taps >= 1))
+  }
+  const copy = [...out]
+  if (sort === "recent") {
+    copy.sort((a, b) => Date.parse(b.lastSeenAt || "0") - Date.parse(a.lastSeenAt || "0"))
+  } else if (sort === "weak") {
+    copy.sort((a, b) => b.weakScore - a.weakScore || b.taps - a.taps)
+  } else {
+    copy.sort((a, b) => a.lemma.localeCompare(b.lemma, "el") || a.parse.localeCompare(b.parse))
+  }
+  return copy
+}

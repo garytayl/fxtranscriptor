@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, CheckCircle2, Gamepad2, Sparkles, XCircle } from "lucide-react"
+import { ArrowLeft, BookOpen, CheckCircle2, Gamepad2, Library, Sparkles, XCircle } from "lucide-react"
 
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 
@@ -450,6 +450,13 @@ export function GreekEndingsLabClient() {
             >
               <Gamepad2 className="size-4" />
               Verse Quest
+            </Link>
+            <Link
+              href="/devotions/greek/words"
+              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-white/18 bg-white/[0.05] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.1]"
+            >
+              <Library className="size-4 opacity-90" />
+              Word bank
             </Link>
             <Link
               href="/bible"

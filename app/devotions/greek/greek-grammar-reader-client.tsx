@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react"
 import Link from "next/link"
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, GraduationCap, Menu, Sparkles, X } from "lucide-react"
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Gamepad2,
+  GraduationCap,
+  Library,
+  Menu,
+  X,
+} from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 
 import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
@@ -22,6 +32,8 @@ import {
   VERSE_SWIPE_HORIZONTAL_RATIO,
   VERSE_SWIPE_MIN_X,
 } from "@/app/devotions/greek/greek-pilot-verse-shared"
+import { GreekMenuSection, GreekStudyMenuShell } from "@/app/devotions/greek/greek-study-menu-shell"
+import { GreekWordBankOverlay } from "@/app/devotions/greek/greek-word-bank-overlay"
 
 export function GreekGrammarReaderClient() {
   const {
@@ -50,6 +62,7 @@ export function GreekGrammarReaderClient() {
   } = useGreekPilotVerse()
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const [wordBankOpen, setWordBankOpen] = useState(false)
   const [startPickerOpen, setStartPickerOpen] = useState(true)
   const { prefs: uiPrefs, updatePrefs: updateUiPrefs } = useGreekUiPreferences()
   const { wordHintsEnabled, showEnglish } = uiPrefs
@@ -133,7 +146,7 @@ export function GreekGrammarReaderClient() {
 
   const onVerseTouchEnd = useCallback(
     (e: TouchEvent) => {
-      if (menuOpen || selectedWordIndex != null) return
+      if (menuOpen || wordBankOpen || selectedWordIndex != null) return
       const start = verseSwipeStartX.current
       const startY = verseSwipeStartY.current
       verseSwipeStartX.current = null
@@ -151,7 +164,7 @@ export function GreekGrammarReaderClient() {
       if (dx > 0) prevVerse()
       else nextVerse()
     },
-    [menuOpen, selectedWordIndex, prevVerse, nextVerse],
+    [menuOpen, wordBankOpen, selectedWordIndex, prevVerse, nextVerse],
   )
 
   const onMenuTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
@@ -245,19 +258,20 @@ export function GreekGrammarReaderClient() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (selectedWordIndex != null) closeDetails()
+        if (wordBankOpen) setWordBankOpen(false)
+        else if (selectedWordIndex != null) closeDetails()
         else closeMenu()
-      } else if (e.key === "ArrowLeft" && !menuOpen && selectedWordIndex == null) {
+      } else if (e.key === "ArrowLeft" && !menuOpen && !wordBankOpen && selectedWordIndex == null) {
         e.preventDefault()
         prevVerse()
-      } else if (e.key === "ArrowRight" && !menuOpen && selectedWordIndex == null) {
+      } else if (e.key === "ArrowRight" && !menuOpen && !wordBankOpen && selectedWordIndex == null) {
         e.preventDefault()
         nextVerse()
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [menuOpen, selectedWordIndex, closeMenu, closeDetails, prevVerse, nextVerse])
+  }, [menuOpen, wordBankOpen, selectedWordIndex, closeMenu, closeDetails, prevVerse, nextVerse])
 
   const selectedToken =
     selectedWordIndex != null && selectedWordIndex >= 0 ? greekTokens[selectedWordIndex] ?? null : null
@@ -406,168 +420,171 @@ export function GreekGrammarReaderClient() {
         </div>
       </header>
 
-      <AnimatePresence>
-        {menuOpen ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-[78] bg-black/65 px-3 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.35rem))] backdrop-blur-sm sm:px-6"
-            onClick={closeMenu}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 18, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.985 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
-              className="mx-auto w-full max-w-2xl rounded-3xl border border-white/20 bg-[#0a1020]/95 p-4 sm:p-5"
-              role="dialog"
-              aria-label="Study controls"
-              onClick={(e) => e.stopPropagation()}
-              onTouchStart={onMenuTouchStart}
-              onTouchMove={onMenuTouchMove}
-              onTouchEnd={onMenuTouchEnd}
+      <GreekStudyMenuShell
+        open={menuOpen}
+        onClose={closeMenu}
+        title="Grammar reader menu"
+        accent="amber"
+        onMenuTouchStart={onMenuTouchStart}
+        onMenuTouchMove={onMenuTouchMove}
+        onMenuTouchEnd={onMenuTouchEnd}
+      >
+        <div className="space-y-5">
+          <GreekMenuSection label="Vocabulary">
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false)
+                setWordBankOpen(true)
+              }}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-400/35 bg-amber-500/12 px-4 py-3 text-left transition-colors hover:bg-amber-500/18"
             >
-              <div className="mb-4 flex items-center justify-between">
-                <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200/80">
-                  <Sparkles className="size-3.5" />
-                  Study menu
+              <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-100">
+                <Library className="size-4 shrink-0 opacity-90" aria-hidden />
+                Words you&apos;re learning
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-amber-200/50" aria-hidden />
+            </button>
+            <Link
+              href="/devotions/greek/words"
+              onClick={closeMenu}
+              className="block text-center font-mono text-[10px] text-amber-400/70 underline-offset-2 hover:text-amber-300/90"
+            >
+              Open full-page word bank
+            </Link>
+          </GreekMenuSection>
+
+          <GreekMenuSection label="Verse location">
+            <div className="rounded-2xl border border-white/14 bg-black/28 p-3 sm:p-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <label className="space-y-1">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
+                  <select
+                    value={rolodexBookSlug}
+                    onChange={(e) => onRolodexBookChange(e.target.value)}
+                    className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
+                    aria-label="Select Greek study book"
+                  >
+                    {rolodexBooks.map((item) => (
+                      <option key={item.bookSlug} value={item.bookSlug}>
+                        {item.bookName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
+                  <select
+                    value={rolodexChapter}
+                    onChange={(e) => onRolodexChapterChange(Number.parseInt(e.target.value, 10))}
+                    className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
+                    aria-label="Select Greek study chapter"
+                  >
+                    {rolodexChapters.map((item) => (
+                      <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
+                        {item.chapter}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
+                  <select
+                    value={rolodexVerse}
+                    onChange={(e) => setRolodexVerseFromValue(e.target.value)}
+                    className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
+                    aria-label="Select Greek study verse"
+                  >
+                    {rolodexVerseOptions.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+                  {selectedRolodexChapter.label}:{rolodexVerse}
                 </p>
                 <button
                   type="button"
-                  onClick={closeMenu}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/75 hover:bg-white/[0.12]"
-                  aria-label="Close study controls"
+                  onClick={jumpToRolodex}
+                  className="rounded-xl border border-amber-300/40 bg-amber-400/15 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-400/25"
                 >
-                  <X className="size-4" />
+                  Go to verse
                 </button>
               </div>
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-white/15 bg-black/25 p-3 sm:p-4">
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Verse rolodex</p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <label className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Book</span>
-                      <select
-                        value={rolodexBookSlug}
-                        onChange={(e) => onRolodexBookChange(e.target.value)}
-                        className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
-                        aria-label="Select Greek study book"
-                      >
-                        {rolodexBooks.map((item) => (
-                          <option key={item.bookSlug} value={item.bookSlug}>
-                            {item.bookName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Chapter</span>
-                      <select
-                        value={rolodexChapter}
-                        onChange={(e) => onRolodexChapterChange(Number.parseInt(e.target.value, 10))}
-                        className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
-                        aria-label="Select Greek study chapter"
-                      >
-                        {rolodexChapters.map((item) => (
-                          <option key={`${item.bookSlug}-${item.chapter}`} value={item.chapter}>
-                            {item.chapter}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Verse</span>
-                      <select
-                        value={rolodexVerse}
-                        onChange={(e) => setRolodexVerseFromValue(e.target.value)}
-                        className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-amber-300/50 focus:outline-none"
-                        aria-label="Select Greek study verse"
-                      >
-                        {rolodexVerseOptions.map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
-                      {selectedRolodexChapter.label}:{rolodexVerse}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={jumpToRolodex}
-                      className="rounded-xl border border-amber-300/40 bg-amber-400/15 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-amber-100 hover:bg-amber-400/25"
-                    >
-                      Go to verse
-                    </button>
-                  </div>
-                </div>
+            </div>
+          </GreekMenuSection>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateUiPrefs({ wordHintsEnabled: !wordHintsEnabled })}
-                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                      wordHintsEnabled
-                        ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
-                        : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                    }`}
-                  >
-                    {wordHintsEnabled ? "Hints On" : "Hints Off"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateUiPrefs({ showEnglish: !showEnglish })}
-                    className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                      showEnglish
-                        ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
-                        : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
-                    }`}
-                  >
-                    {showEnglish ? "English On" : "English Off"}
-                  </button>
-                  <Link
-                    href={readerUrl}
-                    onClick={closeMenu}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
-                  >
-                    Full Reader
-                    <ExternalLink className="size-3.5 opacity-70" />
-                  </Link>
-                  <Link
-                    href="/devotions/greek/endings"
-                    onClick={closeMenu}
-                    className="inline-flex items-center gap-2 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/90 hover:bg-cyan-500/20"
-                  >
-                    Endings Lab
-                    <GraduationCap className="size-3.5 opacity-80" />
-                  </Link>
-                  <Link
-                    href="/devotions/greek/quest"
-                    onClick={closeMenu}
-                    className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-200/90 hover:bg-emerald-500/20"
-                  >
-                    Verse Quest
-                    <Gamepad2 className="size-3.5 opacity-80" />
-                  </Link>
-                </div>
+          <GreekMenuSection label="Display">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => updateUiPrefs({ wordHintsEnabled: !wordHintsEnabled })}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                  wordHintsEnabled
+                    ? "border-amber-300/50 bg-amber-300/15 text-amber-100"
+                    : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                {wordHintsEnabled ? "Hints On" : "Hints Off"}
+              </button>
+              <button
+                type="button"
+                onClick={() => updateUiPrefs({ showEnglish: !showEnglish })}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                  showEnglish
+                    ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100"
+                    : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                {showEnglish ? "English On" : "English Off"}
+              </button>
+            </div>
+          </GreekMenuSection>
 
-                <button
-                  type="button"
-                  onClick={closeMenu}
-                  className="w-full rounded-2xl border border-white/20 bg-white/[0.04] py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-white/80 hover:bg-white/[0.1]"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+          <GreekMenuSection label="Jump to">
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={readerUrl}
+                onClick={closeMenu}
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/75 hover:bg-white/[0.1]"
+              >
+                Full Reader
+                <ExternalLink className="size-3.5 opacity-70" />
+              </Link>
+              <Link
+                href="/devotions/greek/endings"
+                onClick={closeMenu}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/90 hover:bg-cyan-500/20"
+              >
+                Endings Lab
+                <GraduationCap className="size-3.5 opacity-80" />
+              </Link>
+              <Link
+                href="/devotions/greek/quest"
+                onClick={closeMenu}
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-200/90 hover:bg-emerald-500/20"
+              >
+                Verse Quest
+                <Gamepad2 className="size-3.5 opacity-80" />
+              </Link>
+            </div>
+          </GreekMenuSection>
+
+          <button
+            type="button"
+            onClick={closeMenu}
+            className="w-full rounded-2xl border border-white/18 bg-white/[0.05] py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-white/85 hover:bg-white/[0.1]"
+          >
+            Done
+          </button>
+        </div>
+      </GreekStudyMenuShell>
+
+      <GreekWordBankOverlay open={wordBankOpen} onClose={() => setWordBankOpen(false)} accent="amber" />
 
       <main
         className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
