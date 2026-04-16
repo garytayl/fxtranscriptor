@@ -1,4 +1,7 @@
-import { GREEK_LEMMA_ENGLISH_QUIZ } from "@/lib/bible/greek-lemma-english-gloss.generated"
+import {
+  GREEK_LEMMA_ENGLISH_QUIZ,
+  GREEK_LEMMA_STRONGS_CODE,
+} from "@/lib/bible/greek-lemma-english-gloss.generated"
 
 export function normalizeGreekLemma(lemma: string): string {
   return lemma.normalize("NFC").trim()
@@ -7,6 +10,12 @@ export function normalizeGreekLemma(lemma: string): string {
 export function englishGlossForLemma(lemma: string): string | null {
   const key = normalizeGreekLemma(lemma)
   return GREEK_LEMMA_ENGLISH_QUIZ[key] ?? null
+}
+
+/** Strong's G-code for this Greek lemma (OpenScriptures lexicon), or null if unknown. */
+export function strongsCodeForGreekLemma(lemma: string): string | null {
+  const key = normalizeGreekLemma(lemma)
+  return GREEK_LEMMA_STRONGS_CODE[key] ?? null
 }
 
 /**

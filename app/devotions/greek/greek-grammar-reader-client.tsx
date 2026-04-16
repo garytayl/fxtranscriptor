@@ -45,7 +45,6 @@ export function GreekGrammarReaderClient() {
     error,
     english,
     greekTokens,
-    kjvStrongsForVerse,
     verse,
     prevVerse,
     nextVerse,
@@ -757,7 +756,6 @@ export function GreekGrammarReaderClient() {
                   token={selectedToken}
                   verseNumber={verse}
                   wordIndex={selectedWordIndex ?? 0}
-                  kjvStrongsPairs={kjvStrongsForVerse}
                   scriptureReaderUrl={readerUrl}
                 />
 

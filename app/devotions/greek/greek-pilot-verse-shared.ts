@@ -10,7 +10,6 @@ import {
 } from "@/lib/bible/morph-pilot-menu"
 import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
-import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 export const GREEK_PLACE_STORAGE_KEY = "fx_devotions_greek_place_v1"
 
@@ -59,8 +58,6 @@ export function useGreekPilotVerse() {
   const [error, setError] = useState<string | null>(null)
   const [english, setEnglish] = useState("")
   const [greekTokens, setGreekTokens] = useState<GreekMorphToken[]>([])
-  /** KJV + Strong's word segments for the current pilot chapter (KJV English order). */
-  const [kjvStrongsByVerse, setKjvStrongsByVerse] = useState<Record<number, StrongsWordAndCode[]> | null>(null)
 
   const pilot: MorphPilotChapterMenuItem = MORPH_PILOT_CHAPTERS[pilotIdx] ?? MORPH_PILOT_CHAPTERS[0]
   const passageRef = useMemo(() => morphPilotPassageRef(pilot, verse), [pilot, verse])
@@ -114,46 +111,6 @@ export function useGreekPilotVerse() {
     setRolodexChapter(pilot.chapter)
     setRolodexVerse(verse)
   }, [pilot.bookSlug, pilot.chapter, verse])
-
-  useEffect(() => {
-    if (!hydrated) return
-
-    const controller = new AbortController()
-    void (async () => {
-      try {
-        const res = await fetch(
-          `/api/bible/verse-strongs?book=${encodeURIComponent(pilot.bookSlug)}&chapter=${pilot.chapter}&detail=words`,
-          { signal: controller.signal },
-        )
-        if (!res.ok) {
-          if (!controller.signal.aborted) setKjvStrongsByVerse(null)
-          return
-        }
-        const data = (await res.json()) as { verses?: Record<string, StrongsWordAndCode[]> }
-        const raw = data.verses
-        if (!raw) {
-          if (!controller.signal.aborted) setKjvStrongsByVerse(null)
-          return
-        }
-        const next: Record<number, StrongsWordAndCode[]> = {}
-        for (const [k, pairs] of Object.entries(raw)) {
-          const n = Number.parseInt(k, 10)
-          if (Number.isFinite(n) && Array.isArray(pairs)) next[n] = pairs
-        }
-        if (!controller.signal.aborted) setKjvStrongsByVerse(next)
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") return
-        if (!controller.signal.aborted) setKjvStrongsByVerse(null)
-      }
-    })()
-
-    return () => controller.abort()
-  }, [hydrated, pilot.bookSlug, pilot.chapter])
-
-  const kjvStrongsForVerse = useMemo(() => {
-    const row = kjvStrongsByVerse?.[verse]
-    return row && row.length > 0 ? row : null
-  }, [kjvStrongsByVerse, verse])
 
   useEffect(() => {
     if (!hydrated) return
@@ -261,7 +218,6 @@ export function useGreekPilotVerse() {
     error,
     english,
     greekTokens,
-    kjvStrongsForVerse,
     prevVerse,
     nextVerse,
     rolodexBookSlug,
