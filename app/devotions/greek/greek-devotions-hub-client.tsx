@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Library,
   MapPin,
+  MessageCircle,
   Sparkles,
   Target,
 } from "lucide-react"
@@ -69,6 +70,13 @@ const TILES: {
     blurb: "Every form you have practiced—filter, search, and review.",
     icon: Library,
     className: "border-white/18 bg-white/[0.05] hover:bg-white/[0.1] text-white/90",
+  },
+  {
+    href: "/devotions/greek/coach",
+    title: "Study coach",
+    blurb: "Ask the AI about your path—uses your XP, streak, weak words, and milestones.",
+    icon: MessageCircle,
+    className: "border-fuchsia-400/35 bg-fuchsia-500/10 hover:bg-fuchsia-500/18 text-fuchsia-100",
   },
 ]
 

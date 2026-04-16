@@ -10,4 +10,5 @@ export const GREEK_SECTION_NAV: GreekSectionNavItem[] = [
   { href: "/devotions/greek/reader", label: "Reader" },
   { href: "/devotions/greek/quest", label: "Quest" },
   { href: "/devotions/greek/words", label: "Words" },
+  { href: "/devotions/greek/coach", label: "Coach" },
 ]
