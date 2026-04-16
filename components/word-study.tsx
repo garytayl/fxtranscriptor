@@ -15,6 +15,8 @@ type WordStudyProps = {
   className?: string
   /** Called when the word is clicked (e.g. to show in a sidebar). */
   onSelect?: (code: string) => void
+  /** When true, tooltip explains KJV vs lexicon English (scripture / concordance alignment). */
+  showKjvAlignmentNote?: boolean
 }
 
 /** Shared display for a Strong's entry (used in tooltip and sidebar). */
@@ -66,7 +68,14 @@ export function WordStudyEntryContent({
   )
 }
 
-export function WordStudy({ code, children, entry: entryProp, className, onSelect }: WordStudyProps) {
+export function WordStudy({
+  code,
+  children,
+  entry: entryProp,
+  className,
+  onSelect,
+  showKjvAlignmentNote = false,
+}: WordStudyProps) {
   const [entry, setEntry] = useState<StrongsEntry | null>(entryProp ?? null)
   const [loading, setLoading] = useState(false)
   const [fetched, setFetched] = useState(!!entryProp)
@@ -113,7 +122,7 @@ export function WordStudy({ code, children, entry: entryProp, className, onSelec
           sideOffset={6}
           className="w-[min(20rem,calc(100vw-2rem))] border-white/10 bg-[#0a0a0a] text-white shadow-xl [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
         >
-          <WordStudyEntryContent entry={entry} />
+          <WordStudyEntryContent entry={entry} showKjvAlignmentNote={showKjvAlignmentNote} />
         </HoverCardContent>
       </HoverCard>
     )

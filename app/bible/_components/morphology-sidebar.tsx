@@ -1,9 +1,12 @@
 "use client"
 
+import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 
+import { WordStudy } from "@/components/word-study"
 import { expandGreekMorphToken } from "@/lib/bible/robinson-greek"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
+import type { StrongsWordAndCode } from "@/lib/bible/verse-strongs"
 
 const sidebarClasses =
   "font-sans text-base font-light text-white/90 leading-relaxed [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
@@ -12,10 +15,16 @@ export function MorphologySidebarPanel({
   token,
   verseNumber,
   wordIndex,
+  kjvStrongsPairs,
+  scriptureReaderUrl,
 }: {
   token: GreekMorphToken | null
   verseNumber: number
   wordIndex: number
+  /** KJV English words with Strong's codes for this verse (same verse as morphology). */
+  kjvStrongsPairs?: StrongsWordAndCode[] | null
+  /** Link to fx-greek / KJV word study in the main scripture reader. */
+  scriptureReaderUrl?: string
 }) {
   const expanded = token ? expandGreekMorphToken(token) : null
 
@@ -64,6 +73,36 @@ export function MorphologySidebarPanel({
               This is the base form you would look up in a Greek lexicon.
             </p>
           </div>
+          {kjvStrongsPairs && kjvStrongsPairs.length > 0 ? (
+            <div className="rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 space-y-2">
+              <p className="text-[10px] uppercase tracking-wider text-amber-200/75">KJV English · Strong&apos;s</p>
+              <p className="text-sm text-white/88 leading-relaxed flex flex-wrap gap-x-1.5 gap-y-1">
+                {kjvStrongsPairs.map((seg, i) => (
+                  <span key={`${i}-${seg.word}-${seg.code || "x"}`} className="inline">
+                    {seg.code ? (
+                      <WordStudy code={seg.code} showKjvAlignmentNote className="text-amber-100/95">
+                        {seg.word}
+                      </WordStudy>
+                    ) : (
+                      <span className="text-white/75">{seg.word}</span>
+                    )}
+                  </span>
+                ))}
+              </p>
+              <p className="text-[10px] leading-snug text-white/45">
+                Same concordance as the scripture reader: English follows KJV word order and Strong&apos;s tags, not
+                Greek word order.
+              </p>
+              {scriptureReaderUrl ? (
+                <Link
+                  href={scriptureReaderUrl}
+                  className="inline-flex text-[11px] font-medium text-amber-200/90 underline underline-offset-2 hover:text-amber-100"
+                >
+                  Open this verse in Scripture reader
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
           <div>
             <p className="text-[10px] uppercase tracking-wider text-white/45">Category</p>
             <p className="text-sm text-white/90">{expanded.posLabel}</p>

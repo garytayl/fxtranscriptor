@@ -45,6 +45,7 @@ export function GreekGrammarReaderClient() {
     error,
     english,
     greekTokens,
+    kjvStrongsForVerse,
     verse,
     prevVerse,
     nextVerse,
@@ -752,7 +753,13 @@ export function GreekGrammarReaderClient() {
                 ref={detailContentRef}
                 className="mx-auto min-h-0 w-full max-w-4xl max-h-[calc(min(72dvh,640px)-9.25rem)] overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-1 [-webkit-overflow-scrolling:touch] sm:px-6"
               >
-                <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
+                <MorphologySidebarPanel
+                  token={selectedToken}
+                  verseNumber={verse}
+                  wordIndex={selectedWordIndex ?? 0}
+                  kjvStrongsPairs={kjvStrongsForVerse}
+                  scriptureReaderUrl={readerUrl}
+                />
 
                 <GreekCoachLab
                   key={`${levelKey}-lab-${selectedWordIndex}`}

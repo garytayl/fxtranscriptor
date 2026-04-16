@@ -5,8 +5,11 @@ import { MORPH_PILOT_CHAPTERS, morphPilotPassageRef, morphPilotReaderUrl } from 
 
 describe("morphPilotPassageRef", () => {
   it("builds API ref strings for pilot chapters", () => {
-    expect(morphPilotPassageRef(MORPH_PILOT_CHAPTERS[0], 12)).toBe("John 1:12")
-    expect(morphPilotPassageRef(MORPH_PILOT_CHAPTERS[1], 3)).toBe("Luke 6:3")
+    const first = MORPH_PILOT_CHAPTERS[0]
+    expect(morphPilotPassageRef(first, 12)).toBe(`${first.bookName} ${first.chapter}:12`)
+    const luke6 = MORPH_PILOT_CHAPTERS.find((c) => c.bookSlug === "luke" && c.chapter === 6)
+    expect(luke6).toBeDefined()
+    expect(morphPilotPassageRef(luke6!, 3)).toBe("Luke 6:3")
   })
 })
 

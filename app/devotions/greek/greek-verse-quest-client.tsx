@@ -483,6 +483,7 @@ export function GreekVerseQuestClient() {
     error,
     english,
     greekTokens,
+    kjvStrongsForVerse,
     verse,
     setVerse,
     prevVerse,
@@ -1854,11 +1855,19 @@ export function GreekVerseQuestClient() {
                         token={selectedToken}
                         verseNumber={verse}
                         wordIndex={selectedWordIndex ?? 0}
+                        kjvStrongsPairs={kjvStrongsForVerse}
+                        scriptureReaderUrl={readerUrl}
                       />
                     </div>
                   </div>
                 ) : (
-                  <MorphologySidebarPanel token={selectedToken} verseNumber={verse} wordIndex={selectedWordIndex ?? 0} />
+                  <MorphologySidebarPanel
+                    token={selectedToken}
+                    verseNumber={verse}
+                    wordIndex={selectedWordIndex ?? 0}
+                    kjvStrongsPairs={kjvStrongsForVerse}
+                    scriptureReaderUrl={readerUrl}
+                  />
                 )}
 
                 {questStage === "revealed" ? (
