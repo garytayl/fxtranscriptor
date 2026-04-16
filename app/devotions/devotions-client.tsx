@@ -1058,87 +1058,118 @@ export function DevotionsClient() {
                       )}
                     </motion.div>
                   )}
-                  <div className="w-full max-w-md mx-auto pt-2 space-y-4">
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                      {(
-                        [
-                          {
-                            id: "read" as const,
-                            label: "Read",
-                            hint: "Passage & plans",
-                            icon: BookOpen,
-                            iconClass: "text-white/80",
-                            idle: "border-white/18 bg-white/[0.06] hover:bg-white/[0.1]",
-                            active: "border-amber-400/50 bg-amber-500/10 ring-1 ring-amber-400/25",
-                          },
-                          {
-                            id: "guided" as const,
-                            label: "Guided",
-                            hint: "Meditation & studies",
-                            icon: Sparkles,
-                            iconClass: "text-violet-300/90",
-                            idle: "border-violet-400/22 bg-violet-500/[0.07] hover:bg-violet-500/12",
-                            active: "border-violet-400/45 bg-violet-500/14 ring-1 ring-violet-400/30",
-                          },
-                          {
-                            id: "greek" as const,
-                            label: "Greek",
-                            hint: "Labs & quest",
-                            icon: Languages,
-                            iconClass: "text-emerald-300/90",
-                            idle: "border-emerald-400/22 bg-emerald-500/[0.07] hover:bg-emerald-500/12",
-                            active: "border-emerald-400/45 bg-emerald-500/14 ring-1 ring-emerald-400/28",
-                          },
-                          {
-                            id: "journal" as const,
-                            label: "Journal",
-                            hint: "Saved reflections",
-                            icon: PenLine,
-                            iconClass: "text-cyan-200/85",
-                            idle: "border-cyan-400/20 bg-cyan-500/[0.06] hover:bg-cyan-500/10",
-                            active: "border-cyan-400/40 bg-cyan-500/12 ring-1 ring-cyan-400/25",
-                          },
-                        ] as const
-                      ).map((tile) => {
-                        const Icon = tile.icon
-                        const isOpen = openLandingTile === tile.id
-                        return (
-                          <button
-                            key={tile.id}
-                            type="button"
-                            onClick={() => setOpenLandingTile((prev) => (prev === tile.id ? null : tile.id))}
-                            className={cn(
-                              "group flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border p-4 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35",
-                              isOpen ? tile.active : tile.idle,
-                            )}
-                            aria-expanded={isOpen}
-                            aria-controls={`landing-submenu-${tile.id}`}
-                          >
-                            <Icon className={cn("size-8 shrink-0", tile.iconClass)} aria-hidden />
-                            <span className="font-sans text-base font-medium tracking-tight text-white/95">
-                              {tile.label}
-                            </span>
-                            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45 leading-tight px-1">
-                              {tile.hint}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-
+                  <div className="w-full max-w-md mx-auto pt-2">
                     <AnimatePresence initial={false} mode="wait">
-                      {openLandingTile ? (
+                      {!openLandingTile ? (
+                        <motion.div
+                          key="landing-tiles"
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.98 }}
+                          transition={{ duration: reduced ? 0.12 : 0.2 }}
+                          className="space-y-4"
+                        >
+                          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            {(
+                              [
+                                {
+                                  id: "read" as const,
+                                  label: "Read",
+                                  hint: "Passage & plans",
+                                  icon: BookOpen,
+                                  iconClass: "text-white/80",
+                                  idle: "border-white/18 bg-white/[0.06] hover:bg-white/[0.1]",
+                                },
+                                {
+                                  id: "guided" as const,
+                                  label: "Guided",
+                                  hint: "Meditation & studies",
+                                  icon: Sparkles,
+                                  iconClass: "text-violet-300/90",
+                                  idle: "border-violet-400/22 bg-violet-500/[0.07] hover:bg-violet-500/12",
+                                },
+                                {
+                                  id: "greek" as const,
+                                  label: "Greek",
+                                  hint: "Labs & quest",
+                                  icon: Languages,
+                                  iconClass: "text-emerald-300/90",
+                                  idle: "border-emerald-400/22 bg-emerald-500/[0.07] hover:bg-emerald-500/12",
+                                },
+                                {
+                                  id: "journal" as const,
+                                  label: "Journal",
+                                  hint: "Saved reflections",
+                                  icon: PenLine,
+                                  iconClass: "text-cyan-200/85",
+                                  idle: "border-cyan-400/20 bg-cyan-500/[0.06] hover:bg-cyan-500/10",
+                                },
+                              ] as const
+                            ).map((tile) => {
+                              const Icon = tile.icon
+                              return (
+                                <button
+                                  key={tile.id}
+                                  type="button"
+                                  onClick={() => setOpenLandingTile(tile.id)}
+                                  className={cn(
+                                    "group flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border p-4 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35",
+                                    tile.idle,
+                                  )}
+                                >
+                                  <Icon className={cn("size-8 shrink-0", tile.iconClass)} aria-hidden />
+                                  <span className="font-sans text-base font-medium tracking-tight text-white/95">
+                                    {tile.label}
+                                  </span>
+                                  <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45 leading-tight px-1">
+                                    {tile.hint}
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <p className="text-center font-mono text-[9px] tracking-[0.2em] text-white/35 uppercase">
+                            Tap a square to open
+                          </p>
+                        </motion.div>
+                      ) : (
                         <motion.div
                           key={openLandingTile}
                           id={`landing-submenu-${openLandingTile}`}
                           role="region"
                           aria-label="Actions"
-                          initial={{ opacity: 0, y: -6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: reduced ? 0.12 : 0.2 }}
-                          className="rounded-2xl border border-white/12 bg-black/35 px-3 py-3 sm:px-4"
+                          initial={{ opacity: 0, x: 14 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          transition={{ duration: reduced ? 0.12 : 0.22 }}
+                          className="space-y-4"
                         >
+                          <div className="flex items-start gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setOpenLandingTile(null)}
+                              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/75 transition-colors hover:bg-white/[0.1]"
+                            >
+                              <ArrowLeft className="size-3.5" aria-hidden />
+                              All options
+                            </button>
+                            <div className="min-w-0 pt-0.5 text-left">
+                              <p className="font-sans text-lg font-medium text-white/95">
+                                {openLandingTile === "read" && "Read"}
+                                {openLandingTile === "guided" && "Guided"}
+                                {openLandingTile === "greek" && "Greek"}
+                                {openLandingTile === "journal" && "Journal"}
+                              </p>
+                              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
+                                {openLandingTile === "read" && "Passage & plans"}
+                                {openLandingTile === "guided" && "Meditation & studies"}
+                                {openLandingTile === "greek" && "Labs & quest"}
+                                {openLandingTile === "journal" && "Saved reflections"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-white/12 bg-black/40 px-3 py-3 sm:px-4">
                           {openLandingTile === "read" && (
                             <div className="flex flex-col gap-2">
                               {readingPlan && (
@@ -1267,13 +1298,13 @@ export function DevotionsClient() {
                               )}
                             </div>
                           )}
+                          </div>
+                          <p className="text-center font-mono text-[9px] tracking-[0.2em] text-white/35 uppercase">
+                            Back or Esc to return
+                          </p>
                         </motion.div>
-                      ) : null}
+                      )}
                     </AnimatePresence>
-
-                    <p className="text-center font-mono text-[9px] tracking-[0.2em] text-white/35 uppercase">
-                      Tap a square · Esc to close menu
-                    </p>
                   </div>
                 </div>
               </motion.div>
