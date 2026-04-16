@@ -18,6 +18,11 @@ export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
 
+  /** Devotions is a fullscreen experience (local back/leave controls); hide global nav + hamburger. */
+  if (pathname?.startsWith("/devotions")) {
+    return null
+  }
+
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/"
     if (href.startsWith("/bible")) return pathname.startsWith("/bible")
