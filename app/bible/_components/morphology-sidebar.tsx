@@ -1,15 +1,70 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
-import { WordStudy } from "@/components/word-study"
+import { WordStudyEntryContent } from "@/components/word-study"
 import { strongsCodeForGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
 import { expandGreekMorphToken } from "@/lib/bible/robinson-greek"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
+import type { StrongsEntry } from "@/lib/bible/lexicon"
 
 const sidebarClasses =
   "font-sans text-base font-light text-white/90 leading-relaxed [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white [&_.border-border]:border-white/20"
+
+/** Fetches and renders full Strong's text in-panel (no hover). */
+function InlineStrongsLexicon({ code, surfaceWord }: { code: string; surfaceWord: string }) {
+  const [entry, setEntry] = useState<StrongsEntry | null>(null)
+  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading")
+
+  useEffect(() => {
+    let cancelled = false
+    setPhase("loading")
+    setEntry(null)
+    fetch(`/api/bible/lexicon/${encodeURIComponent(code)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: StrongsEntry | null) => {
+        if (cancelled) return
+        if (data) {
+          setEntry(data)
+          setPhase("ready")
+        } else {
+          setPhase("error")
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPhase("error")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [code])
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-lg font-semibold text-amber-100/95" lang="el">
+          {surfaceWord}
+        </span>
+        <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-amber-200/80">
+          {code}
+        </span>
+      </div>
+      {phase === "loading" ? (
+        <p className="text-xs text-white/50">Loading Strong&apos;s…</p>
+      ) : phase === "error" || !entry ? (
+        <p className="text-xs text-white/55">Could not load this Strong&apos;s entry.</p>
+      ) : (
+        <div
+          className="border-t border-white/15 pt-2 [&_.text-muted-foreground]:text-white/60 [&_.text-foreground]:text-white/92 [&_.border-border]:border-white/20"
+        >
+          <WordStudyEntryContent entry={entry} />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function MorphologySidebarPanel({
   token,
@@ -74,20 +129,14 @@ export function MorphologySidebarPanel({
           <div className="rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 space-y-2">
             <p className="text-[10px] uppercase tracking-wider text-amber-200/75">Strong&apos;s · this word</p>
             {lemmaStrongsCode ? (
-              <p className="text-sm text-white/92 leading-relaxed">
-                <WordStudy code={lemmaStrongsCode} className="text-amber-100/95">
-                  {token.word}
-                </WordStudy>
-                <span className="ml-2 font-mono text-[11px] text-white/50">{lemmaStrongsCode}</span>
-              </p>
+              <InlineStrongsLexicon code={lemmaStrongsCode} surfaceWord={token.word} />
             ) : (
               <p className="text-xs text-white/55 leading-snug">
                 No Strong&apos;s lexicon link for this dictionary form ({token.lemma}) in our lemma index.
               </p>
             )}
             <p className="text-[10px] leading-snug text-white/45">
-              Hover the underlined word for the Strong&apos;s entry (lemma, transliteration, gloss). Linked from this
-              word&apos;s dictionary form, not from KJV word order in this verse.
+              Lexicon is matched from this word&apos;s dictionary form (lemma), not from KJV word order in this verse.
             </p>
             {scriptureReaderUrl ? (
               <Link
