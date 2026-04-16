@@ -21,6 +21,7 @@ import {
   Bell,
   Languages,
   Gamepad2,
+  Sparkles,
   TextCursor,
 } from "lucide-react"
 import { getPassageEntry, savePassageEntry, listPassageEntries, getPassageNotes, saveVerseNote, getVerseNote, type ListedPassageEntry, type VerseNote } from "@/lib/devotions-storage"
@@ -50,6 +51,7 @@ import {
 } from "@/components/ui/dialog"
 import ReactMarkdown from "react-markdown"
 import { StudyGuideShell } from "@/app/studies/[studySlug]/[guideSlug]/study-guide-shell"
+import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   supportsNotifications,
@@ -255,6 +257,9 @@ type BibleChapter = { id: string; number: number }
 
 type Step = "landing" | "planPicker" | "studyPicker" | "studyGuide" | "journalHistory" | "testament" | "book" | "chapter" | "verses" | "reading" | "reflection"
 
+/** Landing grid: four tiles; each expands into a submenu of actions. */
+type LandingTileId = "read" | "guided" | "greek" | "journal"
+
 const SAVE_DEBOUNCE_MS = 400
 
 const slide = {
@@ -324,6 +329,7 @@ export function DevotionsClient() {
     allGuides: { label: string; slug: string | undefined }[]
   } | null>(null)
   const [studyLoading, setStudyLoading] = useState(false)
+  const [openLandingTile, setOpenLandingTile] = useState<LandingTileId | null>(null)
 
   const passageRef = passage?.reference ?? ""
   const reduced = useReducedMotion()
@@ -414,6 +420,19 @@ export function DevotionsClient() {
   useEffect(() => {
     if (step !== "reading") setJournalSheetOpen(false)
   }, [step])
+
+  useEffect(() => {
+    if (step !== "landing") setOpenLandingTile(null)
+  }, [step])
+
+  useEffect(() => {
+    if (step !== "landing" || openLandingTile == null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenLandingTile(null)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [step, openLandingTile])
 
   useEffect(() => {
     if (moreOpen && supportsNotifications()) {
@@ -1038,86 +1057,214 @@ export function DevotionsClient() {
                       )}
                     </motion.div>
                   )}
-                  <div className="flex flex-col gap-3 sm:gap-4 pt-2">
-                    {readingPlan && (
-                      <button
-                        type="button"
-                        onClick={continueReadingPlan}
-                        disabled={loading || booksLoading}
-                        className="w-full min-h-[56px] rounded-xl font-sans text-lg font-light text-white/95 bg-white/15 border border-white/25 hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {loading ? "Loading…" : booksLoading ? "Preparing…" : `Continue in ${getSection(readingPlan.sectionId)?.label ?? readingPlan.sectionId}`}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={loadTodaysPassage}
-                      disabled={loading}
-                      className="w-full min-h-[56px] rounded-xl font-sans text-lg font-light text-white/95 bg-white/10 border border-white/20 hover:bg-white/15 hover:border-white/30 transition-colors disabled:opacity-50"
-                    >
-                      {loading ? "Loading…" : "Today’s passage"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setDir(1); setStep("planPicker"); }}
-                      disabled={booksLoading}
-                      className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors disabled:opacity-50"
-                    >
-                      {booksLoading ? "Preparing…" : "Start a reading plan"}
-                    </button>
-                    <Link
-                      href="/devotions/meditation"
-                      className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-violet-500/10 border border-violet-400/25 hover:bg-violet-500/15 hover:border-violet-400/40 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <TextCursor className="w-5 h-5 text-violet-300/85 shrink-0" aria-hidden />
-                      Meditation · full screen
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={openStudyPicker}
-                      disabled={studyLoading}
-                      className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/15 hover:border-amber-500/40 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      <BookOpen className="w-5 h-5 text-amber-400/80" />
-                      {studyLoading ? "Loading…" : "Guided studies"}
-                    </button>
-                    <Link
-                      href="/devotions/greek/endings"
-                      className="w-full min-h-[56px] rounded-xl font-sans text-base sm:text-lg font-light text-white/95 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/15 hover:border-emerald-500/40 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Languages className="w-5 h-5 text-emerald-400/85 shrink-0" aria-hidden />
-                      Greek Endings Lab
-                    </Link>
-                    <Link
-                      href="/devotions/greek/reader"
-                      className="w-full min-h-[52px] rounded-xl font-sans text-sm font-light text-white/90 bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/12 hover:border-amber-500/35 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <BookOpen className="w-5 h-5 text-amber-400/75 shrink-0" aria-hidden />
-                      Grammar Reader · tap words
-                    </Link>
-                    <Link
-                      href="/devotions/greek/quest"
-                      className="w-full min-h-[52px] rounded-xl font-sans text-sm font-light text-white/90 bg-emerald-500/5 border border-emerald-500/20 hover:bg-emerald-500/12 hover:border-emerald-500/35 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Gamepad2 className="w-5 h-5 text-emerald-400/75 shrink-0" aria-hidden />
-                      Verse Quest · quick quiz loop
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={enterDevotions}
-                      className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/70 border border-white/15 hover:bg-white/10 hover:text-white/90 transition-colors"
-                    >
-                      Choose a passage
-                    </button>
-                    {typeof window !== "undefined" && listPassageEntries().length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => { setDir(1); setStep("journalHistory"); }}
-                        className="w-full min-h-[52px] rounded-xl font-mono text-[11px] tracking-[0.2em] uppercase text-white/60 border border-white/10 hover:bg-white/5 hover:text-white/80 transition-colors"
-                      >
-                        Your journal
-                      </button>
-                    )}
+                  <div className="w-full max-w-md mx-auto pt-2 space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      {(
+                        [
+                          {
+                            id: "read" as const,
+                            label: "Read",
+                            hint: "Passage & plans",
+                            icon: BookOpen,
+                            iconClass: "text-white/80",
+                            idle: "border-white/18 bg-white/[0.06] hover:bg-white/[0.1]",
+                            active: "border-amber-400/50 bg-amber-500/10 ring-1 ring-amber-400/25",
+                          },
+                          {
+                            id: "guided" as const,
+                            label: "Guided",
+                            hint: "Meditation & studies",
+                            icon: Sparkles,
+                            iconClass: "text-violet-300/90",
+                            idle: "border-violet-400/22 bg-violet-500/[0.07] hover:bg-violet-500/12",
+                            active: "border-violet-400/45 bg-violet-500/14 ring-1 ring-violet-400/30",
+                          },
+                          {
+                            id: "greek" as const,
+                            label: "Greek",
+                            hint: "Labs & quest",
+                            icon: Languages,
+                            iconClass: "text-emerald-300/90",
+                            idle: "border-emerald-400/22 bg-emerald-500/[0.07] hover:bg-emerald-500/12",
+                            active: "border-emerald-400/45 bg-emerald-500/14 ring-1 ring-emerald-400/28",
+                          },
+                          {
+                            id: "journal" as const,
+                            label: "Journal",
+                            hint: "Saved reflections",
+                            icon: PenLine,
+                            iconClass: "text-cyan-200/85",
+                            idle: "border-cyan-400/20 bg-cyan-500/[0.06] hover:bg-cyan-500/10",
+                            active: "border-cyan-400/40 bg-cyan-500/12 ring-1 ring-cyan-400/25",
+                          },
+                        ] as const
+                      ).map((tile) => {
+                        const Icon = tile.icon
+                        const isOpen = openLandingTile === tile.id
+                        return (
+                          <button
+                            key={tile.id}
+                            type="button"
+                            onClick={() => setOpenLandingTile((prev) => (prev === tile.id ? null : tile.id))}
+                            className={cn(
+                              "group flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border p-4 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35",
+                              isOpen ? tile.active : tile.idle,
+                            )}
+                            aria-expanded={isOpen}
+                            aria-controls={`landing-submenu-${tile.id}`}
+                          >
+                            <Icon className={cn("size-8 shrink-0", tile.iconClass)} aria-hidden />
+                            <span className="font-sans text-base font-medium tracking-tight text-white/95">
+                              {tile.label}
+                            </span>
+                            <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/45 leading-tight px-1">
+                              {tile.hint}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <AnimatePresence initial={false} mode="wait">
+                      {openLandingTile ? (
+                        <motion.div
+                          key={openLandingTile}
+                          id={`landing-submenu-${openLandingTile}`}
+                          role="region"
+                          aria-label="Actions"
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: reduced ? 0.12 : 0.2 }}
+                          className="rounded-2xl border border-white/12 bg-black/35 px-3 py-3 sm:px-4"
+                        >
+                          {openLandingTile === "read" && (
+                            <div className="flex flex-col gap-2">
+                              {readingPlan && (
+                                <button
+                                  type="button"
+                                  onClick={continueReadingPlan}
+                                  disabled={loading || booksLoading}
+                                  className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-white/12 border border-white/22 hover:bg-white/18 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                  {loading ? "Loading…" : booksLoading ? "Preparing…" : `Continue · ${getSection(readingPlan.sectionId)?.label ?? readingPlan.sectionId}`}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={loadTodaysPassage}
+                                disabled={loading}
+                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-white/8 border border-white/18 hover:bg-white/14 transition-colors disabled:opacity-50"
+                              >
+                                {loading ? "Loading…" : "Today’s passage"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenLandingTile(null)
+                                  setDir(1)
+                                  setStep("planPicker")
+                                }}
+                                disabled={booksLoading}
+                                className="w-full min-h-[44px] rounded-xl font-mono text-[10px] tracking-[0.18em] uppercase text-white/72 border border-white/14 hover:bg-white/8 transition-colors disabled:opacity-50"
+                              >
+                                {booksLoading ? "Preparing…" : "Start a reading plan"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenLandingTile(null)
+                                  enterDevotions()
+                                }}
+                                className="w-full min-h-[44px] rounded-xl font-mono text-[10px] tracking-[0.18em] uppercase text-white/72 border border-white/14 hover:bg-white/8 transition-colors"
+                              >
+                                Choose a passage
+                              </button>
+                            </div>
+                          )}
+
+                          {openLandingTile === "guided" && (
+                            <div className="flex flex-col gap-2">
+                              <Link
+                                href="/devotions/meditation"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-violet-500/12 border border-violet-400/28 hover:bg-violet-500/18 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <TextCursor className="w-5 h-5 text-violet-300/85 shrink-0" aria-hidden />
+                                Meditation · full screen
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenLandingTile(null)
+                                  void openStudyPicker()
+                                }}
+                                disabled={studyLoading}
+                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-amber-500/10 border border-amber-500/28 hover:bg-amber-500/16 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                              >
+                                <BookOpen className="w-5 h-5 text-amber-400/85 shrink-0" aria-hidden />
+                                {studyLoading ? "Loading…" : "Guided studies"}
+                              </button>
+                            </div>
+                          )}
+
+                          {openLandingTile === "greek" && (
+                            <div className="flex flex-col gap-2">
+                              <Link
+                                href="/devotions/greek/endings"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-emerald-500/10 border border-emerald-400/28 hover:bg-emerald-500/16 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Languages className="w-5 h-5 text-emerald-400/85 shrink-0" aria-hidden />
+                                Endings Lab
+                              </Link>
+                              <Link
+                                href="/devotions/greek/reader"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[44px] rounded-xl font-sans text-sm font-light text-white/90 bg-amber-500/6 border border-amber-500/22 hover:bg-amber-500/12 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <BookOpen className="w-5 h-5 text-amber-400/75 shrink-0" aria-hidden />
+                                Grammar Reader
+                              </Link>
+                              <Link
+                                href="/devotions/greek/quest"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[44px] rounded-xl font-sans text-sm font-light text-white/90 bg-emerald-500/6 border border-emerald-500/22 hover:bg-emerald-500/12 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Gamepad2 className="w-5 h-5 text-emerald-400/75 shrink-0" aria-hidden />
+                                Verse Quest
+                              </Link>
+                            </div>
+                          )}
+
+                          {openLandingTile === "journal" && (
+                            <div className="flex flex-col gap-2">
+                              {typeof window !== "undefined" && listPassageEntries().length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenLandingTile(null)
+                                    setDir(1)
+                                    setStep("journalHistory")
+                                  }}
+                                  className="w-full min-h-[48px] rounded-xl font-mono text-[11px] tracking-[0.18em] uppercase text-white/88 border border-white/16 bg-white/[0.05] hover:bg-white/10 transition-colors"
+                                >
+                                  Open your journal
+                                </button>
+                              ) : (
+                                <p className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center font-sans text-sm text-white/55 leading-relaxed">
+                                  Saved prayers and reflections show up here after you write in a passage.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>
+
+                    <p className="text-center font-mono text-[9px] tracking-[0.2em] text-white/35 uppercase">
+                      Tap a square · Esc to close menu
+                    </p>
                   </div>
                 </div>
               </motion.div>
