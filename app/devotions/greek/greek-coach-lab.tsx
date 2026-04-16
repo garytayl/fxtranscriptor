@@ -12,6 +12,16 @@ import type { GreekProgressEvent } from "@/lib/devotions-greek-progress"
 const COACH_XP = 20
 const COACH_HISTORY_LIMIT = 6
 
+function friendlyCoachError(message: string): string {
+  if (/api key is not configured|openai api key/i.test(message)) {
+    return "The AI coach is not set up on this server. You can still use morphology, Strong’s, and verse quizzes."
+  }
+  if (/502|503|504|network|fetch|failed to reach/i.test(message)) {
+    return "The coach could not complete the request. Try again shortly."
+  }
+  return message
+}
+
 const POS_LABELS: Record<string, string> = {
   N: "Noun",
   V: "Verb",
@@ -213,7 +223,8 @@ export function GreekCoachLab({
           xp: COACH_XP,
         })
       } catch (err) {
-        setCoachError(err instanceof Error ? err.message : "Coach insight unavailable right now.")
+        const raw = err instanceof Error ? err.message : "Coach insight unavailable right now."
+        setCoachError(friendlyCoachError(raw))
       } finally {
         setCoachLoading(false)
       }

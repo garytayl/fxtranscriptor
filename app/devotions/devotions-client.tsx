@@ -1243,11 +1243,19 @@ export function DevotionsClient() {
                           {openLandingTile === "greek" && (
                             <div className="flex flex-col gap-2">
                               <Link
-                                href="/devotions/greek/endings"
+                                href="/devotions/greek"
                                 onClick={() => setOpenLandingTile(null)}
-                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-emerald-500/10 border border-emerald-400/28 hover:bg-emerald-500/16 transition-colors flex items-center justify-center gap-2"
+                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-emerald-500/12 border border-emerald-400/32 hover:bg-emerald-500/18 transition-colors flex items-center justify-center gap-2"
                               >
                                 <Languages className="w-5 h-5 text-emerald-400/85 shrink-0" aria-hidden />
+                                Greek study home
+                              </Link>
+                              <Link
+                                href="/devotions/greek/endings"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[44px] rounded-xl font-sans text-sm font-light text-white/90 bg-emerald-500/6 border border-emerald-400/22 hover:bg-emerald-500/12 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Languages className="w-5 h-5 text-emerald-400/75 shrink-0" aria-hidden />
                                 Endings Lab
                               </Link>
                               <Link
@@ -2153,9 +2161,17 @@ export function DevotionsClient() {
               Open in full Scripture reader
             </Link>
             <Link
-              href="/devotions/greek/endings"
+              href="/devotions/greek"
               onClick={() => setMoreOpen(false)}
               className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/25 hover:bg-emerald-500/10 transition-colors text-left"
+            >
+              <Languages className="w-4 h-4 shrink-0" />
+              Greek study home
+            </Link>
+            <Link
+              href="/devotions/greek/endings"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors text-left"
             >
               <Languages className="w-4 h-4 shrink-0" />
               Greek Endings Lab

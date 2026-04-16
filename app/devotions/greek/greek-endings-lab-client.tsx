@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, CheckCircle2, Gamepad2, Library, Sparkles, XCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Sparkles, XCircle } from "lucide-react"
 
+import { GreekSectionQuickNav } from "@/app/devotions/greek/greek-section-quick-nav"
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 
 type EndingsGroup = "verb" | "noun" | "article"
@@ -414,11 +415,11 @@ export function GreekEndingsLabClient() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-black/35 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <Link
-            href="/devotions"
+            href="/devotions/greek"
             className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
           >
             <ArrowLeft className="size-3.5" />
-            Back
+            Greek
           </Link>
           <div className="text-center px-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-300/70">Before you study</p>
@@ -434,33 +435,16 @@ export function GreekEndingsLabClient() {
       <main className="mx-auto w-full max-w-6xl px-4 pb-14 pt-6 sm:px-6 sm:pt-8">
         <section className="rounded-2xl border border-white/10 bg-black/25 p-4 sm:p-5">
           <p className="text-sm text-white/85">
-            Drill the patterns first, then jump into live reading. These are the endings you will keep seeing in the text.
+            <strong className="font-medium text-white/95">Path:</strong> Endings (here) → Grammar Reader (explore verses)
+            → Verse Quest (drills &amp; XP) → Word bank (review forms). Jump anywhere below.
           </p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Link
-              href="/devotions/greek/reader"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
-            >
-              <BookOpen className="size-4" />
-              Grammar Reader
-            </Link>
-            <Link
-              href="/devotions/greek/quest"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-emerald-200/90 hover:bg-emerald-500/20"
-            >
-              <Gamepad2 className="size-4" />
-              Verse Quest
-            </Link>
-            <Link
-              href="/devotions/greek/words"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-white/18 bg-white/[0.05] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.1]"
-            >
-              <Library className="size-4 opacity-90" />
-              Word bank
-            </Link>
+          <div className="mt-4">
+            <GreekSectionQuickNav />
+          </div>
+          <div className="mt-4">
             <Link
               href="/bible"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.1]"
+              className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/80 hover:bg-white/[0.1] sm:w-auto"
             >
               <ArrowLeft className="size-4 rotate-180" />
               Scripture Reader

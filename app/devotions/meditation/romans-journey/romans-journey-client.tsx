@@ -294,11 +294,11 @@ export function RomansJourneyClient() {
                   {passageLoading ? "Loading…" : passageOpen ? "Hide passage" : "Read passage"}
                 </button>
                 <Link
-                  href="/devotions/greek/endings"
+                  href="/devotions/greek"
                   className="flex-1 inline-flex items-center justify-center gap-2 min-h-[48px] rounded-xl border border-emerald-500/25 bg-emerald-950/30 font-mono text-[10px] tracking-[0.15em] uppercase text-emerald-100/90 hover:bg-emerald-950/50 transition-colors"
                 >
                   <Languages className="w-4 h-4 text-emerald-400/70" aria-hidden />
-                  Greek Endings Lab
+                  Greek study
                 </Link>
               </div>
 

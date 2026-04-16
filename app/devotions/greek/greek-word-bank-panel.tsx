@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import {
@@ -136,9 +137,22 @@ export function GreekWordBankPanel({
       </p>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-white/55 leading-relaxed">
-          Word forms appear here as you practice in Verse Quest (quiz taps). Open a passage in the quest and tap target words to build this list.
-        </p>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center space-y-4">
+          <p className="text-sm text-white/55 leading-relaxed">
+            Word forms appear here as you practice in Verse Quest (quiz taps). Open a passage in the quest and tap
+            target words to build this list.
+          </p>
+          <Link
+            href="/devotions/greek/quest"
+            className={`inline-flex min-h-[44px] items-center justify-center rounded-xl border px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors ${
+              accent === "emerald"
+                ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/22"
+                : "border-amber-400/40 bg-amber-500/15 text-amber-100 hover:bg-amber-500/22"
+            }`}
+          >
+            Open Verse Quest
+          </Link>
+        </div>
       ) : (
         <ul className="space-y-2">
           {filtered.map((r) => (

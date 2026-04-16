@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation"
+import { GreekDevotionsHubClient } from "@/app/devotions/greek/greek-devotions-hub-client"
 
 export const metadata = {
-  title: "Greek Study · Endings Lab",
+  title: "Greek study · Devotions",
   description:
-    "Greek Study routes here first: memorize endings, then move into Grammar Reader or Verse Quest.",
+    "Endings Lab, Grammar Reader, Verse Quest, and Word bank—Koine Greek practice with MorphGNT pilot chapters.",
 }
 
 export default function DevotionsGreekPage() {
-  redirect("/devotions/greek/endings")
+  return <GreekDevotionsHubClient />
 }

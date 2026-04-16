@@ -16,6 +16,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion"
 
 import { GreekCoachLab } from "@/app/devotions/greek/greek-coach-lab"
+import { GreekProgressStrip } from "@/app/devotions/greek/greek-progress-strip"
 import { GreekGrammarPrimer } from "@/app/bible/_components/greek-grammar-primer"
 import { MorphologySidebarPanel } from "@/app/bible/_components/morphology-sidebar"
 import { buildGreekWordLearningClues } from "@/lib/bible/greek-word-learning-clues"
@@ -284,11 +285,11 @@ export function GreekGrammarReaderClient() {
         <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
           <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
             <Link
-              href="/devotions/greek/endings"
+              href="/devotions/greek"
               className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
             >
               <ArrowLeft className="size-3.5" />
-              Back
+              Greek
             </Link>
             <div className="text-center min-w-0 px-1">
               <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar Reader</p>
@@ -382,11 +383,11 @@ export function GreekGrammarReaderClient() {
       <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
           <Link
-            href="/devotions"
+            href="/devotions/greek"
             className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
           >
             <ArrowLeft className="size-3.5" />
-            Back
+            Greek
           </Link>
           <div className="text-center min-w-0 px-1">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/70">Grammar Reader</p>
@@ -430,6 +431,7 @@ export function GreekGrammarReaderClient() {
         onMenuTouchEnd={onMenuTouchEnd}
       >
         <div className="space-y-5">
+          <GreekProgressStrip accent="amber" dense />
           <GreekMenuSection label="Vocabulary">
             <button
               type="button"
@@ -548,6 +550,13 @@ export function GreekGrammarReaderClient() {
           <GreekMenuSection label="Jump to">
             <div className="flex flex-wrap gap-2">
               <Link
+                href="/devotions/greek"
+                onClick={closeMenu}
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-200/90 hover:bg-emerald-500/18"
+              >
+                Greek home
+              </Link>
+              <Link
                 href={readerUrl}
                 onClick={closeMenu}
                 className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/75 hover:bg-white/[0.1]"
@@ -624,11 +633,16 @@ export function GreekGrammarReaderClient() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="w-full max-w-3xl space-y-4 animate-pulse"
+                  className="w-full max-w-3xl space-y-4"
                 >
-                  <div className="h-10 rounded-xl bg-white/10" />
-                  <div className="h-10 rounded-xl bg-white/10" />
-                  <div className="h-10 rounded-xl bg-white/10" />
+                  <p className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+                    Loading verse…
+                  </p>
+                  <div className="space-y-4 animate-pulse">
+                    <div className="h-10 rounded-xl bg-white/10" />
+                    <div className="h-10 rounded-xl bg-white/10" />
+                    <div className="h-10 rounded-xl bg-white/10" />
+                  </div>
                 </motion.div>
               ) : greekTokens.length > 0 ? (
                 <motion.div
