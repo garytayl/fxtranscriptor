@@ -442,7 +442,18 @@ export function GreekCoachLab({
       ) : null}
 
       {coachError ? (
-        <p className="rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2 text-xs text-red-200/95">{coachError}</p>
+        <div className="rounded-lg border border-red-300/30 bg-red-400/10 px-3 py-2.5">
+          <p className="text-xs text-red-200/95">{coachError}</p>
+          <button
+            type="button"
+            onClick={() => void runCoach()}
+            disabled={coachLoading || !selectedToken}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-300/45 bg-red-500/15 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+          >
+            <RefreshCw className="size-3.5" aria-hidden />
+            Retry
+          </button>
+        </div>
       ) : null}
       {coachLoading ? (
         <motion.div

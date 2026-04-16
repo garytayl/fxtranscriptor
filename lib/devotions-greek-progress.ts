@@ -105,9 +105,24 @@ function safeParse(raw: string | null): GreekStudyProgress {
   }
 }
 
+export const GREEK_PROGRESS_BROADCAST_CHANNEL = "fx-greek-progress"
+
+let progressBroadcast: BroadcastChannel | null = null
+
+function broadcastGreekProgressChanged() {
+  if (typeof BroadcastChannel === "undefined") return
+  try {
+    if (!progressBroadcast) progressBroadcast = new BroadcastChannel(GREEK_PROGRESS_BROADCAST_CHANNEL)
+    progressBroadcast.postMessage({ type: "greek-progress-updated" })
+  } catch {
+    /* ignore */
+  }
+}
+
 function saveGreekStudyProgress(progress: GreekStudyProgress): void {
   if (typeof window === "undefined") return
   window.localStorage.setItem(GREEK_PROGRESS_KEY, JSON.stringify(progress))
+  broadcastGreekProgressChanged()
 }
 
 function pruneDateMaps(progress: GreekStudyProgress): GreekStudyProgress {

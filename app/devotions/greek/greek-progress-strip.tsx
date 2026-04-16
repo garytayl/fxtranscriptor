@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import {
   getGreekProgressSnapshot,
   getGreekStudyProgress,
+  GREEK_PROGRESS_BROADCAST_CHANNEL,
   type GreekProgressSnapshot,
 } from "@/lib/devotions-greek-progress"
 import { cn } from "@/lib/utils"
@@ -48,6 +49,13 @@ export function GreekProgressStrip({
       window.removeEventListener("storage", onStorage)
       window.removeEventListener("focus", onFocus)
     }
+  }, [refresh])
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return
+    const ch = new BroadcastChannel(GREEK_PROGRESS_BROADCAST_CHANNEL)
+    ch.onmessage = () => refresh()
+    return () => ch.close()
   }, [refresh])
 
   if (!snap) return null

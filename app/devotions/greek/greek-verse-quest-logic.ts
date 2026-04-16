@@ -105,12 +105,45 @@ export const MOOD_LABELS: Record<string, string> = {
   P: "Participle",
 }
 
-export function vibrateQuest(kind: "correct" | "incorrect" | "skipped") {
+export function vibrateQuest(
+  kind: "correct" | "incorrect" | "skipped",
+  opts?: { hapticsEnabled?: boolean },
+) {
+  if (opts?.hapticsEnabled !== true) return
   if (typeof navigator === "undefined" || !navigator.vibrate) return
   try {
     if (kind === "correct") navigator.vibrate([12, 65, 14])
     else if (kind === "incorrect") navigator.vibrate([32, 55, 48])
     else navigator.vibrate(14)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Very short UI beep; only runs when `soundEnabled` is true (caller reads prefs). */
+export function playQuestFeedbackSound(
+  kind: "correct" | "incorrect" | "skipped",
+  opts?: { soundEnabled?: boolean },
+) {
+  if (opts?.soundEnabled !== true || typeof window === "undefined") return
+  try {
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AC) return
+    const ctx = new AC()
+    const o = ctx.createOscillator()
+    const g = ctx.createGain()
+    o.type = "sine"
+    o.frequency.value = kind === "correct" ? 660 : kind === "incorrect" ? 180 : 420
+    g.gain.value = 0.035
+    o.connect(g)
+    g.connect(ctx.destination)
+    o.start()
+    o.stop(ctx.currentTime + 0.07)
+    o.onended = () => {
+      void ctx.close()
+    }
   } catch {
     /* ignore */
   }

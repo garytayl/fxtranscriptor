@@ -595,8 +595,9 @@ export function GreekGrammarReaderClient() {
 
       <GreekWordBankOverlay open={wordBankOpen} onClose={() => setWordBankOpen(false)} accent="amber" />
 
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_min(380px,36vw)] lg:overflow-hidden">
       <main
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-5 sm:px-8 md:px-14 lg:min-h-0 lg:pb-8"
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
@@ -703,13 +704,43 @@ export function GreekGrammarReaderClient() {
         </div>
       </main>
 
+      <aside className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-l border-white/10 bg-black/25 px-4 py-5 lg:flex lg:max-h-full">
+        {selectedToken ? (
+          <>
+            <MorphologySidebarPanel
+              token={selectedToken}
+              verseNumber={verse}
+              wordIndex={selectedWordIndex ?? 0}
+            />
+            <GreekCoachLab
+              key={`${levelKey}-aside-lab-${selectedWordIndex}`}
+              levelKey={levelKey}
+              passageRef={passageRef}
+              english={english}
+              verseGreekLine={verseGreekLine}
+              selectedToken={selectedToken}
+              wordIndex={selectedWordIndex ?? 0}
+              learningClues={buildGreekWordLearningClues(selectedToken)}
+              awardProgress={awardCoachProgress}
+              className="mt-0"
+            />
+          </>
+        ) : (
+          <p className="text-xs leading-relaxed text-white/55">
+            Tap a word in the verse for morphology and the AI coach. On smaller screens, details open in a bottom
+            sheet.
+          </p>
+        )}
+      </aside>
+      </div>
+
       <AnimatePresence>
         {selectedToken ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[66] flex min-h-0 items-end"
+            className="absolute inset-0 z-[66] flex min-h-0 items-end lg:hidden"
           >
             <button
               type="button"

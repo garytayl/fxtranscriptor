@@ -20,5 +20,21 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
     ],
+    shortcuts: [
+      {
+        name: "Greek study",
+        short_name: "Greek",
+        description: "Labs, reader, and verse quest",
+        url: "/devotions/greek",
+        icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
+      },
+      {
+        name: "Verse Quest",
+        short_name: "Quest",
+        description: "Guided Greek drills and XP",
+        url: "/devotions/greek/quest",
+        icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
+      },
+    ],
   }
 }

@@ -9,12 +9,18 @@ export type GreekUiPreferences = {
   wordHintsEnabled: boolean
   showEnglish: boolean
   reviewMode: boolean
+  /** Short tones on quiz outcomes (off by default). */
+  soundEffectsEnabled: boolean
+  /** Vibration patterns on supported devices (off by default). */
+  hapticsEnabled: boolean
 }
 
 export const GREEK_UI_PREFERENCES_DEFAULTS: GreekUiPreferences = {
   wordHintsEnabled: false,
   showEnglish: true,
   reviewMode: false,
+  soundEffectsEnabled: false,
+  hapticsEnabled: false,
 }
 
 function parseStored(raw: string | null): GreekUiPreferences {
@@ -26,6 +32,9 @@ function parseStored(raw: string | null): GreekUiPreferences {
       wordHintsEnabled: typeof p.wordHintsEnabled === "boolean" ? p.wordHintsEnabled : d.wordHintsEnabled,
       showEnglish: typeof p.showEnglish === "boolean" ? p.showEnglish : d.showEnglish,
       reviewMode: typeof p.reviewMode === "boolean" ? p.reviewMode : d.reviewMode,
+      soundEffectsEnabled:
+        typeof p.soundEffectsEnabled === "boolean" ? p.soundEffectsEnabled : d.soundEffectsEnabled,
+      hapticsEnabled: typeof p.hapticsEnabled === "boolean" ? p.hapticsEnabled : d.hapticsEnabled,
     }
   } catch {
     return d

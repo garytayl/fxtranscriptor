@@ -12,6 +12,8 @@ describe("Greek UI preferences storage key", () => {
       wordHintsEnabled: false,
       showEnglish: true,
       reviewMode: false,
+      soundEffectsEnabled: false,
+      hapticsEnabled: false,
     })
   })
 })

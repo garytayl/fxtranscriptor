@@ -63,6 +63,7 @@ import {
   pickQuestTargetsInPhrase,
   saveDailyVerseRunState,
   todayDateKey,
+  playQuestFeedbackSound,
   vibrateQuest,
   wordFormKey,
   WORD_XP,
@@ -105,7 +106,7 @@ export function GreekVerseQuestClient() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [wordBankOpen, setWordBankOpen] = useState(false)
   const { prefs: uiPrefs, updatePrefs: updateUiPrefs } = useGreekUiPreferences()
-  const { wordHintsEnabled, showEnglish, reviewMode } = uiPrefs
+  const { wordHintsEnabled, showEnglish, reviewMode, hapticsEnabled, soundEffectsEnabled } = uiPrefs
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null)
   const [wordMemory, setWordMemory] = useState<GreekWordMemory>(() => getGreekWordMemory())
   const [questStage, setQuestStage] = useState<QuestWordStage>("challenge")
@@ -399,10 +400,12 @@ export function GreekVerseQuestClient() {
       if (ch) {
         if (meta?.skipped) {
           setQuestQuizFeedback({ outcome: "skipped", correctAnswer, prompt: ch.prompt })
-          vibrateQuest("skipped")
+          vibrateQuest("skipped", { hapticsEnabled })
+          playQuestFeedbackSound("skipped", { soundEnabled: soundEffectsEnabled })
         } else if (wasCorrect) {
           setQuestQuizFeedback({ outcome: "correct", xpGained: WORD_XP, prompt: ch.prompt })
-          vibrateQuest("correct")
+          vibrateQuest("correct", { hapticsEnabled })
+          playQuestFeedbackSound("correct", { soundEnabled: soundEffectsEnabled })
         } else {
           setQuestQuizFeedback({
             outcome: "incorrect",
@@ -410,7 +413,8 @@ export function GreekVerseQuestClient() {
             chosenAnswer: chosenAnswer || undefined,
             prompt: ch.prompt,
           })
-          vibrateQuest("incorrect")
+          vibrateQuest("incorrect", { hapticsEnabled })
+          playQuestFeedbackSound("incorrect", { soundEnabled: soundEffectsEnabled })
         }
       } else {
         setQuestQuizFeedback(null)
@@ -465,6 +469,8 @@ export function GreekVerseQuestClient() {
       completedTargetIndexes,
       correctTargetIndexes,
       finishVerseIfComplete,
+      hapticsEnabled,
+      soundEffectsEnabled,
     ],
   )
 
@@ -1017,6 +1023,28 @@ export function GreekVerseQuestClient() {
               >
                 {showEnglish ? "English On" : "English Off"}
               </button>
+              <button
+                type="button"
+                onClick={() => updateUiPrefs({ hapticsEnabled: !hapticsEnabled })}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                  hapticsEnabled
+                    ? "border-violet-300/50 bg-violet-300/15 text-violet-100"
+                    : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                {hapticsEnabled ? "Haptics On" : "Haptics Off"}
+              </button>
+              <button
+                type="button"
+                onClick={() => updateUiPrefs({ soundEffectsEnabled: !soundEffectsEnabled })}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                  soundEffectsEnabled
+                    ? "border-fuchsia-300/50 bg-fuchsia-300/15 text-fuchsia-100"
+                    : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                {soundEffectsEnabled ? "Sounds On" : "Sounds Off"}
+              </button>
             </div>
           </GreekMenuSection>
 
@@ -1068,8 +1096,15 @@ export function GreekVerseQuestClient() {
 
       <GreekWordBankOverlay open={wordBankOpen} onClose={() => setWordBankOpen(false)} accent="emerald" />
 
+      <div
+        className={
+          selectedToken && questStage === "revealed"
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_min(400px,38vw)] lg:overflow-hidden"
+        }
+      >
       <main
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 pb-32 pt-4 sm:px-8 md:px-14"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 pb-32 pt-4 sm:px-8 md:px-14 lg:min-h-0 lg:pb-10"
         onTouchStart={onVerseTouchStart}
         onTouchEnd={onVerseTouchEnd}
       >
@@ -1251,6 +1286,50 @@ export function GreekVerseQuestClient() {
           ) : null}
         </div>
       </main>
+
+      {!(selectedToken && questStage === "revealed") ? (
+      <aside className="hidden min-h-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/25 px-3 py-4 lg:flex lg:max-h-full">
+        {selectedToken && questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
+          <div className="rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
+            <p className="mt-1 text-sm text-white/85">{questChallenge.prompt}</p>
+            <div className="mt-2 grid grid-cols-1 gap-2">
+              {questChallenge.options.map((option, idx) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => revealQuestWord(idx === questChallenge.correctOptionIndex, { chosenIndex: idx })}
+                  className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white/88 hover:bg-black/45 active:scale-[0.99]"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => revealQuestWord(false, { skipped: true })}
+              className="mt-2 rounded-lg border border-white/20 bg-white/[0.03] px-3 py-1.5 text-xs text-white/72 hover:bg-white/[0.08]"
+            >
+              Reveal without guessing
+            </button>
+          </div>
+        ) : null}
+        {selectedToken && questStage === "challenge" ? (
+          <MorphologySidebarPanel
+            token={selectedToken}
+            verseNumber={verse}
+            wordIndex={selectedWordIndex ?? 0}
+          />
+        ) : null}
+        {!selectedToken ? (
+          <p className="text-xs leading-relaxed text-white/55">
+            Select a target word in the verse. On wide screens, quizzes and coaching stay in this column when
+            possible.
+          </p>
+        ) : null}
+      </aside>
+      ) : null}
+      </div>
 
       <AnimatePresence>
         {selectedToken ? (
