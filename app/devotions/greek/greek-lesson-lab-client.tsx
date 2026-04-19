@@ -304,7 +304,12 @@ export function GreekLessonLabClient() {
         const res = await fetch("/api/devotions/greek-study-coach", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, progressDigest: digest, history: [] }),
+          body: JSON.stringify({
+            message,
+            progressDigest: digest,
+            history: [],
+            coachingFocus: "drill",
+          }),
         })
         const data = (await res.json()) as { reply?: string; followUps?: string[]; error?: string }
         if (!res.ok) throw new Error(data?.error || "Coach unavailable.")
