@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
-import { Sparkles } from "lucide-react"
+import { ArrowLeft, BookOpen, Sparkles, Table2, Volume2, Zap } from "lucide-react"
 
 import { GreekStudyMenuShell, GreekMenuSection } from "@/app/devotions/greek/greek-study-menu-shell"
 import {
@@ -20,9 +19,8 @@ import {
   listGreekWordMemoryRows,
   recordGreekWordMemoryTap,
 } from "@/lib/devotions-greek-word-memory"
-import { getReaderUrlFromReference } from "@/lib/bible/reference"
-import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 import { normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
+import { ENDINGS_TABLES, GRAMMAR_GLOSSARY } from "@/lib/greek-endings-reference"
 import {
   playQuestFeedbackSound,
   todayDateKey,
@@ -30,6 +28,7 @@ import {
 } from "@/app/devotions/greek/greek-verse-quest-logic"
 
 import { PracticeLayout } from "@/app/devotions/greek/greek-practice-layout"
+import { cn } from "@/lib/utils"
 
 function LessonSegmentBar({ total, current, accent }: { total: number; current: number; accent: string }) {
   return (
@@ -39,6 +38,63 @@ function LessonSegmentBar({ total, current, accent }: { total: number; current: 
           key={i}
           className={`h-1 flex-1 rounded-full transition-colors ${i < current ? accent : "bg-white/12"}`}
         />
+      ))}
+    </div>
+  )
+}
+
+function EndingTablesScroll() {
+  return (
+    <div className="space-y-4">
+      {ENDINGS_TABLES.map((table) => (
+        <article key={table.id} className="rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
+          <p className="text-xs font-medium text-violet-200/90">{table.title}</p>
+          <p className="mt-0.5 text-[11px] text-white/50">{table.subtitle}</p>
+          <div className="mt-2 overflow-x-auto rounded-lg border border-white/10">
+            <table className="w-full min-w-[16rem] border-collapse text-left text-xs">
+              <thead className="bg-white/[0.04]">
+                <tr>
+                  {table.columns.map((column) => (
+                    <th
+                      key={column}
+                      className="border-b border-white/10 px-2 py-1.5 font-medium text-white/55"
+                    >
+                      {column}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {table.rows.map((row, rowIndex) => (
+                  <tr key={`${table.id}-r-${rowIndex}`} className="odd:bg-white/[0.02]">
+                    {row.map((cell, cellIndex) => (
+                      <td
+                        key={`${table.id}-r-${rowIndex}-c-${cellIndex}`}
+                        className="border-b border-white/5 px-2 py-1.5 text-white/85"
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function GrammarGlossaryScroll() {
+  return (
+    <div className="space-y-2">
+      {GRAMMAR_GLOSSARY.map((item) => (
+        <article key={item.term} className="rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-3">
+          <p className="text-xs font-medium text-cyan-200/90">{item.term}</p>
+          <p className="mt-1 text-sm text-white/82">{item.plainMeaning}</p>
+          <p className="mt-1 text-[11px] text-white/55">{item.quickExample}</p>
+        </article>
       ))}
     </div>
   )
@@ -67,17 +123,19 @@ function kindSummaryLabel(kind: LessonCardKind): string {
   }
 }
 
+type LessonMenuPanel = "home" | "tables" | "glossary"
+
 export function GreekLessonLabClient() {
-  const { prefs: uiPrefs } = useGreekUiPreferences()
+  const { prefs: uiPrefs, updatePrefs } = useGreekUiPreferences()
   const { hapticsEnabled, soundEffectsEnabled } = uiPrefs
   const [sessionSeed, setSessionSeed] = useState(() => Math.floor(Math.random() * 2 ** 30))
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPanel, setMenuPanel] = useState<LessonMenuPanel>("home")
   const [cards, setCards] = useState<LessonCard[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
   const [revealed, setRevealed] = useState(false)
-  /** Wrong picks before the final reveal for this card (0 = no miss yet, 1 = one miss, still answering or resolved) */
   const [wrongCount, setWrongCount] = useState(0)
   const [sessionXp, setSessionXp] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
@@ -91,6 +149,15 @@ export function GreekLessonLabClient() {
   const todayKey = useMemo(() => todayDateKey(), [])
   const weakHints = useMemo(() => weakLemmasForLesson(), [])
   const { runId, drafts } = useMemo(() => buildLessonDrafts(sessionSeed, { weakLemmas: weakHints }), [sessionSeed, weakHints])
+
+  const openSheet = useCallback((panel: LessonMenuPanel) => {
+    setMenuPanel(panel)
+    setMenuOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!menuOpen) setMenuPanel("home")
+  }, [menuOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -195,12 +262,15 @@ export function GreekLessonLabClient() {
 
   const showRetryHint = wrongCount === 1 && !revealed
 
+  const menuTitle =
+    menuPanel === "home" ? "Lesson" : menuPanel === "tables" ? "Ending tables" : "Grammar terms"
+
   return (
     <PracticeLayout
       title="Lesson"
       accent="violet"
-      onMenu={() => setMenuOpen(true)}
-      menuLabel="Study menu"
+      onMenu={() => openSheet("home")}
+      menuLabel="Reference"
       progressSlot={
         cards && cards.length > 0 ? (
           <div className="mx-auto max-w-lg space-y-1">
@@ -219,47 +289,93 @@ export function GreekLessonLabClient() {
       <GreekStudyMenuShell
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        title="Lesson menu"
+        title={menuTitle}
         accent="violet"
       >
-        <div className="space-y-4 px-1">
-          <GreekMenuSection label="Practice">
-            <div className="flex flex-col gap-2">
-              <Link
-                href="/devotions/greek/quest"
-                onClick={() => setMenuOpen(false)}
-                className="rounded-xl border border-emerald-400/35 bg-emerald-500/12 px-4 py-3 text-sm text-emerald-100 hover:bg-emerald-500/18"
-              >
-                Verse Quest
-              </Link>
-              <Link
-                href="/devotions/greek/endings"
-                onClick={() => setMenuOpen(false)}
-                className="rounded-xl border border-amber-400/35 bg-amber-500/12 px-4 py-3 text-sm text-amber-100 hover:bg-amber-500/18"
-              >
-                Endings Lab
-              </Link>
-              <Link
-                href="/devotions/greek/english-search"
-                onClick={() => setMenuOpen(false)}
-                className="rounded-xl border border-violet-400/35 bg-violet-500/12 px-4 py-3 text-sm text-violet-100 hover:bg-violet-500/18"
-              >
-                English word search
-              </Link>
-              <Link
-                href="/devotions/greek/words"
-                onClick={() => setMenuOpen(false)}
-                className="rounded-xl border border-white/15 bg-white/[0.05] px-4 py-3 text-sm text-white/80 hover:bg-white/[0.1]"
-              >
-                Word bank
-              </Link>
-            </div>
-          </GreekMenuSection>
-          <p className="px-1 text-xs leading-relaxed text-white/50">
-            Each run mixes endings, vocabulary both ways, and pilot-verse morphology. Vocabulary and verse-grammar
-            results update your word bank (weak words surface again in lessons and Quest). Two tries: full XP, then half,
-            then none.
-          </p>
+        <div className="space-y-4 px-0.5">
+          {menuPanel !== "home" ? (
+            <button
+              type="button"
+              onClick={() => setMenuPanel("home")}
+              className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-xs text-white/75 hover:bg-white/[0.1]"
+            >
+              <ArrowLeft className="size-3.5" aria-hidden />
+              Back
+            </button>
+          ) : null}
+
+          {menuPanel === "home" ? (
+            <>
+              <GreekMenuSection label="Quick reference">
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMenuPanel("tables")}
+                    className="flex w-full items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-left text-sm text-amber-100 hover:bg-amber-500/16"
+                  >
+                    <Table2 className="size-5 shrink-0 opacity-90" aria-hidden />
+                    <span>Verb &amp; noun ending tables</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMenuPanel("glossary")}
+                    className="flex w-full items-center gap-3 rounded-xl border border-cyan-400/28 bg-cyan-500/10 px-4 py-3 text-left text-sm text-cyan-100 hover:bg-cyan-500/16"
+                  >
+                    <BookOpen className="size-5 shrink-0 opacity-90" aria-hidden />
+                    <span>Grammar terms (cases, tense, …)</span>
+                  </button>
+                </div>
+              </GreekMenuSection>
+              <GreekMenuSection label="Feedback">
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={soundEffectsEnabled}
+                    onClick={() => updatePrefs({ soundEffectsEnabled: !soundEffectsEnabled })}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                      soundEffectsEnabled
+                        ? "border-violet-400/35 bg-violet-500/15 text-violet-100"
+                        : "border-white/12 bg-white/[0.04] text-white/70",
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Volume2 className="size-4 shrink-0 opacity-90" aria-hidden />
+                      Sound effects
+                    </span>
+                    <span className="text-[11px] text-white/45">{soundEffectsEnabled ? "On" : "Off"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={hapticsEnabled}
+                    onClick={() => updatePrefs({ hapticsEnabled: !hapticsEnabled })}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                      hapticsEnabled
+                        ? "border-violet-400/35 bg-violet-500/15 text-violet-100"
+                        : "border-white/12 bg-white/[0.04] text-white/70",
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Zap className="size-4 shrink-0 opacity-90" aria-hidden />
+                      Haptics
+                    </span>
+                    <span className="text-[11px] text-white/45">{hapticsEnabled ? "On" : "Off"}</span>
+                  </button>
+                </div>
+              </GreekMenuSection>
+              <p className="text-xs leading-relaxed text-white/45">
+                Everything stays on this screen—open tables or terms anytime. Results still sync to your word bank for
+                Verse Quest. Two tries per card: full XP, then half, then none.
+              </p>
+            </>
+          ) : menuPanel === "tables" ? (
+            <EndingTablesScroll />
+          ) : (
+            <GrammarGlossaryScroll />
+          )}
         </div>
       </GreekStudyMenuShell>
 
@@ -300,21 +416,13 @@ export function GreekLessonLabClient() {
                 })}
               </ul>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={startNewLesson}
-                className="rounded-2xl border border-violet-400/45 bg-violet-500/20 px-8 py-3 text-sm font-medium text-violet-50 hover:bg-violet-500/30"
-              >
-                New lesson
-              </button>
-              <Link
-                href="/devotions/greek/words"
-                className="rounded-2xl border border-white/15 bg-white/[0.06] px-8 py-3 text-center text-sm font-medium text-white/85 hover:bg-white/[0.1]"
-              >
-                Review word bank
-              </Link>
-            </div>
+            <button
+              type="button"
+              onClick={startNewLesson}
+              className="rounded-2xl border border-violet-400/45 bg-violet-500/20 px-8 py-3 text-sm font-medium text-violet-50 hover:bg-violet-500/30"
+            >
+              New lesson
+            </button>
           </motion.div>
         ) : card ? (
           <AnimatePresence mode="wait">
@@ -331,6 +439,20 @@ export function GreekLessonLabClient() {
                   <span className="rounded-full border border-violet-400/35 bg-violet-500/15 px-2.5 py-1 text-[11px] font-medium text-violet-100/95">
                     {card.topic}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => openSheet("tables")}
+                    className="rounded-full border border-amber-400/35 bg-amber-500/12 px-2.5 py-1 text-[11px] font-medium text-amber-100/95 hover:bg-amber-500/18"
+                  >
+                    Tables
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openSheet("glossary")}
+                    className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100/90 hover:bg-cyan-500/16"
+                  >
+                    Terms
+                  </button>
                 </div>
                 <p className="text-lg leading-snug text-white/95">{card.prompt}</p>
                 {card.hint ? (
@@ -401,22 +523,9 @@ export function GreekLessonLabClient() {
                 <div className="space-y-3">
                   <p className="text-sm leading-relaxed text-white/60">{card.explainer}</p>
                   {card.kind === "morph" && card.passageRef ? (
-                    <Link
-                      href={
-                        getReaderUrlFromReference(card.passageRef, FX_GREEK_GRAMMAR_TRANSLATION_KEY) ?? "/bible"
-                      }
-                      className="inline-flex w-full items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/12 py-2.5 text-sm text-cyan-100/95 hover:bg-cyan-500/18"
-                    >
-                      Read this verse in Grammar Reader
-                    </Link>
-                  ) : null}
-                  {card.kind === "endings" && card.endingsQuestId ? (
-                    <Link
-                      href="/devotions/greek/endings"
-                      className="inline-flex w-full items-center justify-center rounded-xl border border-amber-400/30 bg-amber-500/10 py-2.5 text-sm text-amber-100/90 hover:bg-amber-500/16"
-                    >
-                      Review endings tables
-                    </Link>
+                    <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-center text-xs text-white/50">
+                      Verse: {card.passageRef}
+                    </p>
                   ) : null}
                   {wrongCount === 1 && selected === card.correctIndex ? (
                     <p className="text-xs text-white/45">Second-try correct: half XP for this card.</p>
