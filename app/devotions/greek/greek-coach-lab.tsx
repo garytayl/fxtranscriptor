@@ -106,29 +106,41 @@ export function GreekCoachLab({
     : "Why is this form parsed this way?"
   const coachMicroFocus = learningClues?.parseTemplate ?? selectedToken.parse ?? ""
 
+  const needsPrepPrompts = Boolean(
+    quizContext && (quizContext.outcome === "incorrect" || quizContext.outcome === "skipped"),
+  )
+
   const quizFollowUpActions = useMemo<CoachQuickAction[]>(() => {
     if (!quizContext) return []
     const q = quizContext
-    const actions: CoachQuickAction[] = [
-      {
-        id: "quiz-why",
-        label: "Why this answer?",
-        prompt: `For this quiz: "${q.prompt}" — Explain why "${q.correctAnswer}" is the right choice for the Greek form ${selectedToken.word} (lemma ${selectedToken.lemma}).`,
-      },
-    ]
-    if (q.outcome === "incorrect" && q.chosenAnswer) {
-      actions.push({
-        id: "quiz-contrast",
-        label: "My pick vs correct",
-        prompt: `I answered "${q.chosenAnswer}" but the correct option was "${q.correctAnswer}" on: "${q.prompt}". What is the decisive difference for this word?`,
-      })
-    }
-    actions.push({
+    const prepNext: CoachQuickAction = {
       id: "quiz-next",
-      label: "What to notice next time",
-      prompt: `For a ${q.kind} question like "${q.prompt}", what should I check on the word ${selectedToken.word} before I choose?`,
-    })
-    return actions
+      label: "Prepare for next time",
+      prompt: `I missed this ${q.kind} quiz. For questions like "${q.prompt}" on the word ${selectedToken.word} (lemma ${selectedToken.lemma}), what should I check or rehearse before I answer next time? Keep it practical and short.`,
+    }
+    const checklist: CoachQuickAction = {
+      id: "quiz-checklist",
+      label: "Quick checklist",
+      prompt: `For ${q.kind} questions on ${selectedToken.word}, give me a tiny mental checklist (2–4 bullets) to run before I tap an answer.`,
+    }
+    const whyAnswer: CoachQuickAction = {
+      id: "quiz-why",
+      label: "Why this answer?",
+      prompt: `For this quiz: "${q.prompt}" — Explain why "${q.correctAnswer}" is the right choice for the Greek form ${selectedToken.word} (lemma ${selectedToken.lemma}).`,
+    }
+    const contrast: CoachQuickAction | null =
+      q.outcome === "incorrect" && q.chosenAnswer
+        ? {
+            id: "quiz-contrast",
+            label: "My pick vs correct",
+            prompt: `I answered "${q.chosenAnswer}" but the correct option was "${q.correctAnswer}" on: "${q.prompt}". What is the decisive difference for this word?`,
+          }
+        : null
+
+    if (q.outcome === "incorrect" || q.outcome === "skipped") {
+      return [prepNext, checklist, whyAnswer, ...(contrast ? [contrast] : [])]
+    }
+    return [whyAnswer, ...(contrast ? [contrast] : []), prepNext, checklist]
   }, [quizContext, selectedToken.lemma, selectedToken.word])
 
   const quickActions = useMemo<CoachQuickAction[]>(
@@ -288,9 +300,11 @@ export function GreekCoachLab({
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/85">AI Greek Coach Lab</p>
           <p className="mt-1 text-xs leading-relaxed text-white/65">
-            {quizContext
-              ? "Ask GPT about this word — your last quiz is included in every request."
-              : "Quick actions, follow-up prompts, and re-ask history."}
+            {needsPrepPrompts
+              ? "Tap a button below — no typing needed to get back on track."
+              : quizContext
+                ? "Ask GPT about this word — your last quiz is included in every request."
+                : "Quick actions, follow-up prompts, and re-ask history."}
           </p>
         </div>
         <button
@@ -333,57 +347,135 @@ export function GreekCoachLab({
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            value={coachQuestion}
-            onChange={(e) => setCoachQuestion(e.target.value)}
-            placeholder="Ask a follow-up in plain English..."
-            className="flex-1 rounded-xl border border-emerald-300/35 bg-black/35 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/60 focus:outline-none"
-            aria-label="Ask AI Greek coach a question"
-          />
-          <button
-            type="button"
-            onClick={() => handleAskCoach()}
-            disabled={!coachCanAsk}
-            className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
-          >
-            Ask
-          </button>
+      {needsPrepPrompts && quizFollowUpActions.length > 0 ? (
+        <div className="rounded-xl border border-rose-300/35 bg-gradient-to-br from-rose-500/12 to-black/30 p-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-rose-100/90">Coach — prep for next time</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-white/65">Large tap targets; sends your quiz context automatically.</p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {quizFollowUpActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => handleAskCoach(action.prompt)}
+                disabled={!coachCanAsk}
+                className="min-h-[48px] rounded-xl border border-amber-300/55 bg-amber-400/20 px-3 py-3 text-left text-[13px] font-medium leading-snug text-amber-50 hover:bg-amber-400/28 disabled:opacity-60"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
+      ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          {quizFollowUpActions.map((action) => (
+      <div className="space-y-3">
+        {needsPrepPrompts ? (
+          <details className="group rounded-xl border border-white/12 bg-black/20">
+            <summary className="cursor-pointer list-none px-3 py-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45 [&::-webkit-details-marker]:hidden">
+              <span className="underline decoration-white/20 decoration-dotted underline-offset-2 group-open:text-white/65">
+                Type your own question
+              </span>
+            </summary>
+            <div className="space-y-2 border-t border-white/10 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={coachQuestion}
+                  onChange={(e) => setCoachQuestion(e.target.value)}
+                  placeholder="Optional follow-up in plain English…"
+                  className="flex-1 rounded-xl border border-emerald-300/35 bg-black/35 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/60 focus:outline-none"
+                  aria-label="Ask AI Greek coach a question"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAskCoach()}
+                  disabled={!coachCanAsk}
+                  className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
+                >
+                  Ask
+                </button>
+              </div>
+            </div>
+          </details>
+        ) : (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={coachQuestion}
+              onChange={(e) => setCoachQuestion(e.target.value)}
+              placeholder="Ask a follow-up in plain English..."
+              className="flex-1 rounded-xl border border-emerald-300/35 bg-black/35 px-3 py-2.5 text-sm text-white placeholder:text-white/35 focus:border-emerald-200/60 focus:outline-none"
+              aria-label="Ask AI Greek coach a question"
+            />
             <button
-              key={action.id}
               type="button"
-              onClick={() => handleAskCoach(action.prompt)}
+              onClick={() => handleAskCoach()}
               disabled={!coachCanAsk}
-              className="rounded-full border border-amber-300/50 bg-amber-400/15 px-3 py-1.5 text-[11px] text-amber-50 hover:bg-amber-400/25 disabled:opacity-60"
+              className="rounded-xl border border-emerald-300/45 bg-emerald-400/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-100 hover:bg-emerald-400/30 disabled:opacity-60"
             >
-              {action.label}
+              Ask
             </button>
-          ))}
-          {quickActions.map((action) => (
+          </div>
+        )}
+
+        {!needsPrepPrompts ? (
+          <div className="flex flex-wrap gap-2">
+            {quizFollowUpActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => handleAskCoach(action.prompt)}
+                disabled={!coachCanAsk}
+                className="rounded-full border border-amber-300/50 bg-amber-400/15 px-3 py-1.5 text-[11px] text-amber-50 hover:bg-amber-400/25 disabled:opacity-60"
+              >
+                {action.label}
+              </button>
+            ))}
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => handleAskCoach(action.prompt)}
+                disabled={!coachCanAsk}
+                className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+              >
+                {action.label}
+              </button>
+            ))}
             <button
-              key={action.id}
               type="button"
-              onClick={() => handleAskCoach(action.prompt)}
+              onClick={() => handleAskCoach(defaultCoachQuestion)}
               disabled={!coachCanAsk}
-              className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+              className="rounded-full border border-emerald-300/35 bg-emerald-300/10 px-3 py-1.5 text-[11px] text-emerald-100/90 hover:bg-emerald-300/20 disabled:opacity-60"
             >
-              {action.label}
+              Deep dive this form
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => handleAskCoach(defaultCoachQuestion)}
-            disabled={!coachCanAsk}
-            className="rounded-full border border-emerald-300/35 bg-emerald-300/10 px-3 py-1.5 text-[11px] text-emerald-100/90 hover:bg-emerald-300/20 disabled:opacity-60"
-          >
-            Deep dive this form
-          </button>
-        </div>
+          </div>
+        ) : (
+          <details className="rounded-xl border border-white/10 bg-black/15">
+            <summary className="cursor-pointer list-none px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40 [&::-webkit-details-marker]:hidden">
+              More grammar angles…
+            </summary>
+            <div className="flex flex-wrap gap-2 border-t border-white/10 p-3">
+              {quickActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => handleAskCoach(action.prompt)}
+                  disabled={!coachCanAsk}
+                  className="rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] text-white/80 hover:bg-black/30 disabled:opacity-60"
+                >
+                  {action.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => handleAskCoach(defaultCoachQuestion)}
+                disabled={!coachCanAsk}
+                className="rounded-full border border-emerald-300/35 bg-emerald-300/10 px-3 py-1.5 text-[11px] text-emerald-100/90 hover:bg-emerald-300/20 disabled:opacity-60"
+              >
+                Deep dive this form
+              </button>
+            </div>
+          </details>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

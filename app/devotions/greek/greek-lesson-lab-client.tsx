@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowLeft, BookOpen, Sparkles, Table2, Volume2, Zap } from "lucide-react"
+import { ArrowLeft, BookOpen, Loader2, Sparkles, Table2, Volume2, Zap } from "lucide-react"
 
 import { GreekStudyMenuShell, GreekMenuSection } from "@/app/devotions/greek/greek-study-menu-shell"
 import {
@@ -28,7 +28,23 @@ import {
 } from "@/app/devotions/greek/greek-verse-quest-logic"
 
 import { PracticeLayout } from "@/app/devotions/greek/greek-practice-layout"
+import { buildStudyCoachProgressDigest } from "@/lib/greek-study-coach-context"
 import { cn } from "@/lib/utils"
+
+const LESSON_COACH_QUICK_PROMPTS = [
+  {
+    label: "Prep for next time",
+    question: "How should I prepare so I do not miss this kind of item next time?",
+  },
+  {
+    label: "Smallest thing to memorize",
+    question: "What is the smallest fact or pattern I should memorize from this card?",
+  },
+  {
+    label: "Quick drill",
+    question: "Give me one 30-second drill I can do before I tap Continue.",
+  },
+] as const
 
 function LessonSegmentBar({ total, current, accent }: { total: number; current: number; accent: string }) {
   return (
@@ -137,6 +153,11 @@ export function GreekLessonLabClient() {
   const [selected, setSelected] = useState<number | null>(null)
   const [revealed, setRevealed] = useState(false)
   const [wrongCount, setWrongCount] = useState(0)
+  const [firstWrongIndex, setFirstWrongIndex] = useState<number | null>(null)
+  const [lessonCoachReply, setLessonCoachReply] = useState<string | null>(null)
+  const [lessonCoachLoading, setLessonCoachLoading] = useState(false)
+  const [lessonCoachError, setLessonCoachError] = useState<string | null>(null)
+  const [lessonCoachFollowUps, setLessonCoachFollowUps] = useState<string[]>([])
   const [sessionXp, setSessionXp] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const [resultsByKind, setResultsByKind] = useState<Record<LessonCardKind, { tried: number; correct: number }>>(() => ({
@@ -171,6 +192,10 @@ export function GreekLessonLabClient() {
           setSelected(null)
           setRevealed(false)
           setWrongCount(0)
+          setFirstWrongIndex(null)
+          setLessonCoachReply(null)
+          setLessonCoachError(null)
+          setLessonCoachFollowUps([])
           setSessionXp(0)
           setCorrectCount(0)
           setResultsByKind({
@@ -234,6 +259,7 @@ export function GreekLessonLabClient() {
         playQuestFeedbackSound("incorrect", { soundEnabled: soundEffectsEnabled })
         if (wrongCount === 0) {
           setWrongCount(1)
+          setFirstWrongIndex(optionIndex)
           setSelected(optionIndex)
         } else {
           setSelected(optionIndex)
@@ -253,8 +279,55 @@ export function GreekLessonLabClient() {
     setSelected(null)
     setRevealed(false)
     setWrongCount(0)
+    setFirstWrongIndex(null)
+    setLessonCoachReply(null)
+    setLessonCoachError(null)
+    setLessonCoachFollowUps([])
     setIndex((i) => i + 1)
   }, [cards])
+
+  const askLessonCoach = useCallback(
+    async (question: string) => {
+      if (!card || !revealed) return
+      setLessonCoachLoading(true)
+      setLessonCoachError(null)
+      setLessonCoachReply(null)
+      setLessonCoachFollowUps([])
+      try {
+        const wrongLines: string[] = []
+        if (firstWrongIndex != null) {
+          wrongLines.push(`Learner's first wrong tap: "${card.options[firstWrongIndex]}"`)
+        }
+        if (selected != null && selected !== card.correctIndex) {
+          wrongLines.push(`Still wrong at reveal — last tap: "${card.options[selected]}"`)
+        }
+        const ctx = [
+          `Mixed lesson card · ${card.kind} · ${card.topic}`,
+          `Prompt: ${card.prompt}`,
+          `Correct option: "${card.options[card.correctIndex]}"`,
+          ...wrongLines,
+          `App explainer: ${card.explainer}`,
+        ].join("\n")
+        const digest = buildStudyCoachProgressDigest()
+        const message = `${ctx}\n\n---\n${question}`
+        const res = await fetch("/api/devotions/greek-study-coach", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, progressDigest: digest, history: [] }),
+        })
+        const data = (await res.json()) as { reply?: string; followUps?: string[]; error?: string }
+        if (!res.ok) throw new Error(data?.error || "Coach unavailable.")
+        setLessonCoachReply(typeof data.reply === "string" ? data.reply : "")
+        const fu = Array.isArray(data.followUps) ? data.followUps.filter((s): s is string => typeof s === "string") : []
+        setLessonCoachFollowUps(fu.slice(0, 3))
+      } catch (e) {
+        setLessonCoachError(e instanceof Error ? e.message : "Coach unavailable.")
+      } finally {
+        setLessonCoachLoading(false)
+      }
+    },
+    [card, revealed, firstWrongIndex, selected],
+  )
 
   const startNewLesson = useCallback(() => {
     setSessionSeed(Math.floor(Math.random() * 2 ** 30))
@@ -532,6 +605,56 @@ export function GreekLessonLabClient() {
                   ) : null}
                   {wrongCount >= 1 && selected !== card.correctIndex ? (
                     <p className="text-xs text-white/45">No XP this card — review the note and keep going.</p>
+                  ) : null}
+                  {wrongCount >= 1 ? (
+                    <div className="rounded-xl border border-emerald-400/30 bg-emerald-950/25 px-3 py-3">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-200/85">
+                        Study coach — tap a prompt
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-white/55">
+                        Uses your saved progress on this device. No typing required.
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {LESSON_COACH_QUICK_PROMPTS.map((p) => (
+                          <button
+                            key={p.label}
+                            type="button"
+                            disabled={lessonCoachLoading}
+                            onClick={() => void askLessonCoach(p.question)}
+                            className="min-h-[44px] rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2 py-2 text-center text-[12px] font-medium leading-snug text-emerald-50 hover:bg-emerald-500/22 disabled:opacity-50"
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                      {lessonCoachLoading ? (
+                        <div className="mt-3 flex items-center gap-2 text-xs text-white/50">
+                          <Loader2 className="size-3.5 animate-spin shrink-0" aria-hidden />
+                          Coach is thinking…
+                        </div>
+                      ) : null}
+                      {lessonCoachError ? (
+                        <p className="mt-2 text-xs text-amber-200/90">{lessonCoachError}</p>
+                      ) : null}
+                      {lessonCoachReply ? (
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-white/88">{lessonCoachReply}</p>
+                      ) : null}
+                      {lessonCoachFollowUps.length > 0 && !lessonCoachLoading ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {lessonCoachFollowUps.map((chip) => (
+                            <button
+                              key={chip}
+                              type="button"
+                              disabled={lessonCoachLoading}
+                              onClick={() => void askLessonCoach(chip)}
+                              className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/[0.1] disabled:opacity-50"
+                            >
+                              {chip}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
                   <button
                     type="button"
