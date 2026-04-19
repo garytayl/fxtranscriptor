@@ -13,15 +13,22 @@ import { englishGlossForLemma, normalizeGreekLemma } from "@/lib/bible/greek-lem
 import { MORPH_PILOT_CHAPTERS, morphPilotPassageRef } from "@/lib/bible/morph-pilot-menu"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
 import { ENDINGS_QUESTS, type EndingsQuestGroup } from "@/lib/greek-endings-quest-data"
+import { GREEK_LESSON_ROOTS } from "@/lib/greek-lesson-roots-data"
 
 export const LESSON_ENDINGS_COUNT = 4
 export const LESSON_GLOSS_EN_COUNT = 3
 export const LESSON_GLOSS_LEMMA_EN_COUNT = 3
 export const LESSON_MORPH_COUNT = 4
+/** Combining forms & stems — piece longer words together instead of brute-memorizing glosses. */
+export const LESSON_ROOTS_COUNT = 4
 
 /** @deprecated use LESSON_TOTAL_CARDS */
 export const DEFAULT_LESSON_CARD_COUNT =
-  LESSON_ENDINGS_COUNT + LESSON_GLOSS_EN_COUNT + LESSON_GLOSS_LEMMA_EN_COUNT + LESSON_MORPH_COUNT
+  LESSON_ENDINGS_COUNT +
+  LESSON_GLOSS_EN_COUNT +
+  LESSON_GLOSS_LEMMA_EN_COUNT +
+  LESSON_MORPH_COUNT +
+  LESSON_ROOTS_COUNT
 
 export const LESSON_TOTAL_CARDS = DEFAULT_LESSON_CARD_COUNT
 
@@ -113,8 +120,19 @@ export type LessonDraft =
       passageRef: string
       xp: number
     }
+  | {
+      kind: "root"
+      rootId: string
+      topic: string
+      prompt: string
+      hint: string
+      options: string[]
+      correctIndex: number
+      xp: number
+      explainer: string
+    }
 
-export type LessonCardKind = "endings" | "gloss_en_to_lemma" | "gloss_lemma_to_en" | "morph"
+export type LessonCardKind = "endings" | "gloss_en_to_lemma" | "gloss_lemma_to_en" | "morph" | "root"
 
 export type LessonCard = {
   index: number
@@ -222,6 +240,82 @@ function glossEnToLemmaDraft(
   }
 }
 
+const ROOT_MEANING_FALLBACKS = [
+  "authority",
+  "time",
+  "place",
+  "people",
+  "covenant",
+  "spirit",
+  "truth",
+  "peace",
+]
+
+function rootDraftFromPool(rng: () => number): Extract<LessonDraft, { kind: "root" }> {
+  const pool = [...GREEK_LESSON_ROOTS]
+  if (pool.length < 8) {
+    const r = GREEK_LESSON_ROOTS[0]!
+    return {
+      kind: "root",
+      rootId: r.id,
+      topic: "Greek roots",
+      prompt: `What idea does “${r.form}” usually carry?`,
+      hint: r.form,
+      options: [r.meaning, "three", "God", "write"],
+      correctIndex: 0,
+      xp: 7,
+      explainer: `“${r.form}” → ${r.meaning}.`,
+    }
+  }
+  shuffleInPlace(pool, rng)
+  const correct = pool[0]!
+  const usedMeanings = new Set<string>([correct.meaning])
+  const distractorMeanings: string[] = []
+  for (const r of pool.slice(1)) {
+    if (distractorMeanings.length >= 3) break
+    if (!usedMeanings.has(r.meaning)) {
+      usedMeanings.add(r.meaning)
+      distractorMeanings.push(r.meaning)
+    }
+  }
+  for (const f of ROOT_MEANING_FALLBACKS) {
+    if (distractorMeanings.length >= 3) break
+    if (!usedMeanings.has(f)) {
+      usedMeanings.add(f)
+      distractorMeanings.push(f)
+    }
+  }
+  while (distractorMeanings.length < 3) {
+    distractorMeanings.push(`idea ${distractorMeanings.length + 1}`)
+  }
+  const options = [correct.meaning, ...distractorMeanings.slice(0, 3)]
+  shuffleInPlace(options, rng)
+  const correctIndex = options.indexOf(correct.meaning)
+
+  const hasExample = Boolean(correct.exampleGreek && correct.exampleGloss)
+  const prompt = hasExample
+    ? `The element “${correct.form}” shows up in words like ${correct.exampleGreek} (“${correct.exampleGloss}”). What core idea does this root carry?`
+    : `The building block “${correct.form}” appears in many biblical Greek words. What is its usual sense?`
+
+  let explainer = `“${correct.form}” → ${correct.meaning}.`
+  if (hasExample) {
+    explainer += ` You saw it in ${correct.exampleGreek} ≈ ‘${correct.exampleGloss}.’`
+  }
+  if (correct.note) explainer += ` ${correct.note}`
+
+  return {
+    kind: "root",
+    rootId: correct.id,
+    topic: "Greek roots",
+    prompt,
+    hint: correct.form,
+    options,
+    correctIndex,
+    xp: 7,
+    explainer: explainer.trim(),
+  }
+}
+
 function glossLemmaToEnDraft(
   rng: () => number,
   weak: Set<string>,
@@ -318,6 +412,9 @@ export function buildLessonDrafts(seed: number, opts?: BuildLessonOpts): { runId
   }
   for (const ref of morphRefsForRun(rng, LESSON_MORPH_COUNT)) {
     drafts.push({ kind: "morph", passageRef: ref, xp: 8 })
+  }
+  for (let r = 0; r < LESSON_ROOTS_COUNT; r++) {
+    drafts.push(rootDraftFromPool(rng))
   }
 
   shuffleInPlace(drafts, rng)
@@ -448,6 +545,19 @@ function draftToStaticCard(
       xp: draft.xp,
       explainer: draft.explainer,
       wordMemoryKey: draft.wordMemoryKey,
+    }
+  }
+  if (draft.kind === "root") {
+    return {
+      index,
+      kind: "root",
+      topic: draft.topic,
+      prompt: draft.prompt,
+      hint: draft.hint,
+      options: draft.options,
+      correctIndex: draft.correctIndex,
+      xp: draft.xp,
+      explainer: draft.explainer,
     }
   }
   return {

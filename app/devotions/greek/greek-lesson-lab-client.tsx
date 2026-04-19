@@ -123,6 +123,8 @@ function kindSummaryLabel(kind: LessonCardKind): string {
       return "Greek → English"
     case "morph":
       return "Verse grammar"
+    case "root":
+      return "Greek roots"
   }
 }
 
@@ -152,6 +154,7 @@ export function GreekLessonLabClient() {
     gloss_en_to_lemma: { tried: 0, correct: 0 },
     gloss_lemma_to_en: { tried: 0, correct: 0 },
     morph: { tried: 0, correct: 0 },
+    root: { tried: 0, correct: 0 },
   }))
 
   const todayKey = useMemo(() => todayDateKey(), [])
@@ -190,6 +193,7 @@ export function GreekLessonLabClient() {
             gloss_en_to_lemma: { tried: 0, correct: 0 },
             gloss_lemma_to_en: { tried: 0, correct: 0 },
             morph: { tried: 0, correct: 0 },
+            root: { tried: 0, correct: 0 },
           })
         }
       })
@@ -460,8 +464,8 @@ export function GreekLessonLabClient() {
             <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left">
               <p className="text-[11px] font-medium uppercase tracking-wide text-white/40">By skill</p>
               <ul className="mt-2 space-y-1.5 text-sm text-white/75">
-                {(
-                  ["endings", "gloss_en_to_lemma", "gloss_lemma_to_en", "morph"] as LessonCardKind[]
+                {                  (
+                  ["endings", "root", "gloss_en_to_lemma", "gloss_lemma_to_en", "morph"] as LessonCardKind[]
                 ).map((k) => {
                   const r = resultsByKind[k]
                   if (r.tried === 0) return null
@@ -496,7 +500,14 @@ export function GreekLessonLabClient() {
             >
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-violet-400/35 bg-violet-500/15 px-2.5 py-1 text-[11px] font-medium text-violet-100/95">
+                  <span
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                      card.kind === "root"
+                        ? "border-fuchsia-400/40 bg-fuchsia-500/14 text-fuchsia-100/95"
+                        : "border-violet-400/35 bg-violet-500/15 text-violet-100/95",
+                    )}
+                  >
                     {card.topic}
                   </span>
                   <button
@@ -517,18 +528,26 @@ export function GreekLessonLabClient() {
                 <p className="text-lg leading-snug text-white/95">{card.prompt}</p>
                 {card.hint ? (
                   <p
-                    className={`rounded-xl border px-3 py-3 text-base leading-relaxed ${
+                    className={cn(
+                      "rounded-xl border px-3 py-3 text-base leading-relaxed",
                       card.kind === "gloss_lemma_to_en"
                         ? "border-amber-400/25 bg-amber-500/10 font-serif text-amber-50/95"
                         : card.kind === "gloss_en_to_lemma"
                           ? "border-cyan-400/22 bg-cyan-950/30 text-cyan-50/90"
-                          : "border-white/10 bg-white/[0.04] text-amber-100/90"
-                    }`}
+                          : card.kind === "root"
+                            ? "border-fuchsia-400/35 bg-fuchsia-950/30 font-mono text-[15px] text-fuchsia-50/95"
+                            : "border-white/10 bg-white/[0.04] text-amber-100/90",
+                    )}
                   >
                     {card.kind === "gloss_en_to_lemma" ? (
                       <>
                         <span className="text-[11px] font-sans text-white/45">Gloss · </span>
                         <span className="font-medium">“{card.hint}”</span>
+                      </>
+                    ) : card.kind === "root" ? (
+                      <>
+                        <span className="text-[11px] font-sans text-fuchsia-200/55">Root · </span>
+                        <span className="font-semibold tracking-tight">{card.hint}</span>
                       </>
                     ) : (
                       card.hint
