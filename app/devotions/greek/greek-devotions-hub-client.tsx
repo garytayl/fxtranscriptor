@@ -11,6 +11,7 @@ import {
   Library,
   MapPin,
   MessageCircle,
+  Search,
   Sparkles,
   Target,
 } from "lucide-react"
@@ -74,8 +75,8 @@ const TILES: {
   },
   {
     href: "/devotions/greek/english-search",
-    title: "English → Greek",
-    blurb: "Type an English idea (e.g. love, faith) and browse matching Greek lemmas and lexicon.",
+    title: "English word search",
+    blurb: "Type English (love, faith, holy…) and browse Greek lemmas, Strong’s codes, and lexicon.",
     icon: Languages,
     className:
       "border-violet-400/35 bg-violet-500/10 hover:bg-violet-500/18 text-violet-100",
@@ -166,14 +167,38 @@ export function GreekDevotionsHubClient() {
               <Sparkles className="size-3.5" aria-hidden />
               Greek study
             </span>
-            <p className="text-xs text-white/50">Labs, reader, quest</p>
+            <p className="text-xs text-white/50">Labs, reader, quest, word search</p>
           </div>
-          <span className="w-14 sm:w-20" aria-hidden />
+          <Link
+            href="/devotions/greek/english-search"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-400/45 bg-violet-500/14 px-2.5 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-violet-100 hover:bg-violet-500/22 sm:gap-2 sm:px-3.5"
+            title="Find Greek words by English (e.g. love, faith)"
+          >
+            <Search className="size-3.5 shrink-0 opacity-90" aria-hidden />
+            <span className="max-[380px]:sr-only">Search</span>
+          </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <GreekProgressStrip accent="emerald" className="mb-4" />
+
+        <section
+          className="mb-4 flex flex-col gap-2 rounded-2xl border border-violet-400/28 bg-violet-950/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+          aria-label="English word search"
+        >
+          <p className="text-sm leading-snug text-white/80">
+            <Search className="mr-1.5 inline size-3.5 text-violet-300/90 align-text-bottom" aria-hidden />
+            <strong className="font-medium text-violet-100/95">Word search:</strong> type English (e.g.{" "}
+            <span className="text-white/65">love, faith, spirit</span>) and see matching Greek lemmas.
+          </p>
+          <Link
+            href="/devotions/greek/english-search"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl border border-violet-400/45 bg-violet-500/18 px-4 py-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-violet-50 hover:bg-violet-500/28"
+          >
+            Open search
+          </Link>
+        </section>
 
         {snap && milestone ? (
           <section
@@ -203,7 +228,11 @@ export function GreekDevotionsHubClient() {
             <p className="mt-1.5 text-sm leading-relaxed text-white/85">
               Start with <strong className="text-white/95">Endings Lab</strong>, explore the{" "}
               <strong className="text-white/95">Grammar Reader</strong>, then earn XP in{" "}
-              <strong className="text-white/95">Verse Quest</strong>—your word bank fills as you practice.
+              <strong className="text-white/95">Verse Quest</strong>—your word bank fills as you practice. Use{" "}
+              <Link href="/devotions/greek/english-search" className="font-medium text-violet-200/95 underline-offset-2 hover:underline">
+                word search
+              </Link>{" "}
+              to find Greek lemmas from English anytime.
             </p>
           </section>
         ) : null}
@@ -231,6 +260,13 @@ export function GreekDevotionsHubClient() {
               >
                 <Gamepad2 className="size-3.5" aria-hidden />
                 Quest
+              </Link>
+              <Link
+                href="/devotions/greek/english-search"
+                className="inline-flex items-center gap-2 rounded-xl border border-violet-400/40 bg-violet-500/12 px-3 py-2 text-xs font-medium text-violet-50 transition-colors hover:bg-violet-500/20"
+              >
+                <Search className="size-3.5" aria-hidden />
+                Word search
               </Link>
             </div>
           </section>

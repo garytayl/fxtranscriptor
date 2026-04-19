@@ -36,6 +36,7 @@ export function GreekSectionQuickNav({
           <Link
             key={item.href}
             href={item.href}
+            title={item.title}
             className={cn(
               "rounded-full border px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-colors",
               active ? activeRing : idle,

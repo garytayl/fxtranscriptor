@@ -1,12 +1,12 @@
 import Link from "next/link"
-import { ArrowLeft, Languages } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 
 import { GreekEnglishLemmaSearchPanel } from "@/app/devotions/greek/greek-english-lemma-search-panel"
 import { GreekSectionQuickNav } from "@/app/devotions/greek/greek-section-quick-nav"
 
 export const metadata = {
-  title: "Greek · English word search",
-  description: "Type English glosses to find Greek lemmas, Strong’s numbers, and lexicon entries.",
+  title: "Greek · Word search (English)",
+  description: "Type English to find Greek lemmas, Strong’s numbers, and lexicon entries.",
 }
 
 export default function GreekEnglishSearchPage() {
@@ -23,10 +23,10 @@ export default function GreekEnglishSearchPage() {
           </Link>
           <div className="flex min-w-0 flex-col items-center text-center">
             <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.24em] text-violet-200/85">
-              <Languages className="size-3.5" aria-hidden />
-              English → Greek
+              <Search className="size-3.5" aria-hidden />
+              Word search
             </span>
-            <span className="text-xs text-white/50">Lemma search by gloss</span>
+            <span className="text-xs text-white/50">English in · Greek lemmas out</span>
           </div>
           <Link
             href="/devotions/greek/quest"

@@ -118,7 +118,9 @@ export function GreekEnglishLemmaSearchPanel() {
   return (
     <div className="space-y-5">
       <label className="block space-y-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">Search by English gloss</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
+          Type English to find Greek words (lemma search)
+        </span>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-emerald-400/55" aria-hidden />
           <input

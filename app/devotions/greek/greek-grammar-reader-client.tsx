@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Library,
   Menu,
+  Search,
   X,
 } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -403,10 +404,10 @@ export function GreekGrammarReaderClient() {
             Menu
           </button>
         </div>
-        <div className="flex justify-center pb-2 px-3">
+        <div className="flex flex-wrap justify-center gap-2 px-3 pb-2">
           <Link
             href="/devotions/greek/endings"
-            className="mr-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/90 hover:bg-cyan-500/20"
+            className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/90 hover:bg-cyan-500/20"
           >
             <GraduationCap className="size-3.5" />
             Endings Lab
@@ -417,6 +418,14 @@ export function GreekGrammarReaderClient() {
           >
             <Gamepad2 className="size-3.5" />
             Verse Quest
+          </Link>
+          <Link
+            href="/devotions/greek/english-search"
+            className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-violet-200/90 hover:bg-violet-500/20"
+            title="Find Greek lemmas by English"
+          >
+            <Search className="size-3.5" aria-hidden />
+            Word search
           </Link>
         </div>
       </header>
@@ -447,6 +456,17 @@ export function GreekGrammarReaderClient() {
               </span>
               <ChevronRight className="size-4 shrink-0 text-amber-200/50" aria-hidden />
             </button>
+            <Link
+              href="/devotions/greek/english-search"
+              onClick={closeMenu}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-violet-400/35 bg-violet-500/10 px-4 py-3 text-left transition-colors hover:bg-violet-500/16"
+            >
+              <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-violet-100">
+                <Search className="size-4 shrink-0 opacity-90" aria-hidden />
+                Word search (English → Greek)
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-violet-200/50" aria-hidden />
+            </Link>
             <Link
               href="/devotions/greek/words"
               onClick={closeMenu}
