@@ -3,16 +3,45 @@
  */
 
 import { buildChallengeForTarget, pickQuestTargetsInPhrase } from "@/app/devotions/greek/greek-verse-quest-logic"
+import type { QuestWordChallenge } from "@/app/devotions/greek/greek-verse-quest-logic"
 import { GREEK_LEMMA_ENGLISH_QUIZ } from "@/lib/bible/greek-lemma-english-gloss.generated"
 import { englishGlossForLemma, normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
 import { MORPH_PILOT_CHAPTERS, morphPilotPassageRef } from "@/lib/bible/morph-pilot-menu"
 import type { GreekMorphToken } from "@/lib/bible/morph-types"
-import { ENDINGS_QUESTS } from "@/lib/greek-endings-quest-data"
+import { ENDINGS_QUESTS, type EndingsQuestGroup } from "@/lib/greek-endings-quest-data"
 
-export const DEFAULT_LESSON_CARD_COUNT = 10
-const ENDINGS_PER_RUN = 3
-const GLOSS_PER_RUN = 4
-const MORPH_PER_RUN = 3
+export const LESSON_ENDINGS_COUNT = 4
+export const LESSON_GLOSS_EN_COUNT = 3
+export const LESSON_GLOSS_LEMMA_EN_COUNT = 3
+export const LESSON_MORPH_COUNT = 4
+
+/** @deprecated use LESSON_TOTAL_CARDS */
+export const DEFAULT_LESSON_CARD_COUNT =
+  LESSON_ENDINGS_COUNT + LESSON_GLOSS_EN_COUNT + LESSON_GLOSS_LEMMA_EN_COUNT + LESSON_MORPH_COUNT
+
+export const LESSON_TOTAL_CARDS = DEFAULT_LESSON_CARD_COUNT
+
+const CHALLENGE_KIND_LABEL: Record<QuestWordChallenge["kind"], string> = {
+  lemma: "lemma → English",
+  "part-of-speech": "part of speech",
+  case: "case",
+  number: "number",
+  gender: "gender",
+  tense: "tense",
+  voice: "voice",
+  mood: "mood",
+}
+
+export function endingsTopicLabel(group: EndingsQuestGroup): string {
+  switch (group) {
+    case "verb":
+      return "Verb endings"
+    case "noun":
+      return "Noun endings"
+    case "article":
+      return "Article forms"
+  }
+}
 
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0
@@ -36,10 +65,16 @@ export function lessonSessionKey(dateKey: string, runId: string, cardIndex: numb
   return `greek-lesson-${dateKey}-${runId}-${cardIndex}-${kind}`
 }
 
+export type BuildLessonOpts = {
+  /** Normalized Greek lemmas (e.g. from word bank) weighted in vocabulary picks */
+  weakLemmas?: string[]
+}
+
 export type LessonDraft =
   | {
       kind: "endings"
       questId: string
+      topic: string
       prompt: string
       options: string[]
       correctIndex: number
@@ -48,6 +83,17 @@ export type LessonDraft =
     }
   | {
       kind: "gloss_en_to_lemma"
+      topic: string
+      prompt: string
+      hint: string
+      options: string[]
+      correctIndex: number
+      xp: number
+      explainer: string
+    }
+  | {
+      kind: "gloss_lemma_to_en"
+      topic: string
       prompt: string
       hint: string
       options: string[]
@@ -61,11 +107,15 @@ export type LessonDraft =
       xp: number
     }
 
+export type LessonCardKind = "endings" | "gloss_en_to_lemma" | "gloss_lemma_to_en" | "morph"
+
 export type LessonCard = {
   index: number
-  kind: "endings" | "gloss_en_to_lemma" | "morph"
+  kind: LessonCardKind
+  /** Short label for the chip (e.g. "Verb endings", "John 1:1") */
+  topic: string
   prompt: string
-  /** Secondary line (gloss text, or Greek word for morph) */
+  /** Secondary line (gloss text, Greek lemma, or surface form for morph) */
   hint?: string
   options: string[]
   correctIndex: number
@@ -73,6 +123,28 @@ export type LessonCard = {
   explainer: string
   endingsQuestId?: string
   passageRef?: string
+  /** Morph quiz dimension (lemma, case, …) for richer feedback */
+  morphQuizKind?: QuestWordChallenge["kind"]
+}
+
+function weakLemmaSet(weakLemmas: string[] | undefined): Set<string> {
+  const s = new Set<string>()
+  if (!weakLemmas?.length) return s
+  for (const l of weakLemmas) {
+    const n = normalizeGreekLemma(l)
+    if (n) s.add(n)
+  }
+  return s
+}
+
+function pickLemmaIndexWithWeakBias(rng: () => number, lemmas: string[], weak: Set<string>): number {
+  if (weak.size === 0) return Math.floor(rng() * lemmas.length)
+  const weakIndices: number[] = []
+  for (let i = 0; i < lemmas.length; i++) {
+    if (weak.has(normalizeGreekLemma(lemmas[i]!))) weakIndices.push(i)
+  }
+  if (weakIndices.length === 0 || rng() > 0.48) return Math.floor(rng() * lemmas.length)
+  return weakIndices[Math.floor(rng() * weakIndices.length)]!
 }
 
 function endingsDraftFromQuest(
@@ -85,6 +157,7 @@ function endingsDraftFromQuest(
   return {
     kind: "endings",
     questId: q.id,
+    topic: endingsTopicLabel(q.group),
     prompt: q.prompt,
     options,
     correctIndex,
@@ -93,12 +166,16 @@ function endingsDraftFromQuest(
   }
 }
 
-function glossDraft(rng: () => number): Extract<LessonDraft, { kind: "gloss_en_to_lemma" }> {
+function glossEnToLemmaDraft(
+  rng: () => number,
+  weak: Set<string>,
+): Extract<LessonDraft, { kind: "gloss_en_to_lemma" }> {
   const lemmas = Object.keys(GREEK_LEMMA_ENGLISH_QUIZ).filter((l) => englishGlossForLemma(l))
   if (lemmas.length < 6) {
     return {
       kind: "gloss_en_to_lemma",
-      prompt: "Which Greek word fits this gloss?",
+      topic: "English → Greek",
+      prompt: "Which Greek word matches the gloss “word”?",
       hint: "word",
       options: ["λόγος", "ἀγάπη", "πίστις", "ζωή"],
       correctIndex: 0,
@@ -106,8 +183,8 @@ function glossDraft(rng: () => number): Extract<LessonDraft, { kind: "gloss_en_t
       explainer: "λόγος → word",
     }
   }
-  const pickIdx = Math.floor(rng() * lemmas.length)
-  const correct = lemmas[pickIdx]
+  const pickIdx = pickLemmaIndexWithWeakBias(rng, lemmas, weak)
+  const correct = lemmas[pickIdx]!
   const gloss = englishGlossForLemma(correct)!
   const pool = lemmas.filter((l) => l !== correct)
   shuffleInPlace(pool, rng)
@@ -118,12 +195,74 @@ function glossDraft(rng: () => number): Extract<LessonDraft, { kind: "gloss_en_t
   const correctIndex = options.indexOf(correctLemma)
   return {
     kind: "gloss_en_to_lemma",
-    prompt: "Which Greek word fits this gloss?",
+    topic: weak.has(correctLemma) ? "English → Greek · review" : "English → Greek",
+    prompt: `The English gloss is “${gloss}”. Which Greek word matches?`,
     hint: gloss,
     options,
     correctIndex,
     xp: 8,
-    explainer: `${correctLemma} → ${gloss}`,
+    explainer: `${correctLemma} commonly glosses as “${gloss}”.`,
+  }
+}
+
+function glossLemmaToEnDraft(
+  rng: () => number,
+  weak: Set<string>,
+): Extract<LessonDraft, { kind: "gloss_lemma_to_en" }> {
+  const lemmas = Object.keys(GREEK_LEMMA_ENGLISH_QUIZ).filter((l) => englishGlossForLemma(l))
+  if (lemmas.length < 6) {
+    return {
+      kind: "gloss_lemma_to_en",
+      topic: "Greek → English",
+      prompt: "What English gloss fits this Greek word?",
+      hint: "λόγος",
+      options: ["word", "love", "faith", "life"],
+      correctIndex: 0,
+      xp: 8,
+      explainer: "λόγος → word",
+    }
+  }
+  const pickIdx = pickLemmaIndexWithWeakBias(rng, lemmas, weak)
+  const correctLemmaRaw = lemmas[pickIdx]!
+  const correctLemma = normalizeGreekLemma(correctLemmaRaw)
+  const correctGloss = englishGlossForLemma(correctLemmaRaw)!
+
+  const glossByLemma = lemmas.map((l) => ({
+    lemma: l,
+    gloss: englishGlossForLemma(l)!,
+  }))
+  const otherGlosses = glossByLemma
+    .filter((x) => x.gloss !== correctGloss)
+    .map((x) => x.gloss)
+  const uniqueWrong: string[] = []
+  const seenG = new Set<string>()
+  shuffleInPlace(otherGlosses, rng)
+  for (const g of otherGlosses) {
+    if (seenG.has(g)) continue
+    seenG.add(g)
+    uniqueWrong.push(g)
+    if (uniqueWrong.length >= 3) break
+  }
+  const fallbackGlosses = ["God", "man", "spirit", "son", "day", "house", "people", "world"]
+  for (const g of fallbackGlosses) {
+    if (uniqueWrong.length >= 3) break
+    if (g === correctGloss || seenG.has(g)) continue
+    seenG.add(g)
+    uniqueWrong.push(g)
+  }
+  const options = [correctGloss, ...uniqueWrong.slice(0, 3)]
+  shuffleInPlace(options, rng)
+  const correctIndex = options.indexOf(correctGloss)
+
+  return {
+    kind: "gloss_lemma_to_en",
+    topic: weak.has(correctLemma) ? "Greek → English · review" : "Greek → English",
+    prompt: "What English gloss best fits this Greek word?",
+    hint: correctLemma,
+    options,
+    correctIndex,
+    xp: 8,
+    explainer: `“${correctLemma}” is often glossed “${correctGloss}”.`,
   }
 }
 
@@ -131,7 +270,7 @@ function morphRefsForRun(rng: () => number, count: number): string[] {
   const refs: string[] = []
   for (let i = 0; i < count; i++) {
     const chapterIdx = Math.floor(rng() * MORPH_PILOT_CHAPTERS.length)
-    const ch = MORPH_PILOT_CHAPTERS[chapterIdx]
+    const ch = MORPH_PILOT_CHAPTERS[chapterIdx]!
     const verse = 1 + Math.floor(rng() * Math.max(1, ch.maxVerse))
     refs.push(morphPilotPassageRef(ch, verse))
   }
@@ -139,22 +278,26 @@ function morphRefsForRun(rng: () => number, count: number): string[] {
 }
 
 /** Deterministic lesson draft list (morph entries need `finalizeLessonDrafts`). */
-export function buildLessonDrafts(seed: number): { runId: string; drafts: LessonDraft[] } {
+export function buildLessonDrafts(seed: number, opts?: BuildLessonOpts): { runId: string; drafts: LessonDraft[] } {
   const rng = mulberry32(seed)
   const runId = seed.toString(36)
+  const weak = weakLemmaSet(opts?.weakLemmas)
 
   const endingsPool = [...ENDINGS_QUESTS]
   shuffleInPlace(endingsPool, rng)
-  const endingsPicks = endingsPool.slice(0, Math.min(ENDINGS_PER_RUN, endingsPool.length))
+  const endingsPicks = endingsPool.slice(0, Math.min(LESSON_ENDINGS_COUNT, endingsPool.length))
 
   const drafts: LessonDraft[] = []
   for (const q of endingsPicks) {
     drafts.push(endingsDraftFromQuest(q, rng))
   }
-  for (let g = 0; g < GLOSS_PER_RUN; g++) {
-    drafts.push(glossDraft(rng))
+  for (let g = 0; g < LESSON_GLOSS_EN_COUNT; g++) {
+    drafts.push(glossEnToLemmaDraft(rng, weak))
   }
-  for (const ref of morphRefsForRun(rng, MORPH_PER_RUN)) {
+  for (let g = 0; g < LESSON_GLOSS_LEMMA_EN_COUNT; g++) {
+    drafts.push(glossLemmaToEnDraft(rng, weak))
+  }
+  for (const ref of morphRefsForRun(rng, LESSON_MORPH_COUNT)) {
     drafts.push({ kind: "morph", passageRef: ref, xp: 8 })
   }
 
@@ -181,6 +324,12 @@ export async function fetchMorphTokensForRef(ref: string, verse: number): Promis
   return mv?.tokens ?? []
 }
 
+function morphExplainer(token: GreekMorphToken, challengeKind: QuestWordChallenge["kind"], ref: string): string {
+  const lemma = token.lemma ? `${normalizeGreekLemma(token.lemma)} · ` : ""
+  const dim = CHALLENGE_KIND_LABEL[challengeKind]
+  return `${lemma}${ref} — ${dim}.`
+}
+
 async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, rng: () => number): Promise<LessonCard> {
   const verse = verseFromPassageRef(draft.passageRef)
   let tokens = await fetchMorphTokensForRef(draft.passageRef, verse)
@@ -190,7 +339,7 @@ async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, 
   if (pick.targetIndexes.length === 0) {
     for (let attempt = 0; attempt < 6 && pick.targetIndexes.length === 0; attempt++) {
       const chapterIdx = Math.floor(rng() * MORPH_PILOT_CHAPTERS.length)
-      const ch = MORPH_PILOT_CHAPTERS[chapterIdx]
+      const ch = MORPH_PILOT_CHAPTERS[chapterIdx]!
       const v = 1 + Math.floor(rng() * Math.max(1, ch.maxVerse))
       ref = morphPilotPassageRef(ch, v)
       tokens = await fetchMorphTokensForRef(ref, v)
@@ -199,26 +348,28 @@ async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, 
   }
 
   if (pick.targetIndexes.length === 0) {
-    const g = glossDraft(rng)
+    const g = glossEnToLemmaDraft(rng, new Set())
     return {
       index: 0,
       kind: "gloss_en_to_lemma",
+      topic: g.topic,
       prompt: g.prompt,
       hint: g.hint,
       options: g.options,
       correctIndex: g.correctIndex,
       xp: draft.xp,
-      explainer: g.explainer,
+      explainer: `${g.explainer} (extra vocab card — no pilot tokens for the first verse tried.)`,
     }
   }
 
-  const ti = pick.targetIndexes[Math.floor(rng() * pick.targetIndexes.length)]
+  const ti = pick.targetIndexes[Math.floor(rng() * pick.targetIndexes.length)]!
   const ch = buildChallengeForTarget(tokens, ti)
   if (!ch) {
-    const g = glossDraft(rng)
+    const g = glossEnToLemmaDraft(rng, new Set())
     return {
       index: 0,
       kind: "gloss_en_to_lemma",
+      topic: g.topic,
       prompt: g.prompt,
       hint: g.hint,
       options: g.options,
@@ -229,27 +380,31 @@ async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, 
   }
 
   const surface = tokens[ti]?.word ?? ""
+  const token = tokens[ti]!
   return {
     index: 0,
     kind: "morph",
+    topic: `Verse · ${ref}`,
     prompt: ch.prompt,
     hint: surface ? `“${surface}”` : undefined,
     options: ch.options,
     correctIndex: ch.correctOptionIndex,
     xp: draft.xp,
-    explainer: `From ${ref}.`,
+    explainer: morphExplainer(token, ch.kind, ref),
     passageRef: ref,
+    morphQuizKind: ch.kind,
   }
 }
 
 function draftToStaticCard(
-  draft: Extract<LessonDraft, { kind: "endings" } | { kind: "gloss_en_to_lemma" }>,
+  draft: Exclude<LessonDraft, { kind: "morph" }>,
   index: number,
 ): LessonCard {
   if (draft.kind === "endings") {
     return {
       index,
       kind: "endings",
+      topic: draft.topic,
       prompt: draft.prompt,
       options: draft.options,
       correctIndex: draft.correctIndex,
@@ -258,9 +413,23 @@ function draftToStaticCard(
       endingsQuestId: draft.questId,
     }
   }
+  if (draft.kind === "gloss_en_to_lemma") {
+    return {
+      index,
+      kind: "gloss_en_to_lemma",
+      topic: draft.topic,
+      prompt: draft.prompt,
+      hint: draft.hint,
+      options: draft.options,
+      correctIndex: draft.correctIndex,
+      xp: draft.xp,
+      explainer: draft.explainer,
+    }
+  }
   return {
     index,
-    kind: "gloss_en_to_lemma",
+    kind: "gloss_lemma_to_en",
+    topic: draft.topic,
     prompt: draft.prompt,
     hint: draft.hint,
     options: draft.options,

@@ -55,7 +55,7 @@ const TILES: {
   {
     href: "/devotions/greek/lesson",
     title: "Mixed lesson",
-    blurb: "One-tap flow: endings, morphology, and gloss drills in a single run.",
+    blurb: "14-card run: endings, English↔Greek lemmas, pilot-verse morphology, two tries, weak-word bias.",
     icon: Layers,
     className:
       "border-violet-400/35 bg-violet-500/10 hover:bg-violet-500/18 text-violet-100",
