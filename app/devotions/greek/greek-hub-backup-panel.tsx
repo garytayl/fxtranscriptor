@@ -43,7 +43,7 @@ export function GreekHubBackupPanel({
           const parsed = JSON.parse(text) as unknown
           const payload = parseGreekBackupPayload(parsed)
           if (!payload) {
-            setImportError("This file is not a valid v1 Greek study backup.")
+            setImportError("This file is not a valid Greek study backup (v1 or v2).")
             return
           }
           applyGreekBackupPayload(payload)
@@ -61,7 +61,7 @@ export function GreekHubBackupPanel({
   const handleReset = useCallback(() => {
     if (
       !window.confirm(
-        "Clear all Greek study data on this device? Progress, place, word memory, preferences, endings lab, and daily run state will be removed. This cannot be undone.",
+        "Clear all Greek study data on this device? Progress, place, word memory, preferences, endings lab, daily run, and verse-quest reading track will be removed. This cannot be undone.",
       )
     ) {
       return

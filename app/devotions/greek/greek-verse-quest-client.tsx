@@ -39,6 +39,18 @@ import {
   type GreekWordMemory,
 } from "@/lib/devotions-greek-word-memory"
 import { MORPH_PILOT_CHAPTERS } from "@/lib/bible/morph-pilot-menu"
+import {
+  assignmentForSeriesStep,
+  BIBLE_QUEST_TRACK_STORAGE_KEY,
+  BIBLE_READING_SERIES,
+  buildSeriesPlan,
+  describeSeriesPace,
+  loadQuestTrack,
+  type BibleSeriesId,
+  type QuestTrackState,
+  saveQuestTrack,
+  seriesPaceDeltaVerses,
+} from "@/lib/quest-bible-series"
 import { useGreekUiPreferences } from "@/lib/devotions-greek-ui-preferences"
 
 import { GreekCoachLab, type GreekQuizCoachContext } from "@/app/devotions/greek/greek-coach-lab"
@@ -67,13 +79,17 @@ import {
   vibrateQuest,
   wordFormKey,
   WORD_XP,
-  type DailyVerseAssignment,
   type DailyVerseRunState,
   type LevelCompleteState,
   type QuestQuizFeedback,
   type QuestWordChallenge,
   type QuestWordStage,
 } from "@/app/devotions/greek/greek-verse-quest-logic"
+
+function questReadingAnchorKey(track: QuestTrackState, todayKey: string): string {
+  if (track.mode === "calendar") return `calendar:${todayKey}`
+  return `series:${track.seriesId}:${track.startDateKey}`
+}
 
 export function GreekVerseQuestClient() {
   const {
@@ -124,10 +140,25 @@ export function GreekVerseQuestClient() {
   )
   const [xpBurst, setXpBurst] = useState<number | null>(null)
   const todayKey = useMemo(() => todayDateKey(), [])
-  const dailyVerseAssignment = useMemo(() => buildDailyVerseAssignment(todayKey), [todayKey])
+  const [questTrack, setQuestTrack] = useState<QuestTrackState>(() => loadQuestTrack())
+  const seriesPlan = useMemo(() => {
+    if (questTrack.mode !== "series") return []
+    return buildSeriesPlan(questTrack.seriesId)
+  }, [questTrack])
+  const activeQuestTarget = useMemo(() => {
+    if (questTrack.mode === "calendar") return buildDailyVerseAssignment(todayKey)
+    return assignmentForSeriesStep(seriesPlan, questTrack.nextStepIndex)
+  }, [questTrack, todayKey, seriesPlan])
 
   const levelKey = `${pilot.bookSlug}-${pilot.chapter}-${verse}`
-  const onDailyVerse = levelKey === dailyVerseAssignment.levelKey
+  const onDailyVerse = Boolean(activeQuestTarget && levelKey === activeQuestTarget.levelKey)
+  const seriesPaceDelta =
+    questTrack.mode === "series" && seriesPlan.length > 0
+      ? seriesPaceDeltaVerses(questTrack.nextStepIndex, questTrack.startDateKey, todayKey, seriesPlan.length)
+      : null
+  const seriesPaceLine = questTrack.mode === "series" ? describeSeriesPace(seriesPaceDelta) : ""
+  const seriesMeta =
+    questTrack.mode === "series" ? BIBLE_READING_SERIES.find((s) => s.id === questTrack.seriesId) : undefined
   const weakWordSet = useMemo(() => buildWeakWordSet(wordMemory, 2), [wordMemory])
   const levelProgressPct = questTargetIndexes.length
     ? Math.round((completedTargetIndexes.length / questTargetIndexes.length) * 100)
@@ -157,7 +188,7 @@ export function GreekVerseQuestClient() {
   const detailPointerStartX = useRef<number | null>(null)
   const detailContentRef = useRef<HTMLDivElement | null>(null)
   const [detailDragOffsetY, setDetailDragOffsetY] = useState(0)
-  const initializedDailySession = useRef(false)
+  const lastQuestAnchorRef = useRef<string>("")
 
   const refreshProgress = useCallback(() => {
     setProgress(getGreekProgressSnapshot(getGreekStudyProgress()))
@@ -182,6 +213,7 @@ export function GreekVerseQuestClient() {
     const onStorage = (e: StorageEvent) => {
       if (!e.key || e.key === "fx_devotions_greek_v1_progress") refreshProgress()
       if (!e.key || e.key === "fx_devotions_greek_v1_word_memory") refreshWordMemory()
+      if (!e.key || e.key === BIBLE_QUEST_TRACK_STORAGE_KEY) setQuestTrack(loadQuestTrack())
     }
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
@@ -201,28 +233,40 @@ export function GreekVerseQuestClient() {
 
   useEffect(() => {
     if (!hydrated) return
-    if (initializedDailySession.current) return
-    initializedDailySession.current = true
+    const anchor = questReadingAnchorKey(questTrack, todayKey)
+    if (lastQuestAnchorRef.current === anchor) return
+    if (!activeQuestTarget) {
+      lastQuestAnchorRef.current = anchor
+      return
+    }
+    lastQuestAnchorRef.current = anchor
     const stored = getDailyVerseRunState()
     const doneToday =
       stored?.date === todayKey &&
-      stored.levelKey === dailyVerseAssignment.levelKey &&
+      stored.levelKey === activeQuestTarget.levelKey &&
       stored.completed === true
     setDailyVerseRunDone(doneToday)
     saveDailyVerseRunState({
       date: todayKey,
-      levelKey: dailyVerseAssignment.levelKey,
+      levelKey: activeQuestTarget.levelKey,
       completed: doneToday,
     })
-    setPilotIdx(dailyVerseAssignment.pilotIdx)
-    setVerse(dailyVerseAssignment.verse)
-  }, [
-    hydrated,
-    todayKey,
-    dailyVerseAssignment.levelKey,
-    dailyVerseAssignment.pilotIdx,
-    dailyVerseAssignment.verse,
-  ])
+    setPilotIdx(activeQuestTarget.pilotIdx)
+    setVerse(activeQuestTarget.verse)
+  }, [hydrated, todayKey, questTrack, activeQuestTarget])
+
+  useEffect(() => {
+    if (!activeQuestTarget) {
+      setDailyVerseRunDone(false)
+      return
+    }
+    const stored = getDailyVerseRunState()
+    const done =
+      stored?.date === todayKey &&
+      stored.levelKey === activeQuestTarget.levelKey &&
+      stored.completed === true
+    setDailyVerseRunDone(done)
+  }, [todayKey, activeQuestTarget?.levelKey])
 
   useEffect(() => {
     if (loading) {
@@ -285,11 +329,39 @@ export function GreekVerseQuestClient() {
     closeMenu()
   }, [applyRolodexSelection, closeMenu])
 
-  const jumpToDailyVerse = useCallback(() => {
-    setPilotIdx(dailyVerseAssignment.pilotIdx)
-    setVerse(dailyVerseAssignment.verse)
+  const jumpToQuestTarget = useCallback(() => {
+    if (!activeQuestTarget) return
+    setPilotIdx(activeQuestTarget.pilotIdx)
+    setVerse(activeQuestTarget.verse)
     setMenuOpen(false)
-  }, [dailyVerseAssignment.pilotIdx, dailyVerseAssignment.verse])
+  }, [activeQuestTarget])
+
+  const applyQuestTrack = useCallback((next: QuestTrackState) => {
+    saveQuestTrack(next)
+    setQuestTrack(next)
+    lastQuestAnchorRef.current = ""
+  }, [])
+
+  const selectCalendarMode = useCallback(() => {
+    applyQuestTrack({ mode: "calendar" })
+  }, [applyQuestTrack])
+
+  const selectSeriesMode = useCallback(
+    (seriesId: BibleSeriesId) => {
+      if (questTrack.mode === "series" && questTrack.seriesId === seriesId) return
+      if (questTrack.mode === "series" && questTrack.seriesId !== seriesId && questTrack.nextStepIndex > 0) {
+        const ok = window.confirm("Change reading series? Progress on the current series will reset.")
+        if (!ok) return
+      }
+      applyQuestTrack({
+        mode: "series",
+        seriesId,
+        startDateKey: todayKey,
+        nextStepIndex: 0,
+      })
+    },
+    [applyQuestTrack, questTrack, todayKey],
+  )
 
   const finishVerseIfComplete = useCallback(
     (nextCompleted: number[], nextCorrect: number[]) => {
@@ -329,22 +401,47 @@ export function GreekVerseQuestClient() {
         encouragement,
       })
       setMicroWinBurst(correctWords > 0 ? "Level complete" : "Level complete - no XP")
-      if (!dailyVerseRunDone && levelKey === dailyVerseAssignment.levelKey) {
+      if (!dailyVerseRunDone && activeQuestTarget && levelKey === activeQuestTarget.levelKey) {
         const perfectDailyRun = correctWords === questTargetIndexes.length
         if (perfectDailyRun) {
           awardProgress({
             kind: "session",
-            key: `${DAILY_VERSE_RUN_KEY}-${todayKey}-${dailyVerseAssignment.levelKey}`,
+            key: `${DAILY_VERSE_RUN_KEY}-${todayKey}-${activeQuestTarget.levelKey}`,
             xp: PERFECT_LEVEL_BONUS_XP,
           })
         }
         setDailyVerseRunDone(true)
         saveDailyVerseRunState({
           date: todayKey,
-          levelKey: dailyVerseAssignment.levelKey,
+          levelKey: activeQuestTarget.levelKey,
           completed: true,
         })
         setMicroWinBurst(perfectDailyRun ? "Daily run complete + bonus XP" : "Daily run complete")
+      }
+      if (questTrack.mode === "series" && activeQuestTarget && levelKey === activeQuestTarget.levelKey) {
+        const plan = buildSeriesPlan(questTrack.seriesId)
+        const nextIdx = questTrack.nextStepIndex + 1
+        const nextTrack: QuestTrackState = {
+          mode: "series",
+          seriesId: questTrack.seriesId,
+          startDateKey: questTrack.startDateKey,
+          nextStepIndex: nextIdx,
+        }
+        saveQuestTrack(nextTrack)
+        setQuestTrack(nextTrack)
+        const nextAss = assignmentForSeriesStep(plan, nextIdx)
+        if (nextAss) {
+          saveDailyVerseRunState({
+            date: todayKey,
+            levelKey: nextAss.levelKey,
+            completed: false,
+          })
+          setDailyVerseRunDone(false)
+          setPilotIdx(nextAss.pilotIdx)
+          setVerse(nextAss.verse)
+        } else {
+          setMicroWinBurst("Series complete — pick another track or use calendar mode.")
+        }
       }
     },
     [
@@ -356,7 +453,10 @@ export function GreekVerseQuestClient() {
       awardProgress,
       dailyVerseRunDone,
       todayKey,
-      dailyVerseAssignment.levelKey,
+      activeQuestTarget,
+      questTrack,
+      setPilotIdx,
+      setVerse,
     ],
   )
 
@@ -971,12 +1071,78 @@ export function GreekVerseQuestClient() {
             Tip: tap highlighted target words (status under each) to open the quiz and move through the verse.
           </p>
 
+          <GreekMenuSection label="Reading plan">
+            <p className="font-mono text-[10px] leading-relaxed text-white/55">
+              Calendar follows the rotating daily verse. Series reads straight through the Greek pilot text—one verse per
+              day on the calendar, with catch-up by finishing the next verse whenever you return.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={selectCalendarMode}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                  questTrack.mode === "calendar"
+                    ? "border-emerald-300/50 bg-emerald-400/18 text-emerald-50"
+                    : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                Calendar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (questTrack.mode === "calendar") {
+                    selectSeriesMode("gospels")
+                  }
+                }}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                  questTrack.mode === "series"
+                    ? "border-cyan-300/50 bg-cyan-400/18 text-cyan-50"
+                    : "border-white/15 bg-white/[0.03] text-white/70 hover:bg-white/[0.08]"
+                }`}
+              >
+                Series
+              </button>
+            </div>
+            {questTrack.mode === "series" ? (
+              <label className="mt-3 block space-y-1">
+                <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/45">Track</span>
+                <select
+                  value={questTrack.seriesId}
+                  onChange={(e) => selectSeriesMode(e.target.value as BibleSeriesId)}
+                  className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-2 font-mono text-sm text-white focus:border-cyan-300/50 focus:outline-none"
+                  aria-label="Bible reading series"
+                >
+                  {BIBLE_READING_SERIES.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {questTrack.mode === "series" && seriesPaceLine ? (
+              <p className="mt-2 font-mono text-[10px] leading-relaxed text-cyan-100/75">{seriesPaceLine}</p>
+            ) : null}
+            {questTrack.mode === "series" && activeQuestTarget ? (
+              <p className="mt-1 font-mono text-[10px] text-white/50">
+                Next up: verse {questTrack.nextStepIndex + 1} of {seriesPlan.length} · Started {questTrack.startDateKey}
+              </p>
+            ) : null}
+            {questTrack.mode === "series" && !activeQuestTarget ? (
+              <p className="mt-2 font-mono text-[10px] text-amber-200/85">
+                You reached the end of this series. Pick another track or switch to calendar mode.
+              </p>
+            ) : null}
+          </GreekMenuSection>
+
           <GreekMenuSection label="Quest session">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={jumpToDailyVerse}
-                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                onClick={jumpToQuestTarget}
+                disabled={!activeQuestTarget}
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] disabled:cursor-not-allowed disabled:opacity-45 ${
                   onDailyVerse
                     ? dailyVerseRunDone
                       ? "border-emerald-300/45 bg-emerald-400/18 text-emerald-50"
@@ -986,9 +1152,11 @@ export function GreekVerseQuestClient() {
               >
                 {onDailyVerse
                   ? dailyVerseRunDone
-                    ? "Daily run complete"
-                    : "Today's run active"
-                  : `Daily verse ${dailyVerseAssignment.label}:${dailyVerseAssignment.verse}`}
+                    ? "Quest target done"
+                    : "Quest target active"
+                  : activeQuestTarget
+                    ? `Target verse ${activeQuestTarget.label}:${activeQuestTarget.verse}`
+                    : "Series complete"}
               </button>
               <button
                 type="button"
@@ -1117,9 +1285,11 @@ export function GreekVerseQuestClient() {
               <Target className="mr-1 inline size-3.5" />
               {onDailyVerse
                 ? dailyVerseRunDone
-                  ? "Daily run done"
-                  : "Daily run in progress"
-                : `Today ${dailyVerseAssignment.label}:${dailyVerseAssignment.verse}`}
+                  ? "Quest run done"
+                  : "Quest run active"
+                : activeQuestTarget
+                  ? `${questTrack.mode === "series" ? "Series" : "Today"} ${activeQuestTarget.label}:${activeQuestTarget.verse}`
+                  : "Series finished"}
             </span>
             <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1">
               Targets {completedTargetIndexes.length}/{questTargetIndexes.length}
@@ -1144,11 +1314,21 @@ export function GreekVerseQuestClient() {
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
               Verse {verse} of {pilot.maxVerse}
             </p>
+            {questTrack.mode === "series" && seriesPaceLine ? (
+              <p className="mx-auto max-w-md font-mono text-[10px] uppercase leading-relaxed tracking-[0.12em] text-cyan-200/65">
+                {seriesMeta?.short ?? "Series"} · {seriesPaceLine}
+              </p>
+            ) : null}
             {onDailyVerse ? (
               <p className="mx-auto max-w-md font-mono text-[10px] uppercase leading-relaxed tracking-[0.12em] text-emerald-200/70">
                 {dailyVerseRunDone
-                  ? "Daily run completed. Keep reviewing for mastery."
-                  : "Daily verse run active. Clear all targets to complete today."}
+                  ? "Quest target completed. Keep reviewing for mastery."
+                  : "Quest target active. Clear all targets to finish this verse."}
+              </p>
+            ) : null}
+            {!activeQuestTarget && questTrack.mode === "series" ? (
+              <p className="mx-auto max-w-md font-mono text-[10px] uppercase leading-relaxed tracking-[0.12em] text-amber-200/75">
+                Series complete. Open the menu to choose another track or return to calendar mode.
               </p>
             ) : null}
             {clusterGreekPreview ? (
