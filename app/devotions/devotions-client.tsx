@@ -20,8 +20,10 @@ import {
   Calendar,
   Bell,
   Languages,
+  Layers,
   Gamepad2,
   Library,
+  Search,
   Sparkles,
   TextCursor,
 } from "lucide-react"
@@ -1251,6 +1253,14 @@ export function DevotionsClient() {
                                 Greek study home
                               </Link>
                               <Link
+                                href="/devotions/greek/lesson"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[48px] rounded-xl font-sans text-[15px] font-light text-white/95 bg-violet-500/12 border border-violet-400/32 hover:bg-violet-500/18 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Layers className="w-5 h-5 text-violet-300/90 shrink-0" aria-hidden />
+                                Mixed lesson · one-tap drills
+                              </Link>
+                              <Link
                                 href="/devotions/greek/endings"
                                 onClick={() => setOpenLandingTile(null)}
                                 className="w-full min-h-[44px] rounded-xl font-sans text-sm font-light text-white/90 bg-emerald-500/6 border border-emerald-400/22 hover:bg-emerald-500/12 transition-colors flex items-center justify-center gap-2"
@@ -1273,6 +1283,14 @@ export function DevotionsClient() {
                               >
                                 <Gamepad2 className="w-5 h-5 text-emerald-400/75 shrink-0" aria-hidden />
                                 Verse Quest
+                              </Link>
+                              <Link
+                                href="/devotions/greek/english-search"
+                                onClick={() => setOpenLandingTile(null)}
+                                className="w-full min-h-[44px] rounded-xl font-sans text-sm font-light text-white/90 bg-violet-500/6 border border-violet-400/24 hover:bg-violet-500/12 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Search className="w-5 h-5 text-violet-300/80 shrink-0" aria-hidden />
+                                English → Greek word search
                               </Link>
                               <Link
                                 href="/devotions/greek/words"
@@ -2169,6 +2187,14 @@ export function DevotionsClient() {
               Greek study home
             </Link>
             <Link
+              href="/devotions/greek/lesson"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-violet-200/90 hover:text-violet-100 py-3 px-4 rounded-lg border border-violet-500/28 hover:bg-violet-500/12 transition-colors text-left"
+            >
+              <Layers className="w-4 h-4 shrink-0" />
+              Greek mixed lesson
+            </Link>
+            <Link
               href="/devotions/greek/endings"
               onClick={() => setMoreOpen(false)}
               className="flex items-center gap-2 font-mono text-xs tracking-wider text-emerald-200/90 hover:text-emerald-100 py-3 px-4 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/10 transition-colors text-left"
@@ -2191,6 +2217,14 @@ export function DevotionsClient() {
             >
               <Gamepad2 className="w-4 h-4 shrink-0" />
               Verse Quest · quick quiz loop
+            </Link>
+            <Link
+              href="/devotions/greek/english-search"
+              onClick={() => setMoreOpen(false)}
+              className="flex items-center gap-2 font-mono text-xs tracking-wider text-violet-200/90 hover:text-violet-100 py-3 px-4 rounded-lg border border-violet-500/25 hover:bg-violet-500/12 transition-colors text-left"
+            >
+              <Search className="w-4 h-4 shrink-0" />
+              Greek word search (English)
             </Link>
             <Link
               href="/devotions/greek/words"
