@@ -4,6 +4,7 @@ import {
   buildLessonDrafts,
   DEFAULT_LESSON_CARD_COUNT,
   lessonSessionKey,
+  lessonVocabMemoryKey,
   LESSON_ENDINGS_COUNT,
   LESSON_GLOSS_EN_COUNT,
   LESSON_GLOSS_LEMMA_EN_COUNT,
@@ -55,6 +56,7 @@ describe("Greek lesson session drafts", () => {
         expect(d.correctIndex).toBeLessThan(4)
         expect(d.hint.trim().length).toBeGreaterThan(0)
         expect(d.prompt).toContain("“")
+        expect(d.wordMemoryKey).toBe(lessonVocabMemoryKey(d.options[d.correctIndex]!))
       } else if (d.kind === "gloss_lemma_to_en") {
         expect(d.options).toHaveLength(4)
         expect(new Set(d.options).size).toBe(4)
@@ -62,6 +64,7 @@ describe("Greek lesson session drafts", () => {
         expect(d.correctIndex).toBeLessThan(4)
         expect(d.hint.trim().length).toBeGreaterThan(0)
         expect(d.options[d.correctIndex]).toBeTruthy()
+        expect(d.wordMemoryKey).toBe(lessonVocabMemoryKey(d.hint))
       } else {
         expect(d.passageRef).toMatch(/:\d+/)
         expect(d.xp).toBeGreaterThan(0)

@@ -18,7 +18,10 @@ import { useGreekUiPreferences } from "@/lib/devotions-greek-ui-preferences"
 import {
   getGreekWordMemory,
   listGreekWordMemoryRows,
+  recordGreekWordMemoryTap,
 } from "@/lib/devotions-greek-word-memory"
+import { getReaderUrlFromReference } from "@/lib/bible/reference"
+import { FX_GREEK_GRAMMAR_TRANSLATION_KEY } from "@/lib/bible/reader-translation-keys"
 import { normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
 import {
   playQuestFeedbackSound,
@@ -154,6 +157,9 @@ export function GreekLessonLabClient() {
         const mult = wrongCount === 0 ? 1 : 0.5
         vibrateQuest("correct", { hapticsEnabled })
         playQuestFeedbackSound("correct", { soundEnabled: soundEffectsEnabled })
+        if (card.wordMemoryKey) {
+          recordGreekWordMemoryTap(card.wordMemoryKey, true)
+        }
         awardCard(card, mult)
         bumpResult(card.kind, true)
       } else {
@@ -165,6 +171,9 @@ export function GreekLessonLabClient() {
         } else {
           setSelected(optionIndex)
           setRevealed(true)
+          if (card.wordMemoryKey) {
+            recordGreekWordMemoryTap(card.wordMemoryKey, false)
+          }
           bumpResult(card.kind, false)
         }
       }
@@ -247,8 +256,9 @@ export function GreekLessonLabClient() {
             </div>
           </GreekMenuSection>
           <p className="px-1 text-xs leading-relaxed text-white/50">
-            Each run mixes endings, vocabulary both ways, and real verse morphology. Two tries on vocabulary and grammar
-            cards: full XP on the first correct pick, half XP if you need a second try.
+            Each run mixes endings, vocabulary both ways, and pilot-verse morphology. Vocabulary and verse-grammar
+            results update your word bank (weak words surface again in lessons and Quest). Two tries: full XP, then half,
+            then none.
           </p>
         </div>
       </GreekStudyMenuShell>
@@ -381,6 +391,24 @@ export function GreekLessonLabClient() {
               {revealed ? (
                 <div className="space-y-3">
                   <p className="text-sm leading-relaxed text-white/60">{card.explainer}</p>
+                  {card.kind === "morph" && card.passageRef ? (
+                    <Link
+                      href={
+                        getReaderUrlFromReference(card.passageRef, FX_GREEK_GRAMMAR_TRANSLATION_KEY) ?? "/bible"
+                      }
+                      className="inline-flex w-full items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/12 py-2.5 text-sm text-cyan-100/95 hover:bg-cyan-500/18"
+                    >
+                      Read this verse in Grammar Reader
+                    </Link>
+                  ) : null}
+                  {card.kind === "endings" && card.endingsQuestId ? (
+                    <Link
+                      href="/devotions/greek/endings"
+                      className="inline-flex w-full items-center justify-center rounded-xl border border-amber-400/30 bg-amber-500/10 py-2.5 text-sm text-amber-100/90 hover:bg-amber-500/16"
+                    >
+                      Review endings tables
+                    </Link>
+                  ) : null}
                   {wrongCount === 1 && selected === card.correctIndex ? (
                     <p className="text-xs text-white/45">Second-try correct: half XP for this card.</p>
                   ) : null}

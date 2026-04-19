@@ -2,7 +2,11 @@
  * Duolingo-style Greek lesson: deterministic draft builder + async morph hydration.
  */
 
-import { buildChallengeForTarget, pickQuestTargetsInPhrase } from "@/app/devotions/greek/greek-verse-quest-logic"
+import {
+  buildChallengeForTarget,
+  pickQuestTargetsInPhrase,
+  wordFormKey,
+} from "@/app/devotions/greek/greek-verse-quest-logic"
 import type { QuestWordChallenge } from "@/app/devotions/greek/greek-verse-quest-logic"
 import { GREEK_LEMMA_ENGLISH_QUIZ } from "@/lib/bible/greek-lemma-english-gloss.generated"
 import { englishGlossForLemma, normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
@@ -90,6 +94,8 @@ export type LessonDraft =
       correctIndex: number
       xp: number
       explainer: string
+      /** Ties lesson vocab to word bank / weak-word loop (`lemma|lesson-vocab`). */
+      wordMemoryKey: string
     }
   | {
       kind: "gloss_lemma_to_en"
@@ -100,6 +106,7 @@ export type LessonDraft =
       correctIndex: number
       xp: number
       explainer: string
+      wordMemoryKey: string
     }
   | {
       kind: "morph"
@@ -125,6 +132,14 @@ export type LessonCard = {
   passageRef?: string
   /** Morph quiz dimension (lemma, case, …) for richer feedback */
   morphQuizKind?: QuestWordChallenge["kind"]
+  /** When set, lesson outcome updates spaced-repetition stats (same store as Verse Quest). */
+  wordMemoryKey?: string
+}
+
+const LESSON_VOCAB_MEMORY_PARSE = "lesson-vocab"
+
+export function lessonVocabMemoryKey(lemma: string): string {
+  return `${normalizeGreekLemma(lemma)}|${LESSON_VOCAB_MEMORY_PARSE}`
 }
 
 function weakLemmaSet(weakLemmas: string[] | undefined): Set<string> {
@@ -181,6 +196,7 @@ function glossEnToLemmaDraft(
       correctIndex: 0,
       xp: 8,
       explainer: "λόγος → word",
+      wordMemoryKey: lessonVocabMemoryKey("λόγος"),
     }
   }
   const pickIdx = pickLemmaIndexWithWeakBias(rng, lemmas, weak)
@@ -202,6 +218,7 @@ function glossEnToLemmaDraft(
     correctIndex,
     xp: 8,
     explainer: `${correctLemma} commonly glosses as “${gloss}”.`,
+    wordMemoryKey: lessonVocabMemoryKey(correctLemma),
   }
 }
 
@@ -220,6 +237,7 @@ function glossLemmaToEnDraft(
       correctIndex: 0,
       xp: 8,
       explainer: "λόγος → word",
+      wordMemoryKey: lessonVocabMemoryKey("λόγος"),
     }
   }
   const pickIdx = pickLemmaIndexWithWeakBias(rng, lemmas, weak)
@@ -263,6 +281,7 @@ function glossLemmaToEnDraft(
     correctIndex,
     xp: 8,
     explainer: `“${correctLemma}” is often glossed “${correctGloss}”.`,
+    wordMemoryKey: lessonVocabMemoryKey(correctLemma),
   }
 }
 
@@ -359,6 +378,7 @@ async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, 
       correctIndex: g.correctIndex,
       xp: draft.xp,
       explainer: `${g.explainer} (extra vocab card — no pilot tokens for the first verse tried.)`,
+      wordMemoryKey: g.wordMemoryKey,
     }
   }
 
@@ -376,11 +396,13 @@ async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, 
       correctIndex: g.correctIndex,
       xp: draft.xp,
       explainer: g.explainer,
+      wordMemoryKey: g.wordMemoryKey,
     }
   }
 
   const surface = tokens[ti]?.word ?? ""
   const token = tokens[ti]!
+  const memKey = token.lemma && token.parse ? wordFormKey(token) : undefined
   return {
     index: 0,
     kind: "morph",
@@ -393,6 +415,7 @@ async function morphDraftToCard(draft: Extract<LessonDraft, { kind: "morph" }>, 
     explainer: morphExplainer(token, ch.kind, ref),
     passageRef: ref,
     morphQuizKind: ch.kind,
+    wordMemoryKey: memKey,
   }
 }
 
@@ -424,6 +447,7 @@ function draftToStaticCard(
       correctIndex: draft.correctIndex,
       xp: draft.xp,
       explainer: draft.explainer,
+      wordMemoryKey: draft.wordMemoryKey,
     }
   }
   return {
@@ -436,6 +460,7 @@ function draftToStaticCard(
     correctIndex: draft.correctIndex,
     xp: draft.xp,
     explainer: draft.explainer,
+    wordMemoryKey: draft.wordMemoryKey,
   }
 }
 
