@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, CheckCircle2, Sparkles, XCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react"
 
+import { PracticeLayout } from "@/app/devotions/greek/greek-practice-layout"
 import { GreekSectionQuickNav } from "@/app/devotions/greek/greek-section-quick-nav"
+import { ENDINGS_QUESTS, type EndingsQuest } from "@/lib/greek-endings-quest-data"
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 
 type EndingsGroup = "verb" | "noun" | "article"
@@ -16,16 +18,6 @@ type EndingsTable = {
   subtitle: string
   columns: string[]
   rows: string[][]
-}
-
-type EndingsQuest = {
-  id: string
-  group: EndingsGroup
-  prompt: string
-  answer: string
-  distractors: string[]
-  explainer: string
-  xp: number
 }
 
 type EndingsLabState = {
@@ -106,72 +98,6 @@ export const ENDINGS_TABLES: EndingsTable[] = [
       ["Dat pl", "τοῖς", "ταῖς", "τοῖς"],
       ["Acc pl", "τούς", "τάς", "τά"],
     ],
-  },
-]
-
-export const ENDINGS_QUESTS: EndingsQuest[] = [
-  {
-    id: "verb-1",
-    group: "verb",
-    prompt: "Which ending is 2nd person singular present active?",
-    answer: "-εις",
-    distractors: ["-ω", "-ομεν", "-ουσι(ν)"],
-    explainer: "Present active 2nd singular is -εις.",
-    xp: 7,
-  },
-  {
-    id: "verb-2",
-    group: "verb",
-    prompt: "You see a verb ending in -σατε. Which form is most likely?",
-    answer: "2nd plural aorist active",
-    distractors: ["1st singular aorist active", "3rd singular present active", "1st plural present active"],
-    explainer: "-σατε is the common 2nd plural aorist active ending.",
-    xp: 8,
-  },
-  {
-    id: "verb-3",
-    group: "verb",
-    prompt: "Pick the normal 3rd plural present active ending.",
-    answer: "-ουσι(ν)",
-    distractors: ["-ει", "-ετε", "-σαν"],
-    explainer: "3rd plural present active is typically -ουσι(ν).",
-    xp: 7,
-  },
-  {
-    id: "noun-1",
-    group: "noun",
-    prompt: "For 2nd declension masculine, what is nominative singular?",
-    answer: "-ος",
-    distractors: ["-ου", "-οι", "-ον"],
-    explainer: "2nd declension masculine nominative singular is -ος.",
-    xp: 7,
-  },
-  {
-    id: "noun-2",
-    group: "noun",
-    prompt: "A neuter plural nominative/accusative ending is usually:",
-    answer: "-α",
-    distractors: ["-οι", "-ους", "-ων"],
-    explainer: "Neuter plural nominative and accusative commonly use -α.",
-    xp: 8,
-  },
-  {
-    id: "article-1",
-    group: "article",
-    prompt: "Which article form is feminine genitive singular?",
-    answer: "τῆς",
-    distractors: ["τῇ", "τῶν", "τήν"],
-    explainer: "Feminine genitive singular article is τῆς.",
-    xp: 7,
-  },
-  {
-    id: "article-2",
-    group: "article",
-    prompt: "Which is neuter nominative/accusative plural article?",
-    answer: "τά",
-    distractors: ["οἱ", "αἱ", "τούς"],
-    explainer: "Neuter nominative/accusative plural article is τά.",
-    xp: 7,
   },
 ]
 
@@ -410,29 +336,20 @@ export function GreekEndingsLabClient() {
     setAwardedXp(xp > 0 ? xp : null)
   }, [activeQuest, answeredSet, labState, saveLabState, selectedOption])
 
-  return (
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,#123024,transparent_40%),linear-gradient(to_bottom,#04070b,#020407,#010203)] text-white">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-black/35 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link
-            href="/devotions/greek"
-            className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
-          >
-            <ArrowLeft className="size-3.5" />
-            Greek
-          </Link>
-          <div className="text-center px-2">
-            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-emerald-300/70">Before you study</p>
-            <p className="text-sm text-white/85">Greek Endings Lab</p>
-          </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-200/90">
-            <Sparkles className="size-3.5" />
-            Memorize
-          </div>
-        </div>
-      </header>
+  const progressSlot = (
+    <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 text-xs text-white/78 sm:text-sm">
+      <span>
+        Drills {completedFilteredCount}/{Math.max(filteredQuests.length, 1)} · Streak {labState.correctStreak}
+      </span>
+      <Link href="/devotions/greek/lesson" className="text-amber-200/95 hover:text-amber-100">
+        Mixed lesson →
+      </Link>
+    </div>
+  )
 
-      <main className="mx-auto w-full max-w-6xl px-4 pb-14 pt-6 sm:px-6 sm:pt-8">
+  return (
+    <PracticeLayout title="Endings lab" accent="amber" progressSlot={progressSlot}>
+      <main className="mx-auto w-full max-w-6xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pt-8">
         <section className="rounded-2xl border border-white/10 bg-black/25 p-4 sm:p-5">
           <p className="text-sm text-white/85">
             <strong className="font-medium text-white/95">Path:</strong> Endings (here) → Grammar Reader (explore verses)
@@ -509,14 +426,9 @@ export function GreekEndingsLabClient() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.07] p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200/85">Ending quests only</p>
-              <p className="text-sm text-white/82">Quick recall prompts just for endings patterns.</p>
-            </div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/70">
-              Solved {completedFilteredCount}/{filteredQuests.length} · Streak {labState.correctStreak}
-            </p>
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200/85">Ending quests only</p>
+            <p className="mt-1 text-sm text-white/82">Quick recall prompts just for endings patterns.</p>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -610,6 +522,6 @@ export function GreekEndingsLabClient() {
           </p>
         </section>
       </main>
-    </div>
+    </PracticeLayout>
   )
 }

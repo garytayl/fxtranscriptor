@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Languages,
   Library,
+  Layers,
   MapPin,
   MessageCircle,
   Search,
@@ -50,6 +51,14 @@ const TILES: {
     icon: GraduationCap,
     className:
       "border-emerald-400/35 bg-emerald-500/10 hover:bg-emerald-500/18 text-emerald-100",
+  },
+  {
+    href: "/devotions/greek/lesson",
+    title: "Mixed lesson",
+    blurb: "One-tap flow: endings, morphology, and gloss drills in a single run.",
+    icon: Layers,
+    className:
+      "border-violet-400/35 bg-violet-500/10 hover:bg-violet-500/18 text-violet-100",
   },
   {
     href: "/devotions/greek/reader",

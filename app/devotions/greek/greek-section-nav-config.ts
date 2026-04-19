@@ -8,6 +8,11 @@ export type GreekSectionNavItem = {
 
 export const GREEK_SECTION_NAV: GreekSectionNavItem[] = [
   { href: "/devotions/greek", label: "Home" },
+  {
+    href: "/devotions/greek/lesson",
+    label: "Lesson",
+    title: "Mixed practice: endings, morphology, and English → Greek gloss",
+  },
   { href: "/devotions/greek/endings", label: "Endings" },
   { href: "/devotions/greek/reader", label: "Reader" },
   { href: "/devotions/greek/quest", label: "Quest" },

@@ -29,12 +29,20 @@ export default function GreekStudyCoachPage() {
             </span>
             <span className="text-xs text-white/50">Your progress · your questions</span>
           </div>
-          <Link
-            href="/devotions/greek/quest"
-            className="shrink-0 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-200/90 hover:bg-emerald-500/18"
-          >
-            Quest
-          </Link>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            <Link
+              href="/devotions/greek/lesson"
+              className="rounded-full border border-violet-400/35 bg-violet-500/12 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-violet-100 hover:bg-violet-500/20 sm:px-3"
+            >
+              Lesson
+            </Link>
+            <Link
+              href="/devotions/greek/quest"
+              className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-200/90 hover:bg-emerald-500/18 sm:px-3"
+            >
+              Quest
+            </Link>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">

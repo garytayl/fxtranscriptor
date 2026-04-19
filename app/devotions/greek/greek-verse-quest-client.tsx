@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent } from "react"
 import Link from "next/link"
 import {
-  ArrowLeft,
   BookOpen,
   CheckCircle2,
   ChevronLeft,
@@ -13,7 +12,6 @@ import {
   Flame,
   GraduationCap,
   Library,
-  Menu,
   Search,
   Target,
   X,
@@ -57,6 +55,7 @@ import { useGreekUiPreferences } from "@/lib/devotions-greek-ui-preferences"
 import { GreekCoachLab, type GreekQuizCoachContext } from "@/app/devotions/greek/greek-coach-lab"
 import { GreekProgressStrip } from "@/app/devotions/greek/greek-progress-strip"
 import { GreekMenuSection, GreekStudyMenuShell } from "@/app/devotions/greek/greek-study-menu-shell"
+import { PracticeLayout } from "@/app/devotions/greek/greek-practice-layout"
 import { GreekWordBankOverlay } from "@/app/devotions/greek/greek-word-bank-overlay"
 import {
   DETAIL_SWIPE_CLOSE_THRESHOLD,
@@ -838,58 +837,47 @@ export function GreekVerseQuestClient() {
   const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
 
   return (
-    <div className="fixed inset-0 z-[100] flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,#172033,transparent_44%),linear-gradient(to_bottom,#05070f,#030407,#010103)] text-white">
-      <header className="relative z-[72] shrink-0 border-b border-white/10 bg-black/30 backdrop-blur-xl">
-        <div className="flex items-center justify-between px-3 sm:px-5 pt-[max(0.55rem,env(safe-area-inset-top))] pb-2">
-          <Link
-            href="/devotions/greek"
-            className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
-          >
-            <ArrowLeft className="size-3.5" />
-            Greek
-          </Link>
-          <div className="text-center min-w-0 px-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300/70">Verse Quest</p>
-            <p className="text-sm text-white/80 truncate">{pilot.label}</p>
+    <PracticeLayout
+      title="Verse Quest"
+      accent="emerald"
+      onMenu={() => setMenuOpen(true)}
+      menuLabel="Study menu"
+      progressSlot={
+        <div className="mx-auto max-w-5xl space-y-2.5">
+          <p className="truncate px-2 text-center text-xs text-white/65">{pilot.label}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link
+              href="/devotions/greek/lesson"
+              className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1.5 text-[11px] text-violet-100 hover:bg-violet-500/18"
+            >
+              Lesson
+            </Link>
+            <Link
+              href="/devotions/greek/endings"
+              className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 text-[11px] text-cyan-100 hover:bg-cyan-500/18"
+            >
+              <GraduationCap className="size-3.5" />
+              Endings
+            </Link>
+            <Link
+              href="/devotions/greek/reader"
+              className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-100 hover:bg-amber-500/18"
+            >
+              <BookOpen className="size-3.5" />
+              Reader
+            </Link>
+            <Link
+              href="/devotions/greek/english-search"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-[11px] text-white/75 hover:bg-white/[0.1]"
+              title="Find Greek lemmas by English"
+            >
+              <Search className="size-3.5" aria-hidden />
+              Search
+            </Link>
           </div>
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-white/15 bg-white/[0.03] px-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:bg-white/[0.08]"
-            aria-label="Open study menu"
-          >
-            <Menu className="size-3.5" />
-            Study
-          </button>
-        </div>
-        <div className="flex flex-wrap justify-center gap-2 px-3 pb-2">
-          <Link
-            href="/devotions/greek/endings"
-            className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/90 hover:bg-cyan-500/20"
-          >
-            <GraduationCap className="size-3.5" />
-            Endings Lab
-          </Link>
-          <Link
-            href="/devotions/greek/reader"
-            className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-200/90 hover:bg-amber-500/20"
-          >
-            <BookOpen className="size-3.5" />
-            Grammar Reader
-          </Link>
-          <Link
-            href="/devotions/greek/english-search"
-            className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-violet-200/90 hover:bg-violet-500/20"
-            title="Find Greek lemmas by English"
-          >
-            <Search className="size-3.5" aria-hidden />
-            Word search
-          </Link>
-        </div>
-        <div className="px-4 pb-2.5 sm:px-8 md:px-14">
-          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 gap-3 px-2 sm:gap-4">
             <div className="min-w-0 space-y-1">
-              <p className="font-mono text-[8px] uppercase tracking-[0.14em] text-white/45">Today&apos;s XP</p>
+              <p className="text-[10px] text-white/45">Today&apos;s XP</p>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
@@ -900,7 +888,7 @@ export function GreekVerseQuestClient() {
               </div>
             </div>
             <div className="min-w-0 space-y-1">
-              <p className="font-mono text-[8px] uppercase tracking-[0.14em] text-white/45">Verse targets</p>
+              <p className="text-[10px] text-white/45">Verse targets</p>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-300/80 via-emerald-300/85 to-emerald-200/90 transition-[width] duration-250"
@@ -910,8 +898,8 @@ export function GreekVerseQuestClient() {
             </div>
           </div>
         </div>
-      </header>
-
+      }
+    >
       {/* In-flow feedback strip — avoids overlapping header, verse line, and toasts colliding */}
       <AnimatePresence mode="wait">
         {levelComplete ? (
@@ -1922,6 +1910,6 @@ export function GreekVerseQuestClient() {
           <ExternalLink className="size-3.5 opacity-80" />
         </Link>
       </footer>
-    </div>
+    </PracticeLayout>
   )
 }

@@ -6,11 +6,12 @@ import type { ReactNode, TouchEvent } from "react"
 
 import { cn } from "@/lib/utils"
 
-type Accent = "emerald" | "amber"
+type Accent = "emerald" | "amber" | "violet"
 
 const accentTitle: Record<Accent, string> = {
   emerald: "text-emerald-200/90",
   amber: "text-amber-200/90",
+  violet: "text-violet-200/90",
 }
 
 type GreekStudyMenuShellProps = {

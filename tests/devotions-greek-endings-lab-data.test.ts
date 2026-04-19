@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  ENDINGS_QUESTS,
-  ENDINGS_TABLES,
-  buildEndingsQuestChoices,
-} from "@/app/devotions/greek/greek-endings-lab-client"
+import { ENDINGS_TABLES, buildEndingsQuestChoices } from "@/app/devotions/greek/greek-endings-lab-client"
+import { ENDINGS_QUESTS } from "@/lib/greek-endings-quest-data"
 
 describe("Greek Endings Lab data", () => {
   it("ships all core endings sections with rows", () => {

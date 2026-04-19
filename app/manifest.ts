@@ -29,6 +29,13 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
       },
       {
+        name: "Greek mixed lesson",
+        short_name: "Lesson",
+        description: "Endings, morphology, and gloss in one practice run",
+        url: "/devotions/greek/lesson",
+        icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
+      },
+      {
         name: "Verse Quest",
         short_name: "Quest",
         description: "Guided Greek drills and XP",
