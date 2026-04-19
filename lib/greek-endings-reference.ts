@@ -146,8 +146,10 @@ export const GRAMMAR_GLOSSARY: GrammarGlossaryItem[] = [
   },
   {
     term: "Dative",
-    plainMeaning: "Often indirect object, location, or means - 'to/for/in/by'.",
-    quickExample: "διδάσκει τοῖς μαθηταῖς -> 'he teaches the disciples'.",
+    plainMeaning:
+      "Most often the indirect object: who receives the action on the side—whom you speak to, give to, teach, and so on. Greek still uses dative when English drops the word 'to.' Also used for place (where) and means (with what).",
+    quickExample:
+      "λέγει τῷ Πέτρῳ -> 'he says to Peter': Peter is dative; English keeps 'to.' διδάσκει τοῖς μαθηταῖς -> 'he teaches the disciples': same idea—they receive the teaching—even though English usually does not say 'to the disciples.'",
   },
   {
     term: "Accusative",
