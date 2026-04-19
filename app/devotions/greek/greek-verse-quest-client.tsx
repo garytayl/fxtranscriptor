@@ -1096,13 +1096,7 @@ export function GreekVerseQuestClient() {
 
       <GreekWordBankOverlay open={wordBankOpen} onClose={() => setWordBankOpen(false)} accent="emerald" />
 
-      <div
-        className={
-          selectedToken && questStage === "revealed"
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-            : "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_min(400px,38vw)] lg:overflow-hidden"
-        }
-      >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_min(400px,38vw)] lg:overflow-hidden">
       <main
         className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 pb-32 pt-4 sm:px-8 md:px-14 lg:min-h-0 lg:pb-10"
         onTouchStart={onVerseTouchStart}
@@ -1287,48 +1281,169 @@ export function GreekVerseQuestClient() {
         </div>
       </main>
 
-      {!(selectedToken && questStage === "revealed") ? (
       <aside className="hidden min-h-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/25 px-3 py-4 lg:flex lg:max-h-full">
-        {selectedToken && questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
-          <div className="rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
-            <p className="mt-1 text-sm text-white/85">{questChallenge.prompt}</p>
-            <div className="mt-2 grid grid-cols-1 gap-2">
-              {questChallenge.options.map((option, idx) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => revealQuestWord(idx === questChallenge.correctOptionIndex, { chosenIndex: idx })}
-                  className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white/88 hover:bg-black/45 active:scale-[0.99]"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => revealQuestWord(false, { skipped: true })}
-              className="mt-2 rounded-lg border border-white/20 bg-white/[0.03] px-3 py-1.5 text-xs text-white/72 hover:bg-white/[0.08]"
-            >
-              Reveal without guessing
-            </button>
-          </div>
-        ) : null}
-        {selectedToken && questStage === "challenge" ? (
-          <MorphologySidebarPanel
-            token={selectedToken}
-            verseNumber={verse}
-            wordIndex={selectedWordIndex ?? 0}
-          />
-        ) : null}
         {!selectedToken ? (
           <p className="text-xs leading-relaxed text-white/55">
-            Select a target word in the verse. On wide screens, quizzes and coaching stay in this column when
-            possible.
+            Select a target word in the verse. On desktop, quizzes, results, morphology, and coach stay in this
+            column—no bottom sheet.
           </p>
-        ) : null}
+        ) : (
+          <>
+            <div className="sticky top-0 z-[1] -mx-3 -mt-4 mb-1 flex items-center justify-between gap-2 border-b border-white/10 bg-[#060b14]/90 px-3 py-2 backdrop-blur-md">
+              <div className="min-w-0">
+                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/45">Verse Quest · Word</p>
+                <p className="truncate text-sm text-white/90" lang="el">
+                  {selectedToken.word}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDetails}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/70 hover:bg-white/[0.12]"
+                aria-label="Close word panel"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {questStage === "challenge" && questChallenge?.targetIndex === selectedWordIndex ? (
+              <div className="rounded-xl border border-cyan-300/30 bg-cyan-400/[0.08] p-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85">Quick challenge</p>
+                <p className="mt-1 text-sm text-white/85">{questChallenge.prompt}</p>
+                <div className="mt-2 grid grid-cols-1 gap-2">
+                  {questChallenge.options.map((option, idx) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => revealQuestWord(idx === questChallenge.correctOptionIndex, { chosenIndex: idx })}
+                      className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white/88 hover:bg-black/45 active:scale-[0.99]"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => revealQuestWord(false, { skipped: true })}
+                  className="mt-2 rounded-lg border border-white/20 bg-white/[0.03] px-3 py-1.5 text-xs text-white/72 hover:bg-white/[0.08]"
+                >
+                  Reveal without guessing
+                </button>
+              </div>
+            ) : null}
+
+            {questStage === "challenge" ? (
+              <MorphologySidebarPanel
+                token={selectedToken}
+                verseNumber={verse}
+                wordIndex={selectedWordIndex ?? 0}
+              />
+            ) : null}
+
+            {questStage === "revealed" && questQuizFeedback ? (
+              <div className="space-y-3">
+                {questQuizFeedback.outcome === "correct" ? (
+                  <div className="rounded-xl border border-emerald-400/45 bg-gradient-to-br from-emerald-500/25 to-emerald-600/10 p-3">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-emerald-200" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-100/95">Correct</p>
+                        <p className="mt-1 text-base font-medium text-white">Nice work.</p>
+                        <p className="mt-1 text-xs text-white/75">
+                          +{questQuizFeedback.xpGained} XP · {questQuizFeedback.prompt}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : questQuizFeedback.outcome === "incorrect" ? (
+                  <div className="rounded-xl border border-rose-400/40 bg-gradient-to-br from-rose-500/20 to-rose-950/30 p-3">
+                    <div className="flex items-start gap-2.5">
+                      <XCircle className="mt-0.5 size-6 shrink-0 text-rose-200" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-rose-100/90">Not quite</p>
+                        <p className="mt-1 text-sm text-white/92">
+                          Correct answer:{" "}
+                          <span className="font-medium text-rose-50">{questQuizFeedback.correctAnswer}</span>
+                        </p>
+                        {questQuizFeedback.chosenAnswer &&
+                        questQuizFeedback.chosenAnswer !== questQuizFeedback.correctAnswer ? (
+                          <p className="mt-1 text-xs text-white/65">
+                            Your choice: <span className="text-white/85">{questQuizFeedback.chosenAnswer}</span>
+                          </p>
+                        ) : null}
+                        <p className="mt-1.5 text-[11px] text-white/55">{questQuizFeedback.prompt}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-sky-400/35 bg-gradient-to-br from-sky-500/15 to-slate-900/40 p-3">
+                    <div className="flex items-start gap-2.5">
+                      <Eye className="mt-0.5 size-6 shrink-0 text-sky-200" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-sky-100/85">Revealed</p>
+                        <p className="mt-1 text-sm text-white/90">
+                          Answer: <span className="font-medium text-sky-50">{questQuizFeedback.correctAnswer}</span>
+                        </p>
+                        <p className="mt-1.5 text-[11px] text-white/55">{questQuizFeedback.prompt}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {questStage === "revealed" ? (
+              <div className="rounded-xl border border-emerald-300/30 bg-emerald-400/[0.08] p-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-100/85">Word memory</p>
+                <p className="mt-1 text-sm text-white/92">
+                  Familiarity: <span className="text-emerald-100">{selectedFamiliarityLabel}</span>
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-white/75">
+                  {selectedTokenLearningClues?.quickReason ??
+                    `Lemma ${selectedToken.lemma} · parse ${selectedToken.parse}`}
+                </p>
+              </div>
+            ) : null}
+
+            {questStage === "revealed" ? (
+              <div className="flex flex-col gap-4">
+                <div className={greekCoachQuizContext ? "order-1" : "order-2"}>
+                  <GreekCoachLab
+                    key={`${levelKey}-aside-lab-${selectedWordIndex}`}
+                    levelKey={levelKey}
+                    passageRef={passageRef}
+                    english={english}
+                    verseGreekLine={verseGreekLine}
+                    selectedToken={selectedToken}
+                    wordIndex={selectedWordIndex ?? 0}
+                    learningClues={selectedTokenLearningClues}
+                    awardProgress={awardProgress}
+                    quizContext={greekCoachQuizContext}
+                    className="mt-0"
+                  />
+                </div>
+                <div className={greekCoachQuizContext ? "order-2" : "order-1"}>
+                  <MorphologySidebarPanel
+                    token={selectedToken}
+                    verseNumber={verse}
+                    wordIndex={selectedWordIndex ?? 0}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {questStage === "revealed" ? (
+              <button
+                type="button"
+                onClick={continueQuest}
+                className="w-full rounded-lg border border-emerald-300/40 bg-emerald-400/20 px-3 py-2.5 text-xs text-emerald-50 hover:bg-emerald-400/30"
+              >
+                Continue quest
+              </button>
+            ) : null}
+          </>
+        )}
       </aside>
-      ) : null}
       </div>
 
       <AnimatePresence>
@@ -1337,7 +1452,7 @@ export function GreekVerseQuestClient() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[66] flex min-h-0 items-end"
+            className="absolute inset-0 z-[66] flex min-h-0 items-end lg:hidden"
           >
             <button
               type="button"
