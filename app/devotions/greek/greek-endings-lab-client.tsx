@@ -9,7 +9,8 @@ import { GreekSectionQuickNav } from "@/app/devotions/greek/greek-section-quick-
 import { recordGreekStudyEvent } from "@/lib/devotions-greek-progress"
 import { buildEndingsQuestChoices } from "@/lib/greek-endings-quest-utils"
 import { ENDINGS_QUESTS } from "@/lib/greek-endings-quest-data"
-import { ENDINGS_SECTIONS, ENDINGS_TABLES, GRAMMAR_GLOSSARY } from "@/lib/greek-endings-reference"
+import { GrammarGlossaryTerms } from "@/app/devotions/greek/grammar-glossary-terms"
+import { ENDINGS_SECTIONS, ENDINGS_TABLES } from "@/lib/greek-endings-reference"
 
 export { ENDINGS_SECTIONS, ENDINGS_TABLES, type EndingsSection } from "@/lib/greek-endings-reference"
 export { buildEndingsQuestChoices, buildEndingsQuestKey } from "@/lib/greek-endings-quest-utils"
@@ -202,22 +203,8 @@ export function GreekEndingsLabClient() {
           ))}
         </section>
 
-        <section className="mt-6 rounded-2xl border border-cyan-400/30 bg-cyan-500/[0.07] p-4 sm:p-5">
-          <div className="mb-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/90">What these grammar words mean</p>
-            <p className="mt-1 text-sm text-white/82">
-              Quick plain-English definitions so terms like genitive and dative stop feeling abstract.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {GRAMMAR_GLOSSARY.map((item) => (
-              <article key={item.term} className="rounded-xl border border-white/12 bg-black/30 p-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-100/90">{item.term}</p>
-                <p className="mt-1 text-sm text-white/88">{item.plainMeaning}</p>
-                <p className="mt-1 text-xs text-white/65">{item.quickExample}</p>
-              </article>
-            ))}
-          </div>
+        <section className="mt-6">
+          <GrammarGlossaryTerms layout="grid" showIntro />
         </section>
 
         <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.07] p-4 sm:p-5">

@@ -20,13 +20,14 @@ import {
   recordGreekWordMemoryTap,
 } from "@/lib/devotions-greek-word-memory"
 import { normalizeGreekLemma } from "@/lib/bible/greek-lemma-english-quiz"
-import { ENDINGS_TABLES, GRAMMAR_GLOSSARY } from "@/lib/greek-endings-reference"
+import { ENDINGS_TABLES } from "@/lib/greek-endings-reference"
 import {
   playQuestFeedbackSound,
   todayDateKey,
   vibrateQuest,
 } from "@/app/devotions/greek/greek-verse-quest-logic"
 
+import { GrammarGlossaryTerms } from "@/app/devotions/greek/grammar-glossary-terms"
 import { PracticeLayout } from "@/app/devotions/greek/greek-practice-layout"
 import { buildStudyCoachProgressDigest } from "@/lib/greek-study-coach-context"
 import { cn } from "@/lib/utils"
@@ -96,20 +97,6 @@ function EndingTablesScroll() {
               </tbody>
             </table>
           </div>
-        </article>
-      ))}
-    </div>
-  )
-}
-
-function GrammarGlossaryScroll() {
-  return (
-    <div className="space-y-2">
-      {GRAMMAR_GLOSSARY.map((item) => (
-        <article key={item.term} className="rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-3">
-          <p className="text-xs font-medium text-cyan-200/90">{item.term}</p>
-          <p className="mt-1 text-sm text-white/82">{item.plainMeaning}</p>
-          <p className="mt-1 text-[11px] text-white/55">{item.quickExample}</p>
         </article>
       ))}
     </div>
@@ -447,7 +434,7 @@ export function GreekLessonLabClient() {
           ) : menuPanel === "tables" ? (
             <EndingTablesScroll />
           ) : (
-            <GrammarGlossaryScroll />
+            <GrammarGlossaryTerms layout="stack" className="px-0.5" />
           )}
         </div>
       </GreekStudyMenuShell>

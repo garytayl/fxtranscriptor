@@ -136,13 +136,17 @@ export type GrammarGlossaryItem = {
 export const GRAMMAR_GLOSSARY: GrammarGlossaryItem[] = [
   {
     term: "Nominative",
-    plainMeaning: "Usually the subject - who/what is doing the action.",
-    quickExample: "ὁ ἄνθρωπος γράφει -> 'the man writes' (man = subject).",
+    plainMeaning:
+      "The subject case: who or what performs the verb, or what the clause is about. In equative sentences ('X is Y'), both the subject and the predicate noun or adjective are usually nominative so they match the same entity.",
+    quickExample:
+      "ὁ ἄνθρωπος γράφει -> 'the man writes': ἄνθρωπος is nominative because he is the doer. ὁ θεὸς ἀγάπη ἐστίν -> 'God is love': θεός and ἀγάπη both stay nominative because they name the same thing from two angles.",
   },
   {
     term: "Genitive",
-    plainMeaning: "Usually possession or source - often 'of'.",
-    quickExample: "λόγος θεοῦ -> 'word of God'.",
+    plainMeaning:
+      "Marks source, owner, or 'belongs to' relationships—English often uses 'of,' 'from,' or possessive 's.' It can also be partitive ('some of the crowd') or depend on certain verbs and prepositions that simply take the genitive in Greek.",
+    quickExample:
+      "λόγος θεοῦ -> 'word of God': God is the source or possessor. μέρος τῶν μαθητῶν -> 'part of the disciples': partitive—out of the whole group. Many prepositions (e.g. ἐκ, ἀπό) govern the genitive.",
   },
   {
     term: "Dative",
@@ -153,27 +157,37 @@ export const GRAMMAR_GLOSSARY: GrammarGlossaryItem[] = [
   },
   {
     term: "Accusative",
-    plainMeaning: "Usually direct object - who/what receives the action.",
-    quickExample: "βλέπω τὸν ἄνθρωπον -> 'I see the man'.",
+    plainMeaning:
+      "The direct object case: whoever or whatever the verb most directly acts on—what you see, send, love, or teach as the content of the action. Also used for extent (how far, how long) and as the object of many prepositions (e.g. motion into εἰς + accusative).",
+    quickExample:
+      "βλέπω τὸν ἄνθρωπον -> 'I see the man': he is what is seen. ἀγαπᾷ τὸν κόσμον -> 'he loves the world': the world is the direct object. εἰς τὸν οἶκον -> 'into the house': οἶκον is accusative after εἰς.",
   },
   {
     term: "Tense",
-    plainMeaning: "The kind of action (ongoing, completed, simple snapshot, etc.).",
-    quickExample: "Present often feels ongoing; aorist often feels like a whole event.",
+    plainMeaning:
+      "Greek tense often signals how an action is viewed—ongoing, completed as a whole, background, or with lasting result—not a one-to-one map to English past/present/future. Translators choose English tense from context; your job is to notice the Greek 'camera angle.'",
+    quickExample:
+      "Present indicative is often progressive ('is walking') but can be gnomic or customary ('lions devour prey'). Aorist often presents one bounded event ('he spoke' as a whole). Perfect ties a completed action to a present state or result.",
   },
   {
     term: "Voice",
-    plainMeaning: "How subject relates to action (does it, receives it, or acts with stake in it).",
-    quickExample: "Active = 'he writes', passive = 'he is written/treated'.",
+    plainMeaning:
+      "Active: the subject does the action. Passive: the subject is acted upon. Middle (and many 'deponent' verbs that look middle or passive in form) often carries reflexive, self-interest, or process nuance—English may still use an active translation, so learn verbs in context.",
+    quickExample:
+      "Active γράφει -> 'he writes.' Passive γράφεται -> 'it is written' or 'he is being written about,' depending on context. Many NT verbs have middle forms but read like actives in English—endings flag form; lexicons flag meaning.",
   },
   {
     term: "Mood",
-    plainMeaning: "How the verb is framed (statement, command, wish, possibility).",
-    quickExample: "Indicative states facts; imperative gives commands.",
+    plainMeaning:
+      "Mood is what the verb is doing in the sentence: stating a fact or question (indicative), giving a command (imperative), expressing purpose, fear, or uncertainty (subjunctive), or (rarely in the NT) a polite wish or potential (optative).",
+    quickExample:
+      "λύει -> 'he looses' (indicative, plain statement). λῦσον -> 'loose!' (imperative). ἵνα λύσῃ -> 'so that he might loose' (purpose; subjunctive after ἵνα). Moods show up in main clauses and in subordinate clauses alike.",
   },
   {
     term: "Person + Number",
-    plainMeaning: "Who is involved and how many (I/you/he, singular/plural).",
-    quickExample: "-ω = I..., -εις = you..., -ομεν = we....",
+    plainMeaning:
+      "Person is viewpoint: I / you / he-she-it. Number is how many 'actors' share that ending (singular vs plural). Greek finite verbs spell out person and number in the ending, so explicit pronouns are often omitted unless emphasized.",
+    quickExample:
+      "λύω 'I loose,' λύεις 'you (sg.) loose,' λύει 'he/she/it looses,' λύομεν 'we loose,' λύετε 'you (pl.) loose,' λύουσι(ν) 'they loose.' Same verb stem, different suffix—always check who the ending points to before you translate.",
   },
 ]
