@@ -7,6 +7,7 @@ import {
   BookOpen,
   Gamepad2,
   GraduationCap,
+  Languages,
   Library,
   MapPin,
   MessageCircle,
@@ -70,6 +71,14 @@ const TILES: {
     blurb: "Every form you have practiced—filter, search, and review.",
     icon: Library,
     className: "border-white/18 bg-white/[0.05] hover:bg-white/[0.1] text-white/90",
+  },
+  {
+    href: "/devotions/greek/english-search",
+    title: "English → Greek",
+    blurb: "Type an English idea (e.g. love, faith) and browse matching Greek lemmas and lexicon.",
+    icon: Languages,
+    className:
+      "border-violet-400/35 bg-violet-500/10 hover:bg-violet-500/18 text-violet-100",
   },
   {
     href: "/devotions/greek/coach",

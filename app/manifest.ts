@@ -42,6 +42,13 @@ export default function manifest(): MetadataRoute.Manifest {
         url: "/devotions/greek/coach",
         icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
       },
+      {
+        name: "English to Greek lemmas",
+        short_name: "EN→GR",
+        description: "Search Greek lemmas by English gloss",
+        url: "/devotions/greek/english-search",
+        icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
+      },
     ],
   }
 }
