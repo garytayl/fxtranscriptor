@@ -68,7 +68,7 @@ export function GreekProgressStrip({
 
   if (!snap) return null
 
-  const goalPct = Math.min(100, (snap.todayXp / Math.max(1, snap.dailyGoalXp)) * 100)
+  const nextLevel = snap.level + 1
 
   return (
     <div
@@ -85,10 +85,10 @@ export function GreekProgressStrip({
           <span className="text-white/70">{snap.streak} day streak</span>
         </p>
         <p className="font-mono text-[10px] text-white/60">
-          Today {snap.todayXp}/{snap.dailyGoalXp} XP
-          {snap.dailyGoalReached ? (
-            <span className="ml-1.5 text-emerald-300/90">Goal met</span>
-          ) : null}
+          <span className="text-white/45">To L{nextLevel}</span>{" "}
+          <span className="tabular-nums text-white/75">
+            {snap.currentLevelXp}/{snap.nextLevelXp} XP
+          </span>
         </p>
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
@@ -96,19 +96,19 @@ export function GreekProgressStrip({
           key={xpPulse}
           className={cn("h-full rounded-full bg-gradient-to-r", accentBar[accent])}
           style={{ width: `${snap.levelProgressPct}%` }}
-          title="Progress toward next level"
+          title={`Progress toward level ${nextLevel}`}
           animate={{ filter: ["brightness(1)", "brightness(1.45)", "brightness(1)"] }}
           transition={{ duration: 0.65, ease: "easeOut" }}
         />
       </div>
       <p className="mt-1.5 font-mono text-[9px] text-white/40">
-        Daily goal bar: {Math.round(goalPct)}% · {snap.uniqueWordForms} word forms tracked
+        Next level {Math.round(snap.levelProgressPct)}% · {snap.uniqueWordForms} word forms tracked
       </p>
     </div>
   )
 }
 
-/** Minimal practice chrome: one row of stats + daily XP bar (no level-up bar). */
+/** Minimal practice chrome: level progress row + bar toward next level. */
 export function SlimPracticeBar({
   accent = "emerald",
   className,
@@ -153,7 +153,7 @@ export function SlimPracticeBar({
 
   if (!snap) return null
 
-  const goalPct = Math.min(100, (snap.todayXp / Math.max(1, snap.dailyGoalXp)) * 100)
+  const nextLevel = snap.level + 1
 
   return (
     <div className={cn("border-b border-white/10 bg-black/25 px-3 py-2 sm:px-4", className)}>
@@ -163,16 +163,19 @@ export function SlimPracticeBar({
           <span className="mx-1.5 text-white/30">·</span>
           {snap.streak}d
         </span>
-        <span className="tabular-nums text-white/60">
-          {snap.todayXp}/{snap.dailyGoalXp} XP
-          {snap.dailyGoalReached ? <span className="ml-1.5 text-emerald-400/90">Done</span> : null}
+        <span className="text-right font-mono text-[11px] text-white/60">
+          <span className="text-white/45">L{nextLevel}</span>{" "}
+          <span className="tabular-nums text-white/80">
+            {snap.currentLevelXp}/{snap.nextLevelXp}
+          </span>
         </span>
       </div>
       <div className="mx-auto mt-1.5 h-1 max-w-2xl overflow-hidden rounded-full bg-white/10">
         <motion.div
           key={xpPulse}
           className={cn("h-full rounded-full bg-gradient-to-r transition-[width]", accentBar[accent])}
-          style={{ width: `${goalPct}%` }}
+          style={{ width: `${snap.levelProgressPct}%` }}
+          title={`Progress toward level ${nextLevel}`}
           animate={{ filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         />

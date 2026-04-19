@@ -834,7 +834,7 @@ export function GreekVerseQuestClient() {
     }
   }, [questQuizFeedback, questChallenge, selectedWordIndex])
 
-  const dailyXpPct = Math.max(0, Math.min(100, (progress.todayXp / progress.dailyGoalXp) * 100))
+  const careerLevelPct = Math.max(0, Math.min(100, progress.levelProgressPct))
 
   return (
     <PracticeLayout
@@ -877,12 +877,17 @@ export function GreekVerseQuestClient() {
           </div>
           <div className="grid grid-cols-2 gap-3 px-2 sm:gap-4">
             <div className="min-w-0 space-y-1">
-              <p className="text-[10px] text-white/45">Today&apos;s XP</p>
+              <p className="text-[10px] text-white/45">
+                Next level{" "}
+                <span className="tabular-nums text-white/55">
+                  ({progress.currentLevelXp}/{progress.nextLevelXp} XP)
+                </span>
+              </p>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
                 <motion.div
                   key={xpPulse}
                   className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
-                  style={{ width: `${dailyXpPct}%` }}
+                  style={{ width: `${careerLevelPct}%` }}
                   animate={{ filter: ["brightness(1)", "brightness(1.55)", "brightness(1)"] }}
                   transition={{ duration: 0.55, ease: "easeOut" }}
                 />

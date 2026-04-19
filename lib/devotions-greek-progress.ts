@@ -116,12 +116,6 @@ export type GreekXpAwardDetail = {
   level: number
   previousLevel: number
   totalXp: number
-  /** True when this award pushed today's XP from below the daily goal to at or above it. */
-  dailyGoalJustMet: boolean
-  /** Today's running XP total after this award. */
-  todayXp: number
-  /** Configured daily XP target. */
-  dailyGoalXp: number
 }
 
 export type RecordGreekStudyResult = {
@@ -233,8 +227,6 @@ export function recordGreekStudyEvent(event: GreekProgressEvent): RecordGreekStu
   const progress = getGreekStudyProgress()
   const levelBefore = levelFromXp(progress.totalXp)
   const today = todayStr()
-  const todayXpBeforeAward = progress.dailyXpByDate[today] ?? 0
-  const dailyGoalXp = progress.dailyGoalXp
   const dayAlreadyTracked = progress.daysActive[0] === today
   const daysActive = dayAlreadyTracked
     ? progress.daysActive
@@ -292,9 +284,6 @@ export function recordGreekStudyEvent(event: GreekProgressEvent): RecordGreekStu
 
   const levelAfter = levelFromXp(pruned.totalXp)
   const leveledUp = levelAfter > levelBefore
-  const todayXpAfterAward = pruned.dailyXpByDate[today] ?? 0
-  const dailyGoalJustMet =
-    awardedXp > 0 && todayXpBeforeAward < dailyGoalXp && todayXpAfterAward >= pruned.dailyGoalXp
   let awardDetail: GreekXpAwardDetail | undefined
   if (typeof window !== "undefined" && awardedXp > 0) {
     awardDetail = {
@@ -303,9 +292,6 @@ export function recordGreekStudyEvent(event: GreekProgressEvent): RecordGreekStu
       level: levelAfter,
       previousLevel: levelBefore,
       totalXp: pruned.totalXp,
-      dailyGoalJustMet,
-      todayXp: todayXpAfterAward,
-      dailyGoalXp: pruned.dailyGoalXp,
     }
     if (typeof window.dispatchEvent === "function") {
       window.dispatchEvent(new CustomEvent<GreekXpAwardDetail>(GREEK_XP_AWARD_EVENT, { detail: awardDetail }))

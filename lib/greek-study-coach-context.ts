@@ -48,7 +48,7 @@ export function buildStudyCoachProgressDigestFromState(
     `Level ${snapshot.level} · Total XP ${snapshot.totalXp} · Streak ${snapshot.streak} day(s) · Unique word forms in bank: ${snapshot.uniqueWordForms}`,
   )
   lines.push(
-    `Today: ${snapshot.todayXp}/${snapshot.dailyGoalXp} XP (daily goal ${snapshot.dailyGoalReached ? "met" : "not met yet"})`,
+    `Toward level ${snapshot.level + 1}: ${snapshot.currentLevelXp}/${snapshot.nextLevelXp} XP in this level (${Math.round(snapshot.levelProgressPct)}%)`,
   )
   lines.push(`Sessions / verses / words / coach events today: ${snapshot.sessionsToday} / ${snapshot.versesToday} / ${snapshot.wordsToday} / ${snapshot.coachToday}`)
   lines.push(`Next focus milestone: "${milestone.title}" (${milestone.progressPct}% toward it) — ${milestone.detail}`)

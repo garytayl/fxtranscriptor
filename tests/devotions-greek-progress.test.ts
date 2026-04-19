@@ -83,20 +83,6 @@ describe("devotions greek progress", () => {
       expect(snap.uniqueWordForms).toBe(2)
     }))
 
-  it("sets dailyGoalJustMet when an award crosses the daily XP threshold", () =>
-    withWindow(() => {
-      recordGreekStudyEvent({ kind: "session", key: "open-1", xp: 50 })
-      recordGreekStudyEvent({ kind: "session", key: "open-2", xp: 50 })
-      const cross = recordGreekStudyEvent({ kind: "verse", key: "luke-6-10", xp: 27 })
-      expect(cross.awardDetail?.dailyGoalJustMet).toBe(true)
-      expect(cross.awardDetail?.todayXp).toBe(127)
-      expect(cross.awardDetail?.dailyGoalXp).toBe(120)
-
-      const after = recordGreekStudyEvent({ kind: "verse", key: "luke-6-11", xp: 10 })
-      expect(after.awardDetail?.dailyGoalJustMet).toBe(false)
-      expect(after.awardDetail?.todayXp).toBe(137)
-    }))
-
   it("computes level and streak from stored progress", () => {
     const { today, yesterday } = todayAndYesterday()
     const progress: GreekStudyProgress = {
