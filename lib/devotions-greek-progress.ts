@@ -107,6 +107,35 @@ function safeParse(raw: string | null): GreekStudyProgress {
 
 export const GREEK_PROGRESS_BROADCAST_CHANNEL = "fx-greek-progress"
 
+/** Dispatched on `window` when new XP is recorded (client only). */
+export const GREEK_XP_AWARD_EVENT = "fx-greek-xp-award"
+
+export type GreekXpAwardDetail = {
+  awardedXp: number
+  leveledUp: boolean
+  level: number
+  previousLevel: number
+  totalXp: number
+}
+
+export type RecordGreekStudyResult = {
+  progress: GreekStudyProgress
+  awardedXp: number
+  /** Set when `awardedXp > 0` (browser only). */
+  awardDetail?: GreekXpAwardDetail
+}
+
+/** Subscribe to XP celebrations (same source as `recordGreekStudyEvent` dispatches). No-op on server. */
+export function subscribeGreekXpAwards(handler: (detail: GreekXpAwardDetail) => void): () => void {
+  if (typeof window === "undefined") return () => {}
+  const listener = (e: Event) => {
+    const ce = e as CustomEvent<GreekXpAwardDetail>
+    if (ce.detail && ce.detail.awardedXp > 0) handler(ce.detail)
+  }
+  window.addEventListener(GREEK_XP_AWARD_EVENT, listener)
+  return () => window.removeEventListener(GREEK_XP_AWARD_EVENT, listener)
+}
+
 let progressBroadcast: BroadcastChannel | null = null
 
 function broadcastGreekProgressChanged() {
@@ -194,8 +223,9 @@ export function getGreekStudyProgress(): GreekStudyProgress {
   return safeParse(window.localStorage.getItem(GREEK_PROGRESS_KEY))
 }
 
-export function recordGreekStudyEvent(event: GreekProgressEvent): { progress: GreekStudyProgress; awardedXp: number } {
+export function recordGreekStudyEvent(event: GreekProgressEvent): RecordGreekStudyResult {
   const progress = getGreekStudyProgress()
+  const levelBefore = levelFromXp(progress.totalXp)
   const today = todayStr()
   const dayAlreadyTracked = progress.daysActive[0] === today
   const daysActive = dayAlreadyTracked
@@ -251,7 +281,24 @@ export function recordGreekStudyEvent(event: GreekProgressEvent): { progress: Gr
 
   const pruned = pruneDateMaps(updated)
   saveGreekStudyProgress(pruned)
-  return { progress: pruned, awardedXp }
+
+  const levelAfter = levelFromXp(pruned.totalXp)
+  const leveledUp = levelAfter > levelBefore
+  let awardDetail: GreekXpAwardDetail | undefined
+  if (typeof window !== "undefined" && awardedXp > 0) {
+    awardDetail = {
+      awardedXp,
+      leveledUp,
+      level: levelAfter,
+      previousLevel: levelBefore,
+      totalXp: pruned.totalXp,
+    }
+    if (typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new CustomEvent<GreekXpAwardDetail>(GREEK_XP_AWARD_EVENT, { detail: awardDetail }))
+    }
+  }
+
+  return { progress: pruned, awardedXp, awardDetail }
 }
 
 export function getGreekProgressSnapshot(progress: GreekStudyProgress): GreekProgressSnapshot {

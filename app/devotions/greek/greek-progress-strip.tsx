@@ -1,11 +1,13 @@
 "use client"
 
+import { motion } from "framer-motion"
 import { useCallback, useEffect, useLayoutEffect, useState } from "react"
 
 import {
   getGreekProgressSnapshot,
   getGreekStudyProgress,
   GREEK_PROGRESS_BROADCAST_CHANNEL,
+  subscribeGreekXpAwards,
   type GreekProgressSnapshot,
 } from "@/lib/devotions-greek-progress"
 import { cn } from "@/lib/utils"
@@ -30,6 +32,7 @@ export function GreekProgressStrip({
   dense?: boolean
 }) {
   const [snap, setSnap] = useState<GreekProgressSnapshot | null>(null)
+  const [xpPulse, setXpPulse] = useState(0)
 
   const refresh = useCallback(() => {
     setSnap(getGreekProgressSnapshot(getGreekStudyProgress()))
@@ -58,6 +61,10 @@ export function GreekProgressStrip({
     ch.onmessage = () => refresh()
     return () => ch.close()
   }, [refresh])
+
+  useEffect(() => {
+    return subscribeGreekXpAwards(() => setXpPulse((n) => n + 1))
+  }, [])
 
   if (!snap) return null
 
@@ -85,10 +92,13 @@ export function GreekProgressStrip({
         </p>
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-        <div
+        <motion.div
+          key={xpPulse}
           className={cn("h-full rounded-full bg-gradient-to-r", accentBar[accent])}
           style={{ width: `${snap.levelProgressPct}%` }}
           title="Progress toward next level"
+          animate={{ filter: ["brightness(1)", "brightness(1.45)", "brightness(1)"] }}
+          transition={{ duration: 0.65, ease: "easeOut" }}
         />
       </div>
       <p className="mt-1.5 font-mono text-[9px] text-white/40">
@@ -107,6 +117,7 @@ export function SlimPracticeBar({
   className?: string
 }) {
   const [snap, setSnap] = useState<GreekProgressSnapshot | null>(null)
+  const [xpPulse, setXpPulse] = useState(0)
 
   const refresh = useCallback(() => {
     setSnap(getGreekProgressSnapshot(getGreekStudyProgress()))
@@ -136,6 +147,10 @@ export function SlimPracticeBar({
     return () => ch.close()
   }, [refresh])
 
+  useEffect(() => {
+    return subscribeGreekXpAwards(() => setXpPulse((n) => n + 1))
+  }, [])
+
   if (!snap) return null
 
   const goalPct = Math.min(100, (snap.todayXp / Math.max(1, snap.dailyGoalXp)) * 100)
@@ -154,9 +169,12 @@ export function SlimPracticeBar({
         </span>
       </div>
       <div className="mx-auto mt-1.5 h-1 max-w-2xl overflow-hidden rounded-full bg-white/10">
-        <div
+        <motion.div
+          key={xpPulse}
           className={cn("h-full rounded-full bg-gradient-to-r transition-[width]", accentBar[accent])}
           style={{ width: `${goalPct}%` }}
+          animate={{ filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
         />
       </div>
     </div>

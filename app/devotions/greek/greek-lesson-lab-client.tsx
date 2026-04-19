@@ -376,15 +376,24 @@ export function GreekLessonLabClient() {
                   }
                   const disabled = revealed || (wrongCount === 1 && isSel && !isCorrect)
                   return (
-                    <button
+                    <motion.button
                       key={`${card.index}-${i}-${opt}`}
                       type="button"
                       disabled={disabled}
                       onClick={() => onChoose(i)}
                       className={btnClass}
+                      whileTap={disabled ? undefined : { scale: 0.985 }}
+                      animate={
+                        revealed && isCorrect
+                          ? { scale: [1, 1.04, 1] }
+                          : revealed && isSel && !isCorrect
+                            ? { x: [0, -5, 5, -3, 0] }
+                            : { scale: 1, x: 0 }
+                      }
+                      transition={{ duration: 0.38, ease: "easeOut" }}
                     >
                       {opt}
-                    </button>
+                    </motion.button>
                   )
                 })}
               </div>

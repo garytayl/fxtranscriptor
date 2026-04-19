@@ -27,6 +27,7 @@ import {
   getGreekProgressSnapshot,
   getGreekStudyProgress,
   recordGreekStudyEvent,
+  subscribeGreekXpAwards,
   type GreekProgressSnapshot,
 } from "@/lib/devotions-greek-progress"
 import {
@@ -138,7 +139,7 @@ export function GreekVerseQuestClient() {
   const [progress, setProgress] = useState<GreekProgressSnapshot>(() =>
     getGreekProgressSnapshot(getGreekStudyProgress()),
   )
-  const [xpBurst, setXpBurst] = useState<number | null>(null)
+  const [xpPulse, setXpPulse] = useState(0)
   const todayKey = useMemo(() => todayDateKey(), [])
   const [questTrack, setQuestTrack] = useState<QuestTrackState>(() => loadQuestTrack())
   const seriesPlan = useMemo(() => {
@@ -202,11 +203,16 @@ export function GreekVerseQuestClient() {
     (event: Parameters<typeof recordGreekStudyEvent>[0]) => {
       const { progress: updated, awardedXp } = recordGreekStudyEvent(event)
       setProgress(getGreekProgressSnapshot(updated))
-      if (awardedXp > 0) setXpBurst(awardedXp)
       return awardedXp
     },
     [],
   )
+
+  useEffect(() => {
+    return subscribeGreekXpAwards((d) => {
+      if (d.awardedXp > 0) setXpPulse((n) => n + 1)
+    })
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -218,12 +224,6 @@ export function GreekVerseQuestClient() {
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
   }, [refreshProgress, refreshWordMemory])
-
-  useEffect(() => {
-    if (xpBurst == null) return
-    const t = window.setTimeout(() => setXpBurst(null), 1300)
-    return () => window.clearTimeout(t)
-  }, [xpBurst])
 
   useEffect(() => {
     if (!microWinBurst) return
@@ -880,10 +880,11 @@ export function GreekVerseQuestClient() {
               <p className="text-[10px] text-white/45">Today&apos;s XP</p>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/12">
                 <motion.div
+                  key={xpPulse}
                   className="h-full rounded-full bg-gradient-to-r from-amber-300/85 via-emerald-300/90 to-cyan-300/80"
                   style={{ width: `${dailyXpPct}%` }}
-                  animate={xpBurst != null ? { filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"] } : undefined}
-                  transition={xpBurst != null ? { duration: 0.4 } : undefined}
+                  animate={{ filter: ["brightness(1)", "brightness(1.55)", "brightness(1)"] }}
+                  transition={{ duration: 0.55, ease: "easeOut" }}
                 />
               </div>
             </div>
@@ -920,7 +921,7 @@ export function GreekVerseQuestClient() {
               </p>
             </div>
           </motion.aside>
-        ) : xpBurst != null || microWinBurst ? (
+        ) : microWinBurst ? (
           <motion.aside
             key="burst-hud"
             initial={{ opacity: 0, height: 0 }}
@@ -931,20 +932,9 @@ export function GreekVerseQuestClient() {
             aria-live="polite"
           >
             <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1">
-              {microWinBurst ? (
-                <p className="min-w-0 flex-1 font-mono text-[10px] uppercase leading-snug tracking-[0.14em] text-cyan-100/95">
-                  {microWinBurst}
-                </p>
-              ) : null}
-              {xpBurst != null ? (
-                <p
-                  className={`shrink-0 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-200/95 ${
-                    microWinBurst ? "sm:ml-auto" : ""
-                  }`}
-                >
-                  +{xpBurst} XP
-                </p>
-              ) : null}
+              <p className="min-w-0 flex-1 font-mono text-[10px] uppercase leading-snug tracking-[0.14em] text-cyan-100/95">
+                {microWinBurst}
+              </p>
             </div>
           </motion.aside>
         ) : null}

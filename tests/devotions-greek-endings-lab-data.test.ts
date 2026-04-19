@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import { ENDINGS_TABLES, buildEndingsQuestChoices } from "@/app/devotions/greek/greek-endings-lab-client"
+import { buildEndingsQuestChoices } from "@/lib/greek-endings-quest-utils"
+import { ENDINGS_TABLES } from "@/lib/greek-endings-reference"
 import { ENDINGS_QUESTS } from "@/lib/greek-endings-quest-data"
 
 describe("Greek Endings Lab data", () => {
