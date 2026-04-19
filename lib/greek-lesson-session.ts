@@ -292,14 +292,17 @@ function rootDraftFromPool(rng: () => number): Extract<LessonDraft, { kind: "roo
   shuffleInPlace(options, rng)
   const correctIndex = options.indexOf(correct.meaning)
 
-  const hasExample = Boolean(correct.exampleGreek && correct.exampleGloss)
-  const prompt = hasExample
-    ? `The element “${correct.form}” shows up in words like ${correct.exampleGreek} (“${correct.exampleGloss}”). What core idea does this root carry?`
+  const exampleGreek = correct.exampleGreek?.trim() ?? ""
+  const hasExampleGreek = exampleGreek.length > 0
+  const prompt = hasExampleGreek
+    ? `The element “${correct.form}” shows up in words like ${exampleGreek}. What core idea does this root carry?`
     : `The building block “${correct.form}” appears in many biblical Greek words. What is its usual sense?`
 
   let explainer = `“${correct.form}” → ${correct.meaning}.`
-  if (hasExample) {
-    explainer += ` You saw it in ${correct.exampleGreek} ≈ ‘${correct.exampleGloss}.’`
+  if (hasExampleGreek) {
+    explainer += correct.exampleGloss
+      ? ` Example: ${exampleGreek} is often rendered ‘${correct.exampleGloss}’ in English.`
+      : ` Example word: ${exampleGreek}.`
   }
   if (correct.note) explainer += ` ${correct.note}`
 
